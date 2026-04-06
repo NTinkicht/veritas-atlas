@@ -1,0 +1,16 @@
+$kind: http-request
+name: Submit Review
+method: POST
+url: '{{baseUrl}}/api/v1/reviews'
+order: 2000
+headers:
+  - key: Content-Type
+    value: application/json
+body:
+  type: json
+  content: |-
+    {
+      "caseId": "00000000-0000-0000-0000-000000000000",
+      "submittedBy": "analyst@example.com",
+      "notes": "Ready for editorial review."
+    }

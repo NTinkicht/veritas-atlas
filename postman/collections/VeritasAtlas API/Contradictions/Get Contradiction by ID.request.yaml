@@ -1,0 +1,5 @@
+$kind: http-request
+name: Get Contradiction by ID
+method: GET
+url: '{{baseUrl}}/api/v1/contradictions/{{contradictionId}}'
+order: 2000

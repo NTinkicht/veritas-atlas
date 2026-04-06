@@ -1,0 +1,22 @@
+$kind: http-request
+name: Get Statements
+method: GET
+url: '{{baseUrl}}/api/v1/statements'
+order: 1000
+queryParams:
+  - key: page
+    value: '1'
+  - key: pageSize
+    value: '20'
+  - key: search
+    value: ''
+    disabled: true
+  - key: personId
+    value: ''
+    disabled: true
+  - key: sourceId
+    value: ''
+    disabled: true
+  - key: status
+    value: ''
+    disabled: true

@@ -1,0 +1,15 @@
+$kind: http-request
+name: Reject Case
+method: POST
+url: '{{baseUrl}}/api/v1/cases/{{caseId}}/reject'
+order: 6000
+headers:
+  - key: Content-Type
+    value: application/json
+body:
+  type: json
+  content: |-
+    {
+      "rejectedBy": "reviewer@example.com",
+      "notes": "Rejected due to insufficient evidence."
+    }

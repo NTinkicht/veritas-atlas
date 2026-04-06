@@ -1,0 +1,20 @@
+$kind: http-request
+name: Get Cases
+method: GET
+url: '{{baseUrl}}/api/v1/cases'
+order: 1000
+queryParams:
+  - key: page
+    value: '1'
+  - key: pageSize
+    value: '20'
+  - key: status
+    value: ''
+    disabled: true
+  - key: search
+    value: ''
+    disabled: true
+  - key: sortBy
+    value: CreatedAt
+  - key: sortDirection
+    value: desc

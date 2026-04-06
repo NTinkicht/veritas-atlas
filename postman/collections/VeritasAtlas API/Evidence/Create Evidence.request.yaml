@@ -1,0 +1,19 @@
+$kind: http-request
+name: Create Evidence
+method: POST
+url: '{{baseUrl}}/api/v1/evidence'
+order: 3000
+headers:
+  - key: Content-Type
+    value: application/json
+body:
+  type: json
+  content: |-
+    {
+      "documentId": "00000000-0000-0000-0000-000000000000",
+      "quote": "The government increased spending by 10% last year.",
+      "startOffset": 0,
+      "endOffset": 52,
+      "context": "Paragraph 3 of the press release.",
+      "createdBy": "user@example.com"
+    }

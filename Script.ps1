@@ -5,15 +5,15 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-function Remove-FileIfExists {
+function Ensure-Directory {
     param([Parameter(Mandatory = $true)][string]$Path)
 
-    if (Test-Path $Path) {
-        Remove-Item -Path $Path -Force
-        Write-Host "Removed: $Path"
+    if ([string]::IsNullOrWhiteSpace($Path)) {
+        throw "Ensure-Directory received an empty path."
     }
-    else {
-        Write-Host "Already absent: $Path"
+
+    if (-not (Test-Path $Path)) {
+        New-Item -ItemType Directory -Path $Path -Force | Out-Null
     }
 }
 
@@ -23,14 +23,40 @@ function Write-Utf8File {
         [Parameter(Mandatory = $true)][string]$Content
     )
 
-    $dir = Split-Path -Parent $Path
-    if (-not (Test-Path $dir)) {
-        New-Item -ItemType Directory -Path $dir -Force | Out-Null
+    if ([string]::IsNullOrWhiteSpace($Path)) {
+        throw "Write-Utf8File received an empty path."
     }
+
+    $dir = Split-Path -Parent $Path
+    Ensure-Directory -Path $dir
 
     $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
     [System.IO.File]::WriteAllText($Path, $Content, $utf8NoBom)
     Write-Host "Wrote: $Path"
+}
+
+function Git-Checkpoint {
+    param([Parameter(Mandatory = $true)][string]$Message)
+
+    Push-Location $RootDir
+    try {
+        if (Test-Path ".git") {
+            git add -A | Out-Null
+            git commit -m $Message 2>$null | Out-Null
+            if ($LASTEXITCODE -eq 0) {
+                Write-Host "Created git commit: $Message"
+            }
+            else {
+                Write-Host "No new commit created. Continuing."
+            }
+        }
+        else {
+            Write-Host "No git repo detected, skipping checkpoint."
+        }
+    }
+    finally {
+        Pop-Location
+    }
 }
 
 function Build-Backend {
@@ -43,13 +69,9 @@ function Build-Backend {
         Push-Location $RootDir
         try {
             dotnet build $solutionPath
-            if ($LASTEXITCODE -ne 0) {
-                throw "Backend build failed."
-            }
+            if ($LASTEXITCODE -ne 0) { throw "Backend build failed." }
         }
-        finally {
-            Pop-Location
-        }
+        finally { Pop-Location }
         return
     }
 
@@ -57,272 +79,445 @@ function Build-Backend {
         Push-Location $apiDir
         try {
             dotnet build
-            if ($LASTEXITCODE -ne 0) {
-                throw "Backend build failed."
-            }
+            if ($LASTEXITCODE -ne 0) { throw "Backend build failed." }
         }
-        finally {
-            Pop-Location
-        }
+        finally { Pop-Location }
         return
     }
 
     throw "Could not find solution or api directory."
 }
 
-$apiRoot = Join-Path $RootDir "apps\api"
+function Build-Frontend {
+    param([Parameter(Mandatory = $true)][string]$RootDir)
 
-# These files are duplicates and must be removed because the real definitions already live
-# in DomainEntities.cs and DomainEnums.cs.
-$duplicateEntityPath = Join-Path $apiRoot "VeritasAtlas.Domain\Entities\Contradiction.cs"
-$duplicateTypeEnumPath = Join-Path $apiRoot "VeritasAtlas.Domain\Enums\ContradictionType.cs"
-$duplicateSeverityEnumPath = Join-Path $apiRoot "VeritasAtlas.Domain\Enums\ContradictionSeverity.cs"
-$duplicateStatusEnumPath = Join-Path $apiRoot "VeritasAtlas.Domain\Enums\ContradictionStatus.cs"
-
-$servicePath = Join-Path $apiRoot "VeritasAtlas.Infrastructure\Services\ContradictionSliceService.cs"
-$controllerPath = Join-Path $apiRoot "VeritasAtlas.Api\Controllers\ContradictionsController.cs"
-
-Write-Host "Applying contradiction debug alignment fix..." -ForegroundColor Cyan
-
-Remove-FileIfExists -Path $duplicateEntityPath
-Remove-FileIfExists -Path $duplicateTypeEnumPath
-Remove-FileIfExists -Path $duplicateSeverityEnumPath
-Remove-FileIfExists -Path $duplicateStatusEnumPath
-
-Write-Utf8File -Path $servicePath -Content @'
-using Microsoft.EntityFrameworkCore;
-using VeritasAtlas.Domain.Entities;
-using VeritasAtlas.Domain.Enums;
-using VeritasAtlas.Infrastructure.Persistence;
-
-namespace VeritasAtlas.Infrastructure.Services;
-
-public sealed class ContradictionSliceService
-{
-    private readonly VeritasAtlasDbContext _dbContext;
-
-    public ContradictionSliceService(VeritasAtlasDbContext dbContext)
-    {
-        _dbContext = dbContext;
+    $frontendDir = Join-Path $RootDir "apps\web\veritas-atlas-web"
+    if (-not (Test-Path $frontendDir)) {
+        throw "Frontend directory not found: $frontendDir"
     }
 
-    public async Task<Contradiction> CreateContradictionAsync(
-        Guid primaryClaimId,
-        Guid secondaryClaimId,
-        string topic,
-        string summary,
-        string? contradictionType,
-        string? severity,
-        Guid? caseId,
-        CancellationToken cancellationToken = default)
-    {
-        var primaryClaim = await _dbContext.Claims
-            .AsNoTracking()
-            .FirstOrDefaultAsync(x => x.Id == primaryClaimId, cancellationToken);
+    Push-Location $frontendDir
+    try {
+        npm run build
+        if ($LASTEXITCODE -ne 0) { throw "Frontend build failed." }
+    }
+    finally { Pop-Location }
+}
 
-        var secondaryClaim = await _dbContext.Claims
-            .AsNoTracking()
-            .FirstOrDefaultAsync(x => x.Id == secondaryClaimId, cancellationToken);
+function Ensure-ImportLine {
+    param(
+        [Parameter(Mandatory = $true)][string]$Content,
+        [Parameter(Mandatory = $true)][string]$Anchor,
+        [Parameter(Mandatory = $true)][string]$ImportLine
+    )
 
-        if (primaryClaim is null)
-        {
-            throw new InvalidOperationException($"Primary claim '{primaryClaimId}' was not found.");
-        }
-
-        if (secondaryClaim is null)
-        {
-            throw new InvalidOperationException($"Secondary claim '{secondaryClaimId}' was not found.");
-        }
-
-        var parsedType = Enum.TryParse<ContradictionType>(contradictionType, true, out var contradictionTypeValue)
-            ? contradictionTypeValue
-            : ContradictionType.Direct;
-
-        var parsedSeverity = Enum.TryParse<ContradictionSeverity>(severity, true, out var contradictionSeverityValue)
-            ? contradictionSeverityValue
-            : ContradictionSeverity.Medium;
-
-        var resolvedCaseId = caseId ?? primaryClaim.CaseId ?? secondaryClaim.CaseId;
-        if (!resolvedCaseId.HasValue)
-        {
-            throw new InvalidOperationException("A contradiction requires a CaseId. Provide one explicitly or use claims already linked to a case.");
-        }
-
-        var entity = new Contradiction
-        {
-            CaseId = resolvedCaseId.Value,
-            LeftClaimId = primaryClaimId,
-            RightClaimId = secondaryClaimId,
-            Type = parsedType,
-            Severity = parsedSeverity,
-            Status = ContradictionStatus.Draft,
-            Summary = string.IsNullOrWhiteSpace(summary) ? topic.Trim() : summary.Trim(),
-            Rationale = null,
-            ConfidenceScoreId = null
-        };
-
-        _dbContext.Contradictions.Add(entity);
-        await _dbContext.SaveChangesAsync(cancellationToken);
-
-        return entity;
+    if ($Content -match [regex]::Escape($ImportLine)) {
+        return $Content
     }
 
-    public async Task<(int Total, List<Contradiction> Items)> GetContradictionsAsync(
-        int page,
-        int pageSize,
-        Guid? claimId = null,
-        Guid? caseId = null,
-        CancellationToken cancellationToken = default)
-    {
-        page = page < 1 ? 1 : page;
-        pageSize = pageSize < 1 ? 20 : pageSize;
+    return $Content -replace [regex]::Escape($Anchor), ($Anchor + [Environment]::NewLine + $ImportLine)
+}
 
-        IQueryable<Contradiction> query = _dbContext.Contradictions.AsNoTracking();
+function Ensure-NavBlock {
+    param(
+        [Parameter(Mandatory = $true)][string]$Content,
+        [Parameter(Mandatory = $true)][string]$Anchor,
+        [Parameter(Mandatory = $true)][string]$NavBlock,
+        [Parameter(Mandatory = $true)][string]$PresencePattern
+    )
 
-        if (claimId.HasValue)
-        {
-            query = query.Where(x => x.LeftClaimId == claimId.Value || x.RightClaimId == claimId.Value);
-        }
-
-        if (caseId.HasValue)
-        {
-            query = query.Where(x => x.CaseId == caseId.Value);
-        }
-
-        query = query.OrderByDescending(x => x.CreatedAtUtc);
-
-        var total = await query.CountAsync(cancellationToken);
-        var items = await query
-            .Skip((page - 1) * pageSize)
-            .Take(pageSize)
-            .ToListAsync(cancellationToken);
-
-        return (total, items);
+    if ($Content -match $PresencePattern) {
+        return $Content
     }
 
-    public async Task<Contradiction?> GetContradictionByIdAsync(
-        Guid id,
-        CancellationToken cancellationToken = default)
-    {
-        return await _dbContext.Contradictions
-            .AsNoTracking()
-            .FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
+    return $Content -replace [regex]::Escape($Anchor), ($Anchor + [Environment]::NewLine + $NavBlock)
+}
+
+function Ensure-RouteBlock {
+    param(
+        [Parameter(Mandatory = $true)][string]$Content,
+        [Parameter(Mandatory = $true)][string]$AnchorRoute,
+        [Parameter(Mandatory = $true)][string]$RouteBlock,
+        [Parameter(Mandatory = $true)][string]$PresencePattern
+    )
+
+    if ($Content -match $PresencePattern) {
+        return $Content
     }
+
+    return $Content -replace [regex]::Escape($AnchorRoute), ($AnchorRoute + [Environment]::NewLine + $RouteBlock)
+}
+
+Write-Host "Checkpointing current code with git..."
+Git-Checkpoint -Message ("checkpoint before phase 6.22 - " + (Get-Date -Format "yyyy-MM-dd HH:mm:ss"))
+
+Write-Host "Applying Phase 6.22 - UI one pass - Case Explorer and Contradiction Workbench..."
+
+$webRoot = Join-Path $RootDir "apps\web\veritas-atlas-web\src"
+
+$apiPath = Join-Path $webRoot "api\caseExplorer.ts"
+$hookPath = Join-Path $webRoot "hooks\useCaseExplorer.ts"
+$detailHookPath = Join-Path $webRoot "hooks\useCaseWorkbench.ts"
+$explorerPagePath = Join-Path $webRoot "pages\CaseExplorerPage.tsx"
+$workbenchPagePath = Join-Path $webRoot "pages\CaseWorkbenchPage.tsx"
+$summaryPanelPath = Join-Path $webRoot "components\CaseExplorerSummaryPanel.tsx"
+$queuePanelPath = Join-Path $webRoot "components\ContradictionQueuePanel.tsx"
+$mainPath = Join-Path $webRoot "main.tsx"
+
+Write-Utf8File -Path $apiPath -Content @'
+export type CaseExplorerItem = {
+  id: string;
+  status: string;
+  createdAtUtc: string;
+  createdBy?: string | null;
+};
+
+export type CaseExplorerResponse = {
+  items: CaseExplorerItem[];
+  page: number;
+  pageSize: number;
+  totalCount: number;
+  totalPages: number;
+};
+
+export async function getCaseExplorer(page = 1, pageSize = 50): Promise<CaseExplorerResponse> {
+  const response = await fetch(`/api/v1/cases?page=${page}&pageSize=${pageSize}`);
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(text || `HTTP ${response.status}`);
+  }
+
+  return response.json() as Promise<CaseExplorerResponse>;
 }
 '@
 
-Write-Utf8File -Path $controllerPath -Content @'
-using Microsoft.AspNetCore.Mvc;
-using VeritasAtlas.Api.Contracts.Contradictions;
-using VeritasAtlas.Infrastructure.Services;
+Write-Utf8File -Path $hookPath -Content @'
+import { useQuery } from "@tanstack/react-query";
+import { getCaseExplorer } from "../api/caseExplorer";
 
-namespace VeritasAtlas.Api.Controllers;
-
-[ApiController]
-[Route("api/v1/contradictions")]
-public sealed class ContradictionsController : ControllerBase
-{
-    private readonly ContradictionSliceService _contradictionSliceService;
-
-    public ContradictionsController(ContradictionSliceService contradictionSliceService)
-    {
-        _contradictionSliceService = contradictionSliceService;
-    }
-
-    [HttpPost]
-    public async Task<ActionResult<CreateContradictionResponse>> CreateContradiction(
-        [FromBody] CreateContradictionRequest request,
-        CancellationToken cancellationToken = default)
-    {
-        var entity = await _contradictionSliceService.CreateContradictionAsync(
-            request.PrimaryClaimId,
-            request.SecondaryClaimId,
-            request.Topic,
-            request.Summary,
-            request.ContradictionType,
-            request.Severity,
-            request.CaseId,
-            cancellationToken);
-
-        var response = new CreateContradictionResponse(
-            entity.Id,
-            entity.LeftClaimId,
-            entity.RightClaimId,
-            entity.CaseId,
-            request.Topic,
-            entity.Summary,
-            entity.Type.ToString(),
-            entity.Severity.ToString(),
-            entity.Status.ToString(),
-            entity.CreatedAtUtc,
-            entity.UpdatedAtUtc);
-
-        return Ok(response);
-    }
-
-    [HttpGet]
-    public async Task<ActionResult<GetContradictionsResponse>> GetContradictions(
-        [FromQuery] int page = 1,
-        [FromQuery] int pageSize = 20,
-        [FromQuery] Guid? claimId = null,
-        [FromQuery] Guid? caseId = null,
-        CancellationToken cancellationToken = default)
-    {
-        var (total, items) = await _contradictionSliceService.GetContradictionsAsync(page, pageSize, claimId, caseId, cancellationToken);
-
-        var mapped = items.Select(entity => new GetContradictionsItemResponse(
-            entity.Id,
-            entity.LeftClaimId,
-            entity.RightClaimId,
-            entity.CaseId,
-            entity.Summary,
-            entity.Summary,
-            entity.Type.ToString(),
-            entity.Severity.ToString(),
-            entity.Status.ToString(),
-            entity.CreatedAtUtc,
-            entity.UpdatedAtUtc
-        )).ToArray();
-
-        return Ok(new GetContradictionsResponse(
-            mapped,
-            page,
-            pageSize,
-            total,
-            total == 0 ? 0 : (int)Math.Ceiling(total / (double)pageSize)
-        ));
-    }
-
-    [HttpGet("{id:guid}")]
-    public async Task<ActionResult<GetContradictionResponse>> GetContradiction(
-        [FromRoute] Guid id,
-        CancellationToken cancellationToken = default)
-    {
-        var entity = await _contradictionSliceService.GetContradictionByIdAsync(id, cancellationToken);
-
-        if (entity is null)
-        {
-            return NotFound();
-        }
-
-        return Ok(new GetContradictionResponse(
-            entity.Id,
-            entity.LeftClaimId,
-            entity.RightClaimId,
-            entity.CaseId,
-            entity.Summary,
-            entity.Summary,
-            entity.Type.ToString(),
-            entity.Severity.ToString(),
-            entity.Status.ToString(),
-            entity.CreatedAtUtc,
-            entity.UpdatedAtUtc
-        ));
-    }
+export function useCaseExplorer(page = 1, pageSize = 50) {
+  return useQuery({
+    queryKey: ["case-explorer", page, pageSize],
+    queryFn: () => getCaseExplorer(page, pageSize),
+  });
 }
 '@
 
-Write-Host "Building backend..." -ForegroundColor Cyan
+Write-Utf8File -Path $detailHookPath -Content @'
+import { useMemo } from "react";
+import { useCaseDetail } from "./useCaseDetail";
+import { useClaims } from "./useClaims";
+import { useContradictions } from "./useContradictions";
+
+export function useCaseWorkbench(caseId?: string) {
+  const caseQuery = useCaseDetail(caseId);
+  const claimsQuery = useClaims();
+  const contradictionsQuery = useContradictions(undefined, caseId);
+
+  const linkedClaims = useMemo(() => {
+    const items = claimsQuery.data?.items ?? [];
+    if (!caseId) return [];
+    return items.filter((x) => x.caseId === caseId);
+  }, [claimsQuery.data, caseId]);
+
+  const contradictionItems = contradictionsQuery.data?.items ?? [];
+
+  return {
+    caseQuery,
+    claimsQuery,
+    contradictionsQuery,
+    linkedClaims,
+    contradictionItems,
+  };
+}
+'@
+
+Write-Utf8File -Path $summaryPanelPath -Content @'
+export function CaseExplorerSummaryPanel({
+  totalCases,
+  openCases,
+  totalClaims,
+  totalContradictions,
+}: {
+  totalCases: number;
+  openCases: number;
+  totalClaims: number;
+  totalContradictions: number;
+}) {
+  return (
+    <div style={gridStyle}>
+      <Card title="Cases" value={totalCases} />
+      <Card title="Open Cases" value={openCases} />
+      <Card title="Claims" value={totalClaims} />
+      <Card title="Contradictions" value={totalContradictions} />
+    </div>
+  );
+}
+
+function Card({ title, value }: { title: string; value: number }) {
+  return (
+    <div style={cardStyle}>
+      <span style={{ color: "#666" }}>{title}</span>
+      <strong style={{ fontSize: 28 }}>{value}</strong>
+    </div>
+  );
+}
+
+const gridStyle: React.CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+  gap: 16,
+};
+
+const cardStyle: React.CSSProperties = {
+  border: "1px solid #ddd",
+  borderRadius: 14,
+  padding: 16,
+  display: "grid",
+  gap: 8,
+};
+'@
+
+Write-Utf8File -Path $queuePanelPath -Content @'
+import { Link } from "react-router-dom";
+import type { ContradictionItem } from "../api/contradictions";
+
+export function ContradictionQueuePanel({ items }: { items: ContradictionItem[] }) {
+  return (
+    <div style={panelStyle}>
+      <h3 style={{ marginTop: 0 }}>Contradiction Queue</h3>
+      {items.length === 0 && <p>No contradiction items for this case.</p>}
+      {items.length > 0 && (
+        <ul style={{ marginBottom: 0 }}>
+          {items.map((item) => (
+            <li key={item.id}>
+              <Link to={`/contradictions/${item.id}`}>{item.topic}</Link> - {item.severity} - {item.status}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+const panelStyle: React.CSSProperties = {
+  border: "1px solid #ddd",
+  borderRadius: 14,
+  padding: 16,
+};
+'@
+
+Write-Utf8File -Path $explorerPagePath -Content @'
+import { Link } from "react-router-dom";
+import { useMemo } from "react";
+import { useCaseExplorer } from "../hooks/useCaseExplorer";
+import { useClaims } from "../hooks/useClaims";
+import { useContradictions } from "../hooks/useContradictions";
+import { CaseExplorerSummaryPanel } from "../components/CaseExplorerSummaryPanel";
+
+export function CaseExplorerPage() {
+  const casesQuery = useCaseExplorer();
+  const claimsQuery = useClaims();
+  const contradictionsQuery = useContradictions();
+
+  const totalCases = casesQuery.data?.items.length ?? 0;
+  const totalClaims = claimsQuery.data?.items.length ?? 0;
+  const totalContradictions = contradictionsQuery.data?.items.length ?? 0;
+
+  const openCases = useMemo(() => {
+    const items = casesQuery.data?.items ?? [];
+    return items.filter((x) => x.status !== "Closed" && x.status !== "Resolved").length;
+  }, [casesQuery.data]);
+
+  return (
+    <div style={{ fontFamily: "Arial, sans-serif", padding: "24px" }}>
+      <header style={{ marginBottom: "24px" }}>
+        <h1 style={{ margin: 0 }}>Case Explorer</h1>
+        <p style={{ color: "#555" }}>
+          Main working surface for cases, claims, and contradictions.
+        </p>
+        <nav style={{ display: "flex", gap: "16px", marginTop: "12px", flexWrap: "wrap" }}>
+          <Link to="/">Home</Link>
+          <Link to="/cases">Cases</Link>
+          <Link to="/case-explorer">Case Explorer</Link>
+          <Link to="/contradictions">Contradictions</Link>
+          <Link to="/resolution-board">Resolution Board</Link>
+        </nav>
+      </header>
+
+      <CaseExplorerSummaryPanel
+        totalCases={totalCases}
+        openCases={openCases}
+        totalClaims={totalClaims}
+        totalContradictions={totalContradictions}
+      />
+
+      <section style={{ marginTop: 24 }}>
+        {casesQuery.isLoading && <p>Loading case explorer...</p>}
+        {casesQuery.isError && <p style={{ color: "crimson" }}>Failed to load cases: {(casesQuery.error as Error).message}</p>}
+
+        {casesQuery.isSuccess && (
+          <div style={{ overflowX: "auto" }}>
+            <table style={tableStyle}>
+              <thead>
+                <tr>
+                  <th style={thStyle}>Case</th>
+                  <th style={thStyle}>Status</th>
+                  <th style={thStyle}>Created</th>
+                  <th style={thStyle}>Workbench</th>
+                </tr>
+              </thead>
+              <tbody>
+                {casesQuery.data.items.map((item) => (
+                  <tr key={item.id}>
+                    <td style={tdStyle}>
+                      <Link to={`/cases/${item.id}`}>{item.id}</Link>
+                    </td>
+                    <td style={tdStyle}>{item.status}</td>
+                    <td style={tdStyle}>{new Date(item.createdAtUtc).toLocaleString()}</td>
+                    <td style={tdStyle}>
+                      <Link to={`/case-explorer/${item.id}`}>Open Workbench</Link>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+    </div>
+  );
+}
+
+const tableStyle: React.CSSProperties = {
+  width: "100%",
+  borderCollapse: "collapse",
+  marginTop: 16,
+};
+
+const thStyle: React.CSSProperties = {
+  textAlign: "left",
+  borderBottom: "1px solid #ccc",
+  padding: 10,
+};
+
+const tdStyle: React.CSSProperties = {
+  borderBottom: "1px solid #eee",
+  padding: 10,
+  verticalAlign: "top",
+};
+'@
+
+Write-Utf8File -Path $workbenchPagePath -Content @'
+import { Link, useParams } from "react-router-dom";
+import { useCaseWorkbench } from "../hooks/useCaseWorkbench";
+import { ContradictionQueuePanel } from "../components/ContradictionQueuePanel";
+
+export function CaseWorkbenchPage() {
+  const { id } = useParams();
+  const { caseQuery, linkedClaims, contradictionItems, claimsQuery, contradictionsQuery } = useCaseWorkbench(id);
+
+  if (caseQuery.isLoading) {
+    return <div style={{ fontFamily: "Arial, sans-serif", padding: 24 }}>Loading case workbench...</div>;
+  }
+
+  if (caseQuery.isError) {
+    return <div style={{ fontFamily: "Arial, sans-serif", padding: 24, color: "crimson" }}>Failed to load case: {(caseQuery.error as Error).message}</div>;
+  }
+
+  if (!caseQuery.data) {
+    return <div style={{ fontFamily: "Arial, sans-serif", padding: 24 }}>Case not found.</div>;
+  }
+
+  const item = caseQuery.data;
+
+  return (
+    <div style={{ fontFamily: "Arial, sans-serif", padding: 24 }}>
+      <nav style={{ display: "flex", gap: 16, marginBottom: 20, flexWrap: "wrap" }}>
+        <Link to="/case-explorer">Back to Case Explorer</Link>
+        <Link to={`/cases/${item.id}`}>Case Detail</Link>
+        <Link to={`/contradictions?caseId=${item.id}`}>Contradictions for Case</Link>
+      </nav>
+
+      <h1 style={{ marginTop: 0 }}>Case Workbench</h1>
+
+      <div style={panelStyle}>
+        <Row label="Case Id" value={item.id} />
+        <Row label="Status" value={item.status} />
+        <Row label="Created" value={new Date(item.createdAtUtc).toLocaleString()} />
+      </div>
+
+      <div style={gridStyle}>
+        <div style={panelStyle}>
+          <h3 style={{ marginTop: 0 }}>Linked Claims</h3>
+          {claimsQuery.isLoading && <p>Loading claims...</p>}
+          {!claimsQuery.isLoading && linkedClaims.length === 0 && <p>No linked claims.</p>}
+          {linkedClaims.length > 0 && (
+            <ul style={{ marginBottom: 0 }}>
+              {linkedClaims.map((claim) => (
+                <li key={claim.id}>
+                  <Link to={`/claims/${claim.id}`}>{claim.topic}</Link> - {claim.type} - {claim.status}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
+        <ContradictionQueuePanel items={contradictionItems} />
+      </div>
+
+      <div style={{ ...panelStyle, marginTop: 20 }}>
+        <h3 style={{ marginTop: 0 }}>Operational Actions</h3>
+        <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+          <Link to="/claims">Open Claims Catalog</Link>
+          <Link to={`/contradictions?caseId=${item.id}`}>Open Contradictions Catalog</Link>
+          <Link to="/resolution-board">Open Resolution Board</Link>
+        </div>
+        {contradictionsQuery.isLoading && <p style={{ marginTop: 12 }}>Refreshing contradictions...</p>}
+      </div>
+    </div>
+  );
+}
+
+function Row({ label, value }: { label: string; value: string }) {
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "180px 1fr", gap: 12, padding: "6px 0" }}>
+      <strong>{label}</strong>
+      <span>{value}</span>
+    </div>
+  );
+}
+
+const gridStyle: React.CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "1fr 1fr",
+  gap: 16,
+};
+
+const panelStyle: React.CSSProperties = {
+  border: "1px solid #ddd",
+  borderRadius: 14,
+  padding: 16,
+};
+'@
+
+$mainContent = Get-Content $mainPath -Raw
+
+$mainContent = Ensure-ImportLine -Content $mainContent -Anchor 'import { DashboardPage } from "./pages/DashboardPage";' -ImportLine 'import { CaseExplorerPage } from "./pages/CaseExplorerPage";'
+$mainContent = Ensure-ImportLine -Content $mainContent -Anchor 'import { CaseExplorerPage } from "./pages/CaseExplorerPage";' -ImportLine 'import { CaseWorkbenchPage } from "./pages/CaseWorkbenchPage";'
+
+$mainContent = Ensure-NavBlock -Content $mainContent -Anchor '<Link to="/cases">Cases</Link>' -NavBlock '<Link to="/case-explorer">Case Explorer</Link>' -PresencePattern 'to="/case-explorer"'
+
+$mainContent = Ensure-RouteBlock -Content $mainContent -AnchorRoute '{ path: "/cases", element: <CasesPage /> },' -RouteBlock '{ path: "/case-explorer", element: <CaseExplorerPage /> },
+  { path: "/case-explorer/:id", element: <CaseWorkbenchPage /> },' -PresencePattern 'path: "/case-explorer"'
+
+Write-Utf8File -Path $mainPath -Content $mainContent
+
+Write-Host "Building backend..."
 Build-Backend -RootDir $RootDir
 
-Write-Host "Contradiction debug alignment fix completed successfully." -ForegroundColor Green
+Write-Host "Building frontend..."
+Build-Frontend -RootDir $RootDir
+
+Write-Host "Phase 6.22 completed successfully." -ForegroundColor Green

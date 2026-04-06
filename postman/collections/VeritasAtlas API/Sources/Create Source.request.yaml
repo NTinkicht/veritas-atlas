@@ -1,0 +1,17 @@
+$kind: http-request
+name: Create Source
+method: POST
+url: '{{baseUrl}}/api/v1/sources'
+order: 3000
+headers:
+  - key: Content-Type
+    value: application/json
+body:
+  type: json
+  content: |-
+    {
+      "name": "Official Government Press Office",
+      "type": "Official",
+      "reference": "https://press.gov.example.com",
+      "createdBy": "user@example.com"
+    }

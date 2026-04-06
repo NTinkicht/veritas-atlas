@@ -1,0 +1,13 @@
+$kind: http-request
+name: Get Persons
+method: GET
+url: '{{baseUrl}}/api/v1/persons'
+order: 1000
+queryParams:
+  - key: page
+    value: '1'
+  - key: pageSize
+    value: '20'
+  - key: search
+    value: ''
+    disabled: true

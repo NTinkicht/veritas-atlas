@@ -1,0 +1,18 @@
+$kind: http-request
+name: Create Document
+method: POST
+url: '{{baseUrl}}/api/v1/documents'
+order: 3000
+headers:
+  - key: Content-Type
+    value: application/json
+body:
+  type: json
+  content: |-
+    {
+      "sourceId": "00000000-0000-0000-0000-000000000000",
+      "title": "Press Conference Transcript - Jan 2025",
+      "content": "Full text content of the document goes here.",
+      "externalReference": "https://example.com/doc/123",
+      "createdBy": "user@example.com"
+    }

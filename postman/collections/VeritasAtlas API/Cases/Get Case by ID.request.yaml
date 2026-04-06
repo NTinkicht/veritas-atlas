@@ -1,0 +1,5 @@
+$kind: http-request
+name: Get Case by ID
+method: GET
+url: '{{baseUrl}}/api/v1/cases/{{caseId}}'
+order: 2000

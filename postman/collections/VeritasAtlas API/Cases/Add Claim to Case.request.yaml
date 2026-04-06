@@ -1,0 +1,15 @@
+$kind: http-request
+name: Add Claim to Case
+method: POST
+url: '{{baseUrl}}/api/v1/cases/{{caseId}}/claims'
+order: 4000
+headers:
+  - key: Content-Type
+    value: application/json
+body:
+  type: json
+  content: |-
+    {
+      "claimId": "00000000-0000-0000-0000-000000000000",
+      "createdBy": "user@example.com"
+    }

@@ -1,0 +1,13 @@
+$kind: http-request
+name: Get Claims
+method: GET
+url: '{{baseUrl}}/api/v1/claims'
+order: 1000
+queryParams:
+  - key: page
+    value: '1'
+  - key: pageSize
+    value: '20'
+  - key: statementId
+    value: ''
+    disabled: true

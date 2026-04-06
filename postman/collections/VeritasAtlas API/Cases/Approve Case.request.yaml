@@ -1,0 +1,15 @@
+$kind: http-request
+name: Approve Case
+method: POST
+url: '{{baseUrl}}/api/v1/cases/{{caseId}}/approve'
+order: 5000
+headers:
+  - key: Content-Type
+    value: application/json
+body:
+  type: json
+  content: |-
+    {
+      "approvedBy": "reviewer@example.com",
+      "notes": "Approved after review."
+    }

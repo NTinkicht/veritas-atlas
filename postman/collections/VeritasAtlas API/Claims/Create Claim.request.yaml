@@ -1,0 +1,20 @@
+$kind: http-request
+name: Create Claim
+method: POST
+url: '{{baseUrl}}/api/v1/claims'
+order: 3000
+headers:
+  - key: Content-Type
+    value: application/json
+body:
+  type: json
+  content: |-
+    {
+      "statementId": "00000000-0000-0000-0000-000000000000",
+      "topic": "Economic Policy",
+      "normalizedText": "The government increased spending by 10%.",
+      "type": "Factual",
+      "personId": null,
+      "caseId": null,
+      "isMaterial": true
+    }

@@ -1,0 +1,20 @@
+$kind: http-request
+name: Create Contradiction
+method: POST
+url: '{{baseUrl}}/api/v1/contradictions'
+order: 3000
+headers:
+  - key: Content-Type
+    value: application/json
+body:
+  type: json
+  content: |-
+    {
+      "primaryClaimId": "00000000-0000-0000-0000-000000000000",
+      "secondaryClaimId": "00000000-0000-0000-0000-000000000001",
+      "topic": "Budget Figures",
+      "summary": "Claim A states 10% increase while Claim B states 5% decrease.",
+      "contradictionType": "Factual",
+      "severity": "High",
+      "caseId": null
+    }

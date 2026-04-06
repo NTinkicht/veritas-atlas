@@ -1,0 +1,16 @@
+$kind: http-request
+name: Get Documents
+method: GET
+url: '{{baseUrl}}/api/v1/documents'
+order: 1000
+queryParams:
+  - key: page
+    value: '1'
+  - key: pageSize
+    value: '20'
+  - key: sourceId
+    value: ''
+    disabled: true
+  - key: status
+    value: ''
+    disabled: true

@@ -1,0 +1,17 @@
+$kind: http-request
+name: Create Case
+method: POST
+url: '{{baseUrl}}/api/v1/cases'
+order: 3000
+headers:
+  - key: Content-Type
+    value: application/json
+body:
+  type: json
+  content: |-
+    {
+      "title": "Sample Case Title",
+      "summary": "A brief summary of the case.",
+      "subjectPersonId": null,
+      "createdBy": "user@example.com"
+    }

@@ -1,0 +1,15 @@
+$kind: http-request
+name: Add Alias to Person
+method: POST
+url: '{{baseUrl}}/api/v1/persons/{{personId}}/aliases'
+order: 4000
+headers:
+  - key: Content-Type
+    value: application/json
+body:
+  type: json
+  content: |-
+    {
+      "alias": "J. Doe",
+      "createdBy": "user@example.com"
+    }

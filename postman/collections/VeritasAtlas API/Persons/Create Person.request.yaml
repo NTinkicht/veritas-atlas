@@ -1,0 +1,15 @@
+$kind: http-request
+name: Create Person
+method: POST
+url: '{{baseUrl}}/api/v1/persons'
+order: 3000
+headers:
+  - key: Content-Type
+    value: application/json
+body:
+  type: json
+  content: |-
+    {
+      "displayName": "John Doe",
+      "createdBy": "user@example.com"
+    }
