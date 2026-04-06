@@ -45,6 +45,11 @@ import { PublicationDeskPage } from "./pages/PublicationDeskPage";
 import { CaseDetailPage } from "./pages/CaseDetailPage";
 import { ReviewsPage } from "./pages/ReviewsPage";
 import { DashboardPage } from "./pages/DashboardPage";
+import { IntelligenceHubPage } from "./pages/IntelligenceHubPage";
+import { AgentRunsMonitorPage } from "./pages/AgentRunsMonitorPage";
+import { GlobalSearchPage } from "./pages/GlobalSearchPage";
+import { ObservabilityDashboardPage } from "./pages/ObservabilityDashboardPage";
+import { AdminControlTowerPage } from "./pages/AdminControlTowerPage";
 import { ReviewDecisionBoardPage } from "./pages/ReviewDecisionBoardPage";
 import { PublicationPipelinePage } from "./pages/PublicationPipelinePage";
 import { EvidenceTracePage } from "./pages/EvidenceTracePage";
@@ -70,6 +75,8 @@ function Layout({ children }: { children: React.ReactNode }) {
         <nav style={{ display: "flex", gap: "16px", marginTop: "12px", flexWrap: "wrap" }}>
           <Link to="/">Home</Link>
           <Link to="/dashboard">Dashboard</Link>
+          <Link to="/intelligence">Intelligence Hub</Link>
+          <Link to="/agents">Agent Runs</Link>
           <Link to="/operations-intelligence">Operations Intelligence</Link>
           <Link to="/investigation-navigator">Investigation Navigator</Link>
           <Link to="/analytics-center">Analytics Center</Link>
@@ -199,8 +206,13 @@ function HealthPage() {
 }
 
 const router = createBrowserRouter([
+  { path: "/global-search", element: <GlobalSearchPage /> },
+  { path: "/observability", element: <ObservabilityDashboardPage /> },
+  { path: "/admin", element: <AdminControlTowerPage /> },
   { path: "/", element: <HomePage /> },
   { path: "/dashboard", element: <DashboardPage /> },
+  { path: "/intelligence", element: <IntelligenceHubPage /> },
+  { path: "/agents", element: <AgentRunsMonitorPage /> },
   { path: "/health", element: <HealthPage /> },
   { path: "/operations", element: <OperationsHubPage /> },
   { path: "/navigator", element: <InvestigationNavigatorPage /> },
