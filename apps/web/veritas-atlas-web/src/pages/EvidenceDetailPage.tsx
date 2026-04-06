@@ -20,7 +20,7 @@ export function EvidenceDetailPage() {
   }
 
   const item = query.data;
-  const relatedStatements = statementsQuery.data?.items.filter((x) => x.id && x.text) ?? [];
+  const relatedStatements = (statementsQuery.data?.items ?? []).filter((x) => x.evidenceId === item.id);
 
   return (
     <div style={{ fontFamily: "Arial, sans-serif", padding: "24px" }}>
@@ -53,8 +53,13 @@ export function EvidenceDetailPage() {
 
       <div style={cardStyle}>
         <h3 style={{ marginTop: 0 }}>Statements</h3>
+        <div style={{ display: "flex", gap: "12px", flexWrap: "wrap", marginBottom: "12px" }}>
+          <Link to={`/statements/new?evidenceId=${item.id}`} style={actionLinkStyle}>Create Statement for this Evidence</Link>
+          <Link to="/statements" style={actionLinkStyle}>Open Statements</Link>
+        </div>
+
         {statementsQuery.isLoading && <p>Loading statements...</p>}
-        {statementsQuery.isSuccess && relatedStatements.length === 0 && <p>No statement links shown yet.</p>}
+        {statementsQuery.isSuccess && relatedStatements.length === 0 && <p>No statements are linked to this evidence yet.</p>}
         {statementsQuery.isSuccess && relatedStatements.length > 0 && (
           <ul>
             {relatedStatements.map((statement) => (
@@ -83,4 +88,12 @@ const cardStyle: React.CSSProperties = {
   borderRadius: "12px",
   padding: "16px",
   marginBottom: "16px",
+};
+
+const actionLinkStyle: React.CSSProperties = {
+  padding: "10px 16px",
+  borderRadius: "8px",
+  border: "1px solid #1976d2",
+  textDecoration: "none",
+  color: "inherit",
 };

@@ -71,7 +71,7 @@ function HomePage() {
   return (
     <Layout>
       <h2>Home</h2>
-      <p>Statements list and detail pages are now available.</p>
+      <p>Statement UX linking is now available.</p>
     </Layout>
   );
 }

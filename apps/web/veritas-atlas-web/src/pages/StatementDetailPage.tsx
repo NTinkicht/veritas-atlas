@@ -40,6 +40,11 @@ export function StatementDetailPage() {
         <Row label="Person Id" value={item.personId ?? "N/A"} />
         <Row label="Created" value={new Date(item.createdAt).toLocaleString()} />
       </div>
+
+      <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
+        {item.evidenceId && <Link to={`/evidence/${item.evidenceId}`} style={actionLinkStyle}>Open Evidence</Link>}
+        <Link to="/statements" style={actionLinkStyle}>Back to Statements</Link>
+      </div>
     </div>
   );
 }
@@ -58,4 +63,12 @@ const cardStyle: React.CSSProperties = {
   borderRadius: "12px",
   padding: "16px",
   marginBottom: "16px",
+};
+
+const actionLinkStyle: React.CSSProperties = {
+  padding: "10px 16px",
+  borderRadius: "8px",
+  border: "1px solid #1976d2",
+  textDecoration: "none",
+  color: "inherit",
 };

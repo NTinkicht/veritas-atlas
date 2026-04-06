@@ -8,6 +8,7 @@ export type StatementItem = {
   object: string | null;
   polarity: string;
   status: string;
+  evidenceId?: string | null;
   createdAt: string;
 };
 

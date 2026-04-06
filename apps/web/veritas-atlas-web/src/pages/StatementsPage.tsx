@@ -19,6 +19,10 @@ export function StatementsPage() {
         </nav>
       </header>
 
+      <div style={{ marginBottom: "16px", display: "flex", gap: "12px", flexWrap: "wrap" }}>
+        <Link to="/statements/new" style={actionLinkStyle}>Create New Statement</Link>
+      </div>
+
       {query.isLoading && <p>Loading statements...</p>}
 
       {query.isError && (
@@ -44,6 +48,7 @@ export function StatementsPage() {
                     <th style={thStyle}>Topic</th>
                     <th style={thStyle}>Polarity</th>
                     <th style={thStyle}>Status</th>
+                    <th style={thStyle}>Evidence</th>
                     <th style={thStyle}>Created</th>
                   </tr>
                 </thead>
@@ -54,6 +59,7 @@ export function StatementsPage() {
                       <td style={tdStyle}>{item.topic ?? "N/A"}</td>
                       <td style={tdStyle}>{item.polarity}</td>
                       <td style={tdStyle}>{item.status}</td>
+                      <td style={tdStyle}>{item.evidenceId ? <Link to={`/evidence/${item.evidenceId}`}>{item.evidenceId}</Link> : "N/A"}</td>
                       <td style={tdStyle}>{new Date(item.createdAt).toLocaleString()}</td>
                     </tr>
                   ))}
@@ -83,6 +89,16 @@ const tdStyle: React.CSSProperties = {
   borderBottom: "1px solid #eee",
   padding: "10px",
   verticalAlign: "top",
+};
+
+const actionLinkStyle: React.CSSProperties = {
+  padding: "10px 16px",
+  borderRadius: "8px",
+  border: "1px solid #1976d2",
+  textDecoration: "none",
+  color: "inherit",
+  display: "inline-flex",
+  alignItems: "center",
 };
 
 const emptyStateStyle: React.CSSProperties = {
