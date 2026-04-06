@@ -45,6 +45,9 @@ import { PublicationDeskPage } from "./pages/PublicationDeskPage";
 import { CaseDetailPage } from "./pages/CaseDetailPage";
 import { ReviewsPage } from "./pages/ReviewsPage";
 import { DashboardPage } from "./pages/DashboardPage";
+import { TruthReviewStudioPage } from "./pages/TruthReviewStudioPage";
+import { ContradictionResolutionWorkspacePage } from "./pages/ContradictionResolutionWorkspacePage";
+import { CaseScoreboardPage } from "./pages/CaseScoreboardPage";
 import { CaseExplorerPage } from "./pages/CaseExplorerPage";
 import { CaseWorkbenchPage } from "./pages/CaseWorkbenchPage";
 import { ContradictionsPage } from "./pages/ContradictionsPage";
@@ -70,6 +73,8 @@ function Layout({ children }: { children: React.ReactNode }) {
           <Link to="/persons">Persons</Link>
           <Link to="/cases">Cases</Link>
 <Link to="/case-explorer">Case Explorer</Link>
+<Link to="/truth-review-studio">Truth Review Studio</Link>
+          <Link to="/case-scoreboard">Case Scoreboard</Link>
           <Link to="/reviews">Reviews</Link>
           <Link to="/review-queue">Review Queue</Link>
           <Link to="/review-workspace">Review Workspace</Link>
@@ -206,6 +211,9 @@ const router = createBrowserRouter([
   { path: "/persons/:id", element: <PersonDetailPage /> },
   { path: "/cases", element: <CasesPage /> },
 { path: "/case-explorer", element: <CaseExplorerPage /> },
+{ path: "/truth-review-studio", element: <TruthReviewStudioPage /> },
+  { path: "/contradiction-resolution/:id", element: <ContradictionResolutionWorkspacePage /> },
+  { path: "/case-scoreboard", element: <CaseScoreboardPage /> },
   { path: "/case-explorer/:id", element: <CaseWorkbenchPage /> },
   { path: "/cases/new", element: <CreateCasePage /> },
   { path: "/cases/:id", element: <CaseDetailPage /> },
