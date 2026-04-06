@@ -45,6 +45,11 @@ import { PublicationDeskPage } from "./pages/PublicationDeskPage";
 import { CaseDetailPage } from "./pages/CaseDetailPage";
 import { ReviewsPage } from "./pages/ReviewsPage";
 import { DashboardPage } from "./pages/DashboardPage";
+import { DecisionIntelligencePage } from "./pages/DecisionIntelligencePage";
+import { UnifiedSearchWorkspacePage } from "./pages/UnifiedSearchWorkspacePage";
+import { SourceIntelligencePage } from "./pages/SourceIntelligencePage";
+import { EntityGraphWorkspacePage } from "./pages/EntityGraphWorkspacePage";
+import { ReviewAuditWorkspacePage } from "./pages/ReviewAuditWorkspacePage";
 import { IntelligenceHubPage } from "./pages/IntelligenceHubPage";
 import { AgentRunsMonitorPage } from "./pages/AgentRunsMonitorPage";
 import { GlobalSearchPage } from "./pages/GlobalSearchPage";
@@ -75,6 +80,7 @@ function Layout({ children }: { children: React.ReactNode }) {
         <nav style={{ display: "flex", gap: "16px", marginTop: "12px", flexWrap: "wrap" }}>
           <Link to="/">Home</Link>
           <Link to="/dashboard">Dashboard</Link>
+          <Link to="/decision-intelligence">Decision Intelligence</Link>
           <Link to="/intelligence">Intelligence Hub</Link>
           <Link to="/agents">Agent Runs</Link>
           <Link to="/operations-intelligence">Operations Intelligence</Link>
@@ -85,6 +91,10 @@ function Layout({ children }: { children: React.ReactNode }) {
           <Link to="/cases">Cases</Link>
 <Link to="/case-explorer">Case Explorer</Link>
 <Link to="/truth-review-studio">Truth Review Studio</Link>
+<Link to="/global-search-workspace">Global Search Workspace</Link>
+          <Link to="/source-intelligence">Source Intelligence</Link>
+          <Link to="/entity-graph">Entity Graph</Link>
+          <Link to="/review-audit">Review Audit</Link>
 <Link to="/review-decision-board">Review Decision Board</Link>
           <Link to="/publication-pipeline">Publication Pipeline</Link>
           <Link to="/evidence-trace">Evidence Trace</Link>
@@ -211,6 +221,7 @@ const router = createBrowserRouter([
   { path: "/admin", element: <AdminControlTowerPage /> },
   { path: "/", element: <HomePage /> },
   { path: "/dashboard", element: <DashboardPage /> },
+  { path: "/decision-intelligence", element: <DecisionIntelligencePage /> },
   { path: "/intelligence", element: <IntelligenceHubPage /> },
   { path: "/agents", element: <AgentRunsMonitorPage /> },
   { path: "/health", element: <HealthPage /> },
@@ -232,6 +243,10 @@ const router = createBrowserRouter([
   { path: "/cases", element: <CasesPage /> },
 { path: "/case-explorer", element: <CaseExplorerPage /> },
 { path: "/truth-review-studio", element: <TruthReviewStudioPage /> },
+{ path: "/global-search-workspace", element: <UnifiedSearchWorkspacePage /> },
+  { path: "/source-intelligence", element: <SourceIntelligencePage /> },
+  { path: "/entity-graph", element: <EntityGraphWorkspacePage /> },
+  { path: "/review-audit", element: <ReviewAuditWorkspacePage /> },
 { path: "/review-decision-board", element: <ReviewDecisionBoardPage /> },
   { path: "/publication-pipeline", element: <PublicationPipelinePage /> },
   { path: "/evidence-trace", element: <EvidenceTracePage /> },
