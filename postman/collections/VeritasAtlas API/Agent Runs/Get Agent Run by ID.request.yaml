@@ -1,0 +1,5 @@
+$kind: http-request
+name: Get Agent Run by ID
+method: GET
+url: '{{baseUrl}}/api/v1/agent-runs/{{agentRunId}}'
+order: 2000

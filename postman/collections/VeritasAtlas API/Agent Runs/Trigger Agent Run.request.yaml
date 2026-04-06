@@ -1,0 +1,20 @@
+$kind: http-request
+name: Trigger Agent Run
+method: POST
+url: '{{baseUrl}}/api/v1/agent-runs'
+order: 3000
+headers:
+  - key: Content-Type
+    value: application/json
+body:
+  type: json
+  content: |-
+    {
+      "agentType": "FactCheck",
+      "caseId": "00000000-0000-0000-0000-000000000000",
+      "parameters": {
+        "depth": "full",
+        "includeContradictions": true
+      },
+      "triggeredBy": "user@example.com"
+    }

@@ -1,0 +1,18 @@
+$kind: http-request
+name: Create Statement
+method: POST
+url: '{{baseUrl}}/api/v1/statements'
+order: 3000
+headers:
+  - key: Content-Type
+    value: application/json
+body:
+  type: json
+  content: |-
+    {
+      "personId": "00000000-0000-0000-0000-000000000000",
+      "sourceId": "00000000-0000-0000-0000-000000000000",
+      "content": "The minister stated that inflation is under control.",
+      "dateUtc": "2024-01-15T10:00:00Z",
+      "createdBy": "user@example.com"
+    }

@@ -45,6 +45,8 @@ import { PublicationDeskPage } from "./pages/PublicationDeskPage";
 import { CaseDetailPage } from "./pages/CaseDetailPage";
 import { ReviewsPage } from "./pages/ReviewsPage";
 import { DashboardPage } from "./pages/DashboardPage";
+import { CaseExplorerPage } from "./pages/CaseExplorerPage";
+import { CaseWorkbenchPage } from "./pages/CaseWorkbenchPage";
 import { ContradictionsPage } from "./pages/ContradictionsPage";
 import { ContradictionDetailPage } from "./pages/ContradictionDetailPage";
 import { ResolutionBoardPage } from "./pages/ResolutionBoardPage";
@@ -67,6 +69,7 @@ function Layout({ children }: { children: React.ReactNode }) {
           <Link to="/executive-overview">Executive Overview</Link>
           <Link to="/persons">Persons</Link>
           <Link to="/cases">Cases</Link>
+<Link to="/case-explorer">Case Explorer</Link>
           <Link to="/reviews">Reviews</Link>
           <Link to="/review-queue">Review Queue</Link>
           <Link to="/review-workspace">Review Workspace</Link>
@@ -202,6 +205,8 @@ const router = createBrowserRouter([
   { path: "/persons/new", element: <CreatePersonPage /> },
   { path: "/persons/:id", element: <PersonDetailPage /> },
   { path: "/cases", element: <CasesPage /> },
+{ path: "/case-explorer", element: <CaseExplorerPage /> },
+  { path: "/case-explorer/:id", element: <CaseWorkbenchPage /> },
   { path: "/cases/new", element: <CreateCasePage /> },
   { path: "/cases/:id", element: <CaseDetailPage /> },
   { path: "/reviews", element: <ReviewsPage /> },

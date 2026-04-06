@@ -1,0 +1,19 @@
+$kind: http-request
+name: Get Agent Runs
+method: GET
+url: '{{baseUrl}}/api/v1/agent-runs'
+order: 1000
+queryParams:
+  - key: page
+    value: '1'
+  - key: pageSize
+    value: '20'
+  - key: status
+    value: ''
+    disabled: true
+  - key: agentType
+    value: ''
+    disabled: true
+  - key: caseId
+    value: ''
+    disabled: true

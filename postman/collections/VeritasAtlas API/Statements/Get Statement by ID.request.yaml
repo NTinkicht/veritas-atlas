@@ -1,0 +1,5 @@
+$kind: http-request
+name: Get Statement by ID
+method: GET
+url: '{{baseUrl}}/api/v1/statements/{{statementId}}'
+order: 2000

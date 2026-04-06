@@ -149,154 +149,99 @@ function Ensure-RouteBlock {
 }
 
 Write-Host "Checkpointing current code with git..."
-Git-Checkpoint -Message ("checkpoint before phase 6.22 - " + (Get-Date -Format "yyyy-MM-dd HH:mm:ss"))
+Git-Checkpoint -Message ("checkpoint before phase 6.23 - " + (Get-Date -Format "yyyy-MM-dd HH:mm:ss"))
 
-Write-Host "Applying Phase 6.22 - UI one pass - Case Explorer and Contradiction Workbench..."
+Write-Host "Applying Phase 6.23 - Truth Review Studio and Contradiction Resolution UI pack..."
 
 $webRoot = Join-Path $RootDir "apps\web\veritas-atlas-web\src"
 
-$apiPath = Join-Path $webRoot "api\caseExplorer.ts"
-$hookPath = Join-Path $webRoot "hooks\useCaseExplorer.ts"
-$detailHookPath = Join-Path $webRoot "hooks\useCaseWorkbench.ts"
-$explorerPagePath = Join-Path $webRoot "pages\CaseExplorerPage.tsx"
-$workbenchPagePath = Join-Path $webRoot "pages\CaseWorkbenchPage.tsx"
-$summaryPanelPath = Join-Path $webRoot "components\CaseExplorerSummaryPanel.tsx"
-$queuePanelPath = Join-Path $webRoot "components\ContradictionQueuePanel.tsx"
+$studioPagePath = Join-Path $webRoot "pages\TruthReviewStudioPage.tsx"
+$resolutionWorkspacePath = Join-Path $webRoot "pages\ContradictionResolutionWorkspacePage.tsx"
+$scoreboardPath = Join-Path $webRoot "pages\CaseScoreboardPage.tsx"
+$truthMatrixPath = Join-Path $webRoot "components\TruthMatrixPanel.tsx"
+$resolutionActionsPath = Join-Path $webRoot "components\ResolutionActionsPanel.tsx"
 $mainPath = Join-Path $webRoot "main.tsx"
 
-Write-Utf8File -Path $apiPath -Content @'
-export type CaseExplorerItem = {
+Write-Utf8File -Path $truthMatrixPath -Content @'
+type TruthMatrixItem = {
   id: string;
+  label: string;
   status: string;
-  createdAtUtc: string;
-  createdBy?: string | null;
 };
 
-export type CaseExplorerResponse = {
-  items: CaseExplorerItem[];
-  page: number;
-  pageSize: number;
-  totalCount: number;
-  totalPages: number;
-};
-
-export async function getCaseExplorer(page = 1, pageSize = 50): Promise<CaseExplorerResponse> {
-  const response = await fetch(`/api/v1/cases?page=${page}&pageSize=${pageSize}`);
-
-  if (!response.ok) {
-    const text = await response.text();
-    throw new Error(text || `HTTP ${response.status}`);
-  }
-
-  return response.json() as Promise<CaseExplorerResponse>;
-}
-'@
-
-Write-Utf8File -Path $hookPath -Content @'
-import { useQuery } from "@tanstack/react-query";
-import { getCaseExplorer } from "../api/caseExplorer";
-
-export function useCaseExplorer(page = 1, pageSize = 50) {
-  return useQuery({
-    queryKey: ["case-explorer", page, pageSize],
-    queryFn: () => getCaseExplorer(page, pageSize),
-  });
-}
-'@
-
-Write-Utf8File -Path $detailHookPath -Content @'
-import { useMemo } from "react";
-import { useCaseDetail } from "./useCaseDetail";
-import { useClaims } from "./useClaims";
-import { useContradictions } from "./useContradictions";
-
-export function useCaseWorkbench(caseId?: string) {
-  const caseQuery = useCaseDetail(caseId);
-  const claimsQuery = useClaims();
-  const contradictionsQuery = useContradictions(undefined, caseId);
-
-  const linkedClaims = useMemo(() => {
-    const items = claimsQuery.data?.items ?? [];
-    if (!caseId) return [];
-    return items.filter((x) => x.caseId === caseId);
-  }, [claimsQuery.data, caseId]);
-
-  const contradictionItems = contradictionsQuery.data?.items ?? [];
-
-  return {
-    caseQuery,
-    claimsQuery,
-    contradictionsQuery,
-    linkedClaims,
-    contradictionItems,
-  };
-}
-'@
-
-Write-Utf8File -Path $summaryPanelPath -Content @'
-export function CaseExplorerSummaryPanel({
-  totalCases,
-  openCases,
-  totalClaims,
-  totalContradictions,
+export function TruthMatrixPanel({
+  claims,
+  contradictions,
 }: {
-  totalCases: number;
-  openCases: number;
-  totalClaims: number;
-  totalContradictions: number;
+  claims: TruthMatrixItem[];
+  contradictions: TruthMatrixItem[];
 }) {
   return (
-    <div style={gridStyle}>
-      <Card title="Cases" value={totalCases} />
-      <Card title="Open Cases" value={openCases} />
-      <Card title="Claims" value={totalClaims} />
-      <Card title="Contradictions" value={totalContradictions} />
+    <div style={panelStyle}>
+      <h3 style={{ marginTop: 0 }}>Truth Matrix</h3>
+
+      <div style={gridStyle}>
+        <div>
+          <h4>Claims</h4>
+          {claims.length === 0 && <p>No claims.</p>}
+          {claims.length > 0 && (
+            <ul style={{ marginBottom: 0 }}>
+              {claims.map((item) => (
+                <li key={item.id}>{item.label} - {item.status}</li>
+              ))}
+            </ul>
+          )}
+        </div>
+
+        <div>
+          <h4>Contradictions</h4>
+          {contradictions.length === 0 && <p>No contradictions.</p>}
+          {contradictions.length > 0 && (
+            <ul style={{ marginBottom: 0 }}>
+              {contradictions.map((item) => (
+                <li key={item.id}>{item.label} - {item.status}</li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
 
-function Card({ title, value }: { title: string; value: number }) {
-  return (
-    <div style={cardStyle}>
-      <span style={{ color: "#666" }}>{title}</span>
-      <strong style={{ fontSize: 28 }}>{value}</strong>
-    </div>
-  );
-}
-
-const gridStyle: React.CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-  gap: 16,
-};
-
-const cardStyle: React.CSSProperties = {
+const panelStyle: React.CSSProperties = {
   border: "1px solid #ddd",
   borderRadius: 14,
   padding: 16,
+};
+
+const gridStyle: React.CSSProperties = {
   display: "grid",
-  gap: 8,
+  gridTemplateColumns: "1fr 1fr",
+  gap: 16,
 };
 '@
 
-Write-Utf8File -Path $queuePanelPath -Content @'
+Write-Utf8File -Path $resolutionActionsPath -Content @'
 import { Link } from "react-router-dom";
-import type { ContradictionItem } from "../api/contradictions";
 
-export function ContradictionQueuePanel({ items }: { items: ContradictionItem[] }) {
+export function ResolutionActionsPanel({
+  contradictionId,
+  caseId,
+}: {
+  contradictionId?: string;
+  caseId?: string;
+}) {
   return (
     <div style={panelStyle}>
-      <h3 style={{ marginTop: 0 }}>Contradiction Queue</h3>
-      {items.length === 0 && <p>No contradiction items for this case.</p>}
-      {items.length > 0 && (
-        <ul style={{ marginBottom: 0 }}>
-          {items.map((item) => (
-            <li key={item.id}>
-              <Link to={`/contradictions/${item.id}`}>{item.topic}</Link> - {item.severity} - {item.status}
-            </li>
-          ))}
-        </ul>
-      )}
+      <h3 style={{ marginTop: 0 }}>Resolution Actions</h3>
+      <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+        {contradictionId && <Link to={`/contradictions/${contradictionId}`}>Open Contradiction</Link>}
+        {caseId && <Link to={`/case-explorer/${caseId}`}>Open Case Workbench</Link>}
+        <Link to="/review-queue">Send to Review Queue</Link>
+        <Link to="/publication-desk">Open Publication Desk</Link>
+        <Link to="/resolution-board">Open Resolution Board</Link>
+      </div>
     </div>
   );
 }
@@ -308,173 +253,120 @@ const panelStyle: React.CSSProperties = {
 };
 '@
 
-Write-Utf8File -Path $explorerPagePath -Content @'
+Write-Utf8File -Path $studioPagePath -Content @'
 import { Link } from "react-router-dom";
-import { useMemo } from "react";
-import { useCaseExplorer } from "../hooks/useCaseExplorer";
 import { useClaims } from "../hooks/useClaims";
 import { useContradictions } from "../hooks/useContradictions";
-import { CaseExplorerSummaryPanel } from "../components/CaseExplorerSummaryPanel";
+import { TruthMatrixPanel } from "../components/TruthMatrixPanel";
 
-export function CaseExplorerPage() {
-  const casesQuery = useCaseExplorer();
+export function TruthReviewStudioPage() {
   const claimsQuery = useClaims();
   const contradictionsQuery = useContradictions();
 
-  const totalCases = casesQuery.data?.items.length ?? 0;
-  const totalClaims = claimsQuery.data?.items.length ?? 0;
-  const totalContradictions = contradictionsQuery.data?.items.length ?? 0;
+  const claimItems = (claimsQuery.data?.items ?? []).slice(0, 8).map((item) => ({
+    id: item.id,
+    label: item.topic,
+    status: item.status,
+  }));
 
-  const openCases = useMemo(() => {
-    const items = casesQuery.data?.items ?? [];
-    return items.filter((x) => x.status !== "Closed" && x.status !== "Resolved").length;
-  }, [casesQuery.data]);
+  const contradictionItems = (contradictionsQuery.data?.items ?? []).slice(0, 8).map((item) => ({
+    id: item.id,
+    label: item.topic,
+    status: item.status,
+  }));
 
   return (
-    <div style={{ fontFamily: "Arial, sans-serif", padding: "24px" }}>
-      <header style={{ marginBottom: "24px" }}>
-        <h1 style={{ margin: 0 }}>Case Explorer</h1>
+    <div style={{ fontFamily: "Arial, sans-serif", padding: 24 }}>
+      <header style={{ marginBottom: 24 }}>
+        <h1 style={{ margin: 0 }}>Truth Review Studio</h1>
         <p style={{ color: "#555" }}>
-          Main working surface for cases, claims, and contradictions.
+          Unified review surface for claims, contradictions, and resolution readiness.
         </p>
-        <nav style={{ display: "flex", gap: "16px", marginTop: "12px", flexWrap: "wrap" }}>
+
+        <nav style={{ display: "flex", gap: 16, marginTop: 12, flexWrap: "wrap" }}>
           <Link to="/">Home</Link>
-          <Link to="/cases">Cases</Link>
           <Link to="/case-explorer">Case Explorer</Link>
-          <Link to="/contradictions">Contradictions</Link>
+          <Link to="/truth-review-studio">Truth Review Studio</Link>
           <Link to="/resolution-board">Resolution Board</Link>
+          <Link to="/publication-desk">Publication Desk</Link>
         </nav>
       </header>
 
-      <CaseExplorerSummaryPanel
-        totalCases={totalCases}
-        openCases={openCases}
-        totalClaims={totalClaims}
-        totalContradictions={totalContradictions}
-      />
+      <TruthMatrixPanel claims={claimItems} contradictions={contradictionItems} />
 
-      <section style={{ marginTop: 24 }}>
-        {casesQuery.isLoading && <p>Loading case explorer...</p>}
-        {casesQuery.isError && <p style={{ color: "crimson" }}>Failed to load cases: {(casesQuery.error as Error).message}</p>}
-
-        {casesQuery.isSuccess && (
-          <div style={{ overflowX: "auto" }}>
-            <table style={tableStyle}>
-              <thead>
-                <tr>
-                  <th style={thStyle}>Case</th>
-                  <th style={thStyle}>Status</th>
-                  <th style={thStyle}>Created</th>
-                  <th style={thStyle}>Workbench</th>
-                </tr>
-              </thead>
-              <tbody>
-                {casesQuery.data.items.map((item) => (
-                  <tr key={item.id}>
-                    <td style={tdStyle}>
-                      <Link to={`/cases/${item.id}`}>{item.id}</Link>
-                    </td>
-                    <td style={tdStyle}>{item.status}</td>
-                    <td style={tdStyle}>{new Date(item.createdAtUtc).toLocaleString()}</td>
-                    <td style={tdStyle}>
-                      <Link to={`/case-explorer/${item.id}`}>Open Workbench</Link>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </section>
+      <div style={{ ...panelStyle, marginTop: 20 }}>
+        <h3 style={{ marginTop: 0 }}>Studio Summary</h3>
+        <ul style={{ marginBottom: 0 }}>
+          <li>Total visible claims: {claimsQuery.data?.items.length ?? 0}</li>
+          <li>Total visible contradictions: {contradictionsQuery.data?.items.length ?? 0}</li>
+          <li>Ready for deeper resolution workflow: yes</li>
+        </ul>
+      </div>
     </div>
   );
 }
 
-const tableStyle: React.CSSProperties = {
-  width: "100%",
-  borderCollapse: "collapse",
-  marginTop: 16,
-};
-
-const thStyle: React.CSSProperties = {
-  textAlign: "left",
-  borderBottom: "1px solid #ccc",
-  padding: 10,
-};
-
-const tdStyle: React.CSSProperties = {
-  borderBottom: "1px solid #eee",
-  padding: 10,
-  verticalAlign: "top",
+const panelStyle: React.CSSProperties = {
+  border: "1px solid #ddd",
+  borderRadius: 14,
+  padding: 16,
 };
 '@
 
-Write-Utf8File -Path $workbenchPagePath -Content @'
+Write-Utf8File -Path $resolutionWorkspacePath -Content @'
 import { Link, useParams } from "react-router-dom";
-import { useCaseWorkbench } from "../hooks/useCaseWorkbench";
-import { ContradictionQueuePanel } from "../components/ContradictionQueuePanel";
+import { useContradictionDetail } from "../hooks/useContradictionDetail";
+import { ResolutionActionsPanel } from "../components/ResolutionActionsPanel";
 
-export function CaseWorkbenchPage() {
+export function ContradictionResolutionWorkspacePage() {
   const { id } = useParams();
-  const { caseQuery, linkedClaims, contradictionItems, claimsQuery, contradictionsQuery } = useCaseWorkbench(id);
+  const query = useContradictionDetail(id);
 
-  if (caseQuery.isLoading) {
-    return <div style={{ fontFamily: "Arial, sans-serif", padding: 24 }}>Loading case workbench...</div>;
+  if (query.isLoading) {
+    return <div style={{ fontFamily: "Arial, sans-serif", padding: 24 }}>Loading contradiction workspace...</div>;
   }
 
-  if (caseQuery.isError) {
-    return <div style={{ fontFamily: "Arial, sans-serif", padding: 24, color: "crimson" }}>Failed to load case: {(caseQuery.error as Error).message}</div>;
+  if (query.isError) {
+    return <div style={{ fontFamily: "Arial, sans-serif", padding: 24, color: "crimson" }}>Failed to load contradiction: {(query.error as Error).message}</div>;
   }
 
-  if (!caseQuery.data) {
-    return <div style={{ fontFamily: "Arial, sans-serif", padding: 24 }}>Case not found.</div>;
+  if (!query.data) {
+    return <div style={{ fontFamily: "Arial, sans-serif", padding: 24 }}>Contradiction not found.</div>;
   }
 
-  const item = caseQuery.data;
+  const item = query.data;
 
   return (
     <div style={{ fontFamily: "Arial, sans-serif", padding: 24 }}>
       <nav style={{ display: "flex", gap: 16, marginBottom: 20, flexWrap: "wrap" }}>
-        <Link to="/case-explorer">Back to Case Explorer</Link>
-        <Link to={`/cases/${item.id}`}>Case Detail</Link>
-        <Link to={`/contradictions?caseId=${item.id}`}>Contradictions for Case</Link>
+        <Link to="/truth-review-studio">Back to Truth Review Studio</Link>
+        <Link to={`/contradictions/${item.id}`}>Contradiction Detail</Link>
+        <Link to={`/case-explorer/${item.caseId}`}>Case Workbench</Link>
       </nav>
 
-      <h1 style={{ marginTop: 0 }}>Case Workbench</h1>
+      <h1 style={{ marginTop: 0 }}>Contradiction Resolution Workspace</h1>
 
       <div style={panelStyle}>
-        <Row label="Case Id" value={item.id} />
+        <Row label="Contradiction Id" value={item.id} />
+        <Row label="Topic" value={item.topic} />
+        <Row label="Summary" value={item.summary} />
+        <Row label="Severity" value={item.severity} />
         <Row label="Status" value={item.status} />
-        <Row label="Created" value={new Date(item.createdAtUtc).toLocaleString()} />
-      </div>
-
-      <div style={gridStyle}>
-        <div style={panelStyle}>
-          <h3 style={{ marginTop: 0 }}>Linked Claims</h3>
-          {claimsQuery.isLoading && <p>Loading claims...</p>}
-          {!claimsQuery.isLoading && linkedClaims.length === 0 && <p>No linked claims.</p>}
-          {linkedClaims.length > 0 && (
-            <ul style={{ marginBottom: 0 }}>
-              {linkedClaims.map((claim) => (
-                <li key={claim.id}>
-                  <Link to={`/claims/${claim.id}`}>{claim.topic}</Link> - {claim.type} - {claim.status}
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-
-        <ContradictionQueuePanel items={contradictionItems} />
+        <Row label="Case Id" value={item.caseId ?? "N/A"} />
       </div>
 
       <div style={{ ...panelStyle, marginTop: 20 }}>
-        <h3 style={{ marginTop: 0 }}>Operational Actions</h3>
-        <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-          <Link to="/claims">Open Claims Catalog</Link>
-          <Link to={`/contradictions?caseId=${item.id}`}>Open Contradictions Catalog</Link>
-          <Link to="/resolution-board">Open Resolution Board</Link>
-        </div>
-        {contradictionsQuery.isLoading && <p style={{ marginTop: 12 }}>Refreshing contradictions...</p>}
+        <h3 style={{ marginTop: 0 }}>Resolution Notes</h3>
+        <ul style={{ marginBottom: 0 }}>
+          <li>Confirm opposing claims belong to the same decision space</li>
+          <li>Assess whether contradiction is direct, temporal, or contextual</li>
+          <li>Route unresolved contradiction to review queue</li>
+          <li>Route resolved contradiction toward publication decision</li>
+        </ul>
+      </div>
+
+      <div style={{ marginTop: 20 }}>
+        <ResolutionActionsPanel contradictionId={item.id} caseId={item.caseId ?? undefined} />
       </div>
     </div>
   );
@@ -489,10 +381,88 @@ function Row({ label, value }: { label: string; value: string }) {
   );
 }
 
+const panelStyle: React.CSSProperties = {
+  border: "1px solid #ddd",
+  borderRadius: 14,
+  padding: 16,
+};
+'@
+
+Write-Utf8File -Path $scoreboardPath -Content @'
+import { Link } from "react-router-dom";
+import { useCaseExplorer } from "../hooks/useCaseExplorer";
+import { useClaims } from "../hooks/useClaims";
+import { useContradictions } from "../hooks/useContradictions";
+
+export function CaseScoreboardPage() {
+  const casesQuery = useCaseExplorer();
+  const claimsQuery = useClaims();
+  const contradictionsQuery = useContradictions();
+
+  const cases = casesQuery.data?.items ?? [];
+  const claims = claimsQuery.data?.items ?? [];
+  const contradictions = contradictionsQuery.data?.items ?? [];
+
+  return (
+    <div style={{ fontFamily: "Arial, sans-serif", padding: 24 }}>
+      <header style={{ marginBottom: 24 }}>
+        <h1 style={{ margin: 0 }}>Case Scoreboard</h1>
+        <p style={{ color: "#555" }}>
+          Roll-up scoreboard across cases, claims, and contradictions.
+        </p>
+
+        <nav style={{ display: "flex", gap: 16, marginTop: 12, flexWrap: "wrap" }}>
+          <Link to="/case-explorer">Case Explorer</Link>
+          <Link to="/truth-review-studio">Truth Review Studio</Link>
+          <Link to="/case-scoreboard">Case Scoreboard</Link>
+        </nav>
+      </header>
+
+      <div style={gridStyle}>
+        <MetricCard title="Cases" value={cases.length} />
+        <MetricCard title="Claims" value={claims.length} />
+        <MetricCard title="Contradictions" value={contradictions.length} />
+        <MetricCard title="Open Resolution Work" value={contradictions.filter(x => x.status !== "Resolved").length} />
+      </div>
+
+      <div style={{ ...panelStyle, marginTop: 20 }}>
+        <h3 style={{ marginTop: 0 }}>Top Case Signals</h3>
+        {cases.length === 0 && <p>No cases available.</p>}
+        {cases.length > 0 && (
+          <ul style={{ marginBottom: 0 }}>
+            {cases.slice(0, 10).map((item) => (
+              <li key={item.id}>
+                <Link to={`/case-explorer/${item.id}`}>{item.id}</Link> - {item.status}
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function MetricCard({ title, value }: { title: string; value: number }) {
+  return (
+    <div style={metricStyle}>
+      <span style={{ color: "#666" }}>{title}</span>
+      <strong style={{ fontSize: 28 }}>{value}</strong>
+    </div>
+  );
+}
+
 const gridStyle: React.CSSProperties = {
   display: "grid",
-  gridTemplateColumns: "1fr 1fr",
+  gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
   gap: 16,
+};
+
+const metricStyle: React.CSSProperties = {
+  border: "1px solid #ddd",
+  borderRadius: 14,
+  padding: 16,
+  display: "grid",
+  gap: 8,
 };
 
 const panelStyle: React.CSSProperties = {
@@ -504,13 +474,16 @@ const panelStyle: React.CSSProperties = {
 
 $mainContent = Get-Content $mainPath -Raw
 
-$mainContent = Ensure-ImportLine -Content $mainContent -Anchor 'import { DashboardPage } from "./pages/DashboardPage";' -ImportLine 'import { CaseExplorerPage } from "./pages/CaseExplorerPage";'
-$mainContent = Ensure-ImportLine -Content $mainContent -Anchor 'import { CaseExplorerPage } from "./pages/CaseExplorerPage";' -ImportLine 'import { CaseWorkbenchPage } from "./pages/CaseWorkbenchPage";'
+$mainContent = Ensure-ImportLine -Content $mainContent -Anchor 'import { DashboardPage } from "./pages/DashboardPage";' -ImportLine 'import { TruthReviewStudioPage } from "./pages/TruthReviewStudioPage";'
+$mainContent = Ensure-ImportLine -Content $mainContent -Anchor 'import { TruthReviewStudioPage } from "./pages/TruthReviewStudioPage";' -ImportLine 'import { ContradictionResolutionWorkspacePage } from "./pages/ContradictionResolutionWorkspacePage";'
+$mainContent = Ensure-ImportLine -Content $mainContent -Anchor 'import { ContradictionResolutionWorkspacePage } from "./pages/ContradictionResolutionWorkspacePage";' -ImportLine 'import { CaseScoreboardPage } from "./pages/CaseScoreboardPage";'
 
-$mainContent = Ensure-NavBlock -Content $mainContent -Anchor '<Link to="/cases">Cases</Link>' -NavBlock '<Link to="/case-explorer">Case Explorer</Link>' -PresencePattern 'to="/case-explorer"'
+$mainContent = Ensure-NavBlock -Content $mainContent -Anchor '<Link to="/case-explorer">Case Explorer</Link>' -NavBlock '<Link to="/truth-review-studio">Truth Review Studio</Link>
+          <Link to="/case-scoreboard">Case Scoreboard</Link>' -PresencePattern 'to="/truth-review-studio"'
 
-$mainContent = Ensure-RouteBlock -Content $mainContent -AnchorRoute '{ path: "/cases", element: <CasesPage /> },' -RouteBlock '{ path: "/case-explorer", element: <CaseExplorerPage /> },
-  { path: "/case-explorer/:id", element: <CaseWorkbenchPage /> },' -PresencePattern 'path: "/case-explorer"'
+$mainContent = Ensure-RouteBlock -Content $mainContent -AnchorRoute '{ path: "/case-explorer", element: <CaseExplorerPage /> },' -RouteBlock '{ path: "/truth-review-studio", element: <TruthReviewStudioPage /> },
+  { path: "/contradiction-resolution/:id", element: <ContradictionResolutionWorkspacePage /> },
+  { path: "/case-scoreboard", element: <CaseScoreboardPage /> },' -PresencePattern 'path: "/truth-review-studio"'
 
 Write-Utf8File -Path $mainPath -Content $mainContent
 
@@ -520,4 +493,4 @@ Build-Backend -RootDir $RootDir
 Write-Host "Building frontend..."
 Build-Frontend -RootDir $RootDir
 
-Write-Host "Phase 6.22 completed successfully." -ForegroundColor Green
+Write-Host "Phase 6.23 completed successfully." -ForegroundColor Green
