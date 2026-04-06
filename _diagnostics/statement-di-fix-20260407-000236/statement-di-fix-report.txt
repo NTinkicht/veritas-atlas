@@ -1,0 +1,183 @@
+﻿Statement DI fix smoke test
+Generated: 2026-04-07T00:02:36
+Root: C:\Projects\veritas-atlas
+
+========================================================================================================================
+ServiceCollectionExtensions.cs BEFORE
+========================================================================================================================
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using VeritasAtlas.Application.Interfaces;
+using VeritasAtlas.Infrastructure.Persistence;
+using VeritasAtlas.Infrastructure.Services;
+
+namespace VeritasAtlas.Infrastructure.Extensions;
+
+public static class ServiceCollectionExtensions
+{
+    public static IServiceCollection AddVeritasAtlasInfrastructure(
+        this IServiceCollection services,
+        IConfiguration configuration)
+    {
+        var connectionString = configuration.GetConnectionString("DefaultConnection")
+            ?? throw new InvalidOperationException("Connection string 'DefaultConnection' was not found.");
+
+        services.AddDbContext<VeritasAtlasDbContext>(options =>
+            options.UseNpgsql(connectionString));
+
+        services.AddScoped<IPersonService, PersonService>();
+        services.AddScoped<ISourceService, SourceService>();
+        services.AddScoped<IDocumentService, DocumentService>();
+        services.AddScoped<IEvidenceService, EvidenceService>();
+        services.AddScoped<IStatementService, StatementService>();
+        services.AddScoped<IClaimService, ClaimService>();
+        services.AddScoped<IContradictionService, ContradictionService>();
+        services.AddScoped<ICaseService, CaseService>();
+        services.AddScoped<IConfidenceService, ConfidenceService>();
+        services.AddScoped<IAgentRunService, AgentRunService>();
+        services.AddScoped<IReviewService, ReviewService>();
+        services.AddScoped<IPublicationService, PublicationService>();
+
+        return services;
+    }
+}
+
+
+========================================================================================================================
+ServiceCollectionExtensions.cs AFTER
+========================================================================================================================
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using VeritasAtlas.Application.Interfaces;
+using VeritasAtlas.Infrastructure.Persistence;
+using VeritasAtlas.Infrastructure.Services;
+
+namespace VeritasAtlas.Infrastructure.Extensions;
+
+public static class ServiceCollectionExtensions
+{
+    public static IServiceCollection AddVeritasAtlasInfrastructure(
+        this IServiceCollection services,
+        IConfiguration configuration)
+    {
+        var connectionString = configuration.GetConnectionString("DefaultConnection")
+            ?? throw new InvalidOperationException("Connection string 'DefaultConnection' was not found.");
+
+        services.AddDbContext<VeritasAtlasDbContext>(options =>
+            options.UseNpgsql(connectionString));
+
+        services.AddScoped<IPersonService, PersonService>();
+        services.AddScoped<ISourceService, SourceService>();
+        services.AddScoped<IDocumentService, DocumentService>();
+        services.AddScoped<IEvidenceService, EvidenceService>();
+        services.AddScoped<IStatementService, StatementService>();
+        services.AddScoped<StatementService>();
+        services.AddScoped<IClaimService, ClaimService>();
+        services.AddScoped<IContradictionService, ContradictionService>();
+        services.AddScoped<ICaseService, CaseService>();
+        services.AddScoped<IConfidenceService, ConfidenceService>();
+        services.AddScoped<IAgentRunService, AgentRunService>();
+        services.AddScoped<IReviewService, ReviewService>();
+        services.AddScoped<IPublicationService, PublicationService>();
+
+        return services;
+    }
+}
+
+
+
+========================================================================================================================
+POST /api/v1/sources
+========================================================================================================================
+{
+    "id":  "5629af16-af46-4d12-a300-8c57695970f8",
+    "name":  "Statement DI Fix Source",
+    "type":  "Article",
+    "reference":  {
+                      "externalId":  null,
+                      "url":  "https://example.com/statement-di-fix",
+                      "domain":  "example.com",
+                      "languageCode":  null
+                  },
+    "status":  "Draft",
+    "createdAtUtc":  "2026-04-06T20:02:47.1813331Z",
+    "updatedAtUtc":  "2026-04-06T20:02:47.1813823Z"
+}
+
+========================================================================================================================
+POST /api/v1/documents
+========================================================================================================================
+{
+    "id":  "663f7787-5a49-4b4e-ba70-13ec189de778",
+    "sourceId":  "5629af16-af46-4d12-a300-8c57695970f8",
+    "title":  "Statement DI Fix Document",
+    "status":  "Draft",
+    "createdAtUtc":  "2026-04-06T20:02:48.8056332Z",
+    "updatedAtUtc":  "2026-04-06T20:02:48.8056339Z"
+}
+
+========================================================================================================================
+POST /api/v1/evidence
+========================================================================================================================
+{
+    "id":  "9dd78b78-6173-4f0b-a771-d2e5500dad76",
+    "documentId":  "663f7787-5a49-4b4e-ba70-13ec189de778",
+    "quote":  "This is a quoted evidence snippet for the statement DI fix smoke test.",
+    "status":  "Pending",
+    "createdAtUtc":  "2026-04-06T20:02:49.4493302Z",
+    "updatedAtUtc":  "2026-04-06T20:02:49.4493304Z"
+}
+
+========================================================================================================================
+POST /api/v1/statements
+========================================================================================================================
+{
+    "id":  "61aee25a-42ed-4aa4-9912-df3bbcd6c400",
+    "evidenceId":  "9dd78b78-6173-4f0b-a771-d2e5500dad76",
+    "documentId":  "663f7787-5a49-4b4e-ba70-13ec189de778",
+    "text":  "StatementText { Raw = The subject made a statement during the DI fix verification., Normalized = The subject made a statement during the DI fix verification. }",
+    "polarity":  "Affirmative",
+    "status":  "Extracted",
+    "topic":  "general",
+    "createdAtUtc":  "2026-04-06T20:02:49.7251493Z",
+    "updatedAtUtc":  "2026-04-06T20:02:49.7251494Z"
+}
+
+========================================================================================================================
+GET /api/v1/statements
+========================================================================================================================
+{
+    "total":  1,
+    "page":  1,
+    "pageSize":  10,
+    "items":  [
+                  {
+                      "id":  "61aee25a-42ed-4aa4-9912-df3bbcd6c400",
+                      "text":  "The subject made a statement during the DI fix verification.",
+                      "topic":  "general",
+                      "predicate":  null,
+                      "object":  null,
+                      "polarity":  "Affirmative",
+                      "status":  "Extracted",
+                      "createdAt":  "2026-04-06T20:02:49.725149Z"
+                  }
+              ]
+}
+
+========================================================================================================================
+GET /api/v1/statements/{id}
+========================================================================================================================
+{
+    "id":  "61aee25a-42ed-4aa4-9912-df3bbcd6c400",
+    "text":  "The subject made a statement during the DI fix verification.",
+    "topic":  "general",
+    "predicate":  null,
+    "object":  null,
+    "polarity":  "Affirmative",
+    "status":  "Extracted",
+    "evidenceId":  "9dd78b78-6173-4f0b-a771-d2e5500dad76",
+    "personId":  null,
+    "createdAt":  "2026-04-06T20:02:49.725149Z"
+}
