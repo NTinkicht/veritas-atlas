@@ -1,8 +1,60 @@
-﻿import { Link } from "react-router-dom";
+﻿import { Link, useSearchParams } from "react-router-dom";
+import { useMemo, useState } from "react";
 import { useStatements } from "../hooks/useStatements";
 
 export function StatementsPage() {
+  const [params] = useSearchParams();
+  const forcedEvidenceId = params.get("evidenceId") ?? "";
+
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("All");
+  const [polarityFilter, setPolarityFilter] = useState("All");
+  const [topicFilter, setTopicFilter] = useState("All");
+
   const query = useStatements();
+  const items = query.data?.items ?? [];
+
+  const filteredItems = useMemo(() => {
+    const term = search.trim().toLowerCase();
+
+    return items.filter((item) => {
+      const matchesEvidence =
+        forcedEvidenceId.length === 0 || item.evidenceId === forcedEvidenceId;
+
+      const matchesSearch =
+        term.length === 0 ||
+        item.text.toLowerCase().includes(term) ||
+        (item.topic ?? "").toLowerCase().includes(term) ||
+        (item.predicate ?? "").toLowerCase().includes(term) ||
+        (item.object ?? "").toLowerCase().includes(term);
+
+      const matchesStatus =
+        statusFilter === "All" || item.status === statusFilter;
+
+      const matchesPolarity =
+        polarityFilter === "All" || item.polarity === polarityFilter;
+
+      const matchesTopic =
+        topicFilter === "All" || (item.topic ?? "N/A") === topicFilter;
+
+      return matchesEvidence && matchesSearch && matchesStatus && matchesPolarity && matchesTopic;
+    });
+  }, [items, forcedEvidenceId, search, statusFilter, polarityFilter, topicFilter]);
+
+  const statuses = useMemo(
+    () => ["All", ...Array.from(new Set(items.map((x) => x.status))).sort()],
+    [items]
+  );
+
+  const polarities = useMemo(
+    () => ["All", ...Array.from(new Set(items.map((x) => x.polarity))).sort()],
+    [items]
+  );
+
+  const topics = useMemo(
+    () => ["All", ...Array.from(new Set(items.map((x) => x.topic ?? "N/A"))).sort()],
+    [items]
+  );
 
   return (
     <div style={{ fontFamily: "Arial, sans-serif", padding: "24px" }}>
@@ -23,6 +75,36 @@ export function StatementsPage() {
         <Link to="/statements/new" style={actionLinkStyle}>Create New Statement</Link>
       </div>
 
+      <section style={filterPanelStyle}>
+        <input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search statement text, topic, predicate, or object"
+          style={inputStyle}
+        />
+        <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} style={selectStyle}>
+          {statuses.map((value) => (
+            <option key={value} value={value}>{value}</option>
+          ))}
+        </select>
+        <select value={polarityFilter} onChange={(e) => setPolarityFilter(e.target.value)} style={selectStyle}>
+          {polarities.map((value) => (
+            <option key={value} value={value}>{value}</option>
+          ))}
+        </select>
+        <select value={topicFilter} onChange={(e) => setTopicFilter(e.target.value)} style={selectStyle}>
+          {topics.map((value) => (
+            <option key={value} value={value}>{value}</option>
+          ))}
+        </select>
+      </section>
+
+      {forcedEvidenceId && (
+        <div style={hintCardStyle}>
+          <strong>Evidence scope:</strong> {forcedEvidenceId}
+        </div>
+      )}
+
       {query.isLoading && <p>Loading statements...</p>}
 
       {query.isError && (
@@ -33,11 +115,11 @@ export function StatementsPage() {
 
       {query.isSuccess && (
         <>
-          <p>Showing {query.data.items.length} of {query.data.total} statements</p>
+          <p>Showing {filteredItems.length} of {query.data.total} statements</p>
 
-          {query.data.items.length === 0 ? (
+          {filteredItems.length === 0 ? (
             <div style={emptyStateStyle}>
-              <p style={{ margin: 0 }}>No statements found.</p>
+              <p style={{ margin: 0 }}>No statements found for the current filters.</p>
             </div>
           ) : (
             <div style={{ overflowX: "auto" }}>
@@ -53,7 +135,7 @@ export function StatementsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {query.data.items.map((item) => (
+                  {filteredItems.map((item) => (
                     <tr key={item.id}>
                       <td style={tdStyle}><Link to={`/statements/${item.id}`}>{item.text}</Link></td>
                       <td style={tdStyle}>{item.topic ?? "N/A"}</td>
@@ -72,6 +154,31 @@ export function StatementsPage() {
     </div>
   );
 }
+
+const filterPanelStyle: React.CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "minmax(260px, 1fr) 180px 180px 180px",
+  gap: "12px",
+  marginBottom: "16px",
+};
+
+const inputStyle: React.CSSProperties = {
+  width: "100%",
+  boxSizing: "border-box",
+  padding: "10px 12px",
+  borderRadius: "8px",
+  border: "1px solid #ccc",
+  font: "inherit",
+};
+
+const selectStyle: React.CSSProperties = {
+  width: "100%",
+  boxSizing: "border-box",
+  padding: "10px 12px",
+  borderRadius: "8px",
+  border: "1px solid #ccc",
+  font: "inherit",
+};
 
 const tableStyle: React.CSSProperties = {
   width: "100%",
@@ -106,4 +213,12 @@ const emptyStateStyle: React.CSSProperties = {
   borderRadius: "12px",
   padding: "20px",
   color: "#666",
+};
+
+const hintCardStyle: React.CSSProperties = {
+  marginBottom: "16px",
+  padding: "12px 14px",
+  border: "1px solid #d9e6ff",
+  borderRadius: "12px",
+  background: "#f8fbff",
 };
