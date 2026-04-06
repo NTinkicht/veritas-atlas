@@ -45,6 +45,9 @@ import { PublicationDeskPage } from "./pages/PublicationDeskPage";
 import { CaseDetailPage } from "./pages/CaseDetailPage";
 import { ReviewsPage } from "./pages/ReviewsPage";
 import { DashboardPage } from "./pages/DashboardPage";
+import { ReleaseReadinessHubPage } from "./pages/ReleaseReadinessHubPage";
+import { DeliveryCloseoutWorkspacePage } from "./pages/DeliveryCloseoutWorkspacePage";
+import { OpsCoordinationCenterPage } from "./pages/OpsCoordinationCenterPage";
 import { KnowledgeGraphHubPage } from "./pages/KnowledgeGraphHubPage";
 import { PublicationGovernanceWorkspacePage } from "./pages/PublicationGovernanceWorkspacePage";
 import { ReadinessRadarWorkspacePage } from "./pages/ReadinessRadarWorkspacePage";
@@ -88,6 +91,9 @@ function Layout({ children }: { children: React.ReactNode }) {
           <Link to="/dashboard">Dashboard</Link>
           <Link to="/decision-intelligence">Decision Intelligence</Link>
 <Link to="/knowledge-graph-hub">Knowledge Graph Hub</Link>
+<Link to="/release-readiness-hub">Release Readiness Hub</Link>
+          <Link to="/delivery-closeout">Delivery Closeout</Link>
+          <Link to="/ops-coordination-center">Ops Coordination</Link>
           <Link to="/publication-governance">Publication Governance</Link>
           <Link to="/readiness-radar-workspace">Readiness Radar</Link>
 <Link to="/evidence-flow-studio">Evidence Flow Studio</Link>
@@ -235,6 +241,9 @@ const router = createBrowserRouter([
   { path: "/dashboard", element: <DashboardPage /> },
   { path: "/decision-intelligence", element: <DecisionIntelligencePage /> },
 { path: "/knowledge-graph-hub", element: <KnowledgeGraphHubPage /> },
+{ path: "/release-readiness-hub", element: <ReleaseReadinessHubPage /> },
+  { path: "/delivery-closeout", element: <DeliveryCloseoutWorkspacePage /> },
+  { path: "/ops-coordination-center", element: <OpsCoordinationCenterPage /> },
   { path: "/publication-governance", element: <PublicationGovernanceWorkspacePage /> },
   { path: "/readiness-radar-workspace", element: <ReadinessRadarWorkspacePage /> },
 { path: "/evidence-flow-studio", element: <EvidenceFlowStudioPage /> },

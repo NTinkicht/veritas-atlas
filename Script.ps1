@@ -119,26 +119,105 @@ function Ensure-RouteBlock {
 }
 
 Write-Host "Checkpointing current code with git..." -ForegroundColor Cyan
-Git-Checkpoint -Message ("checkpoint before phase 6.31 - " + (Get-Date -Format "yyyy-MM-dd HH:mm:ss"))
+Git-Checkpoint -Message ("checkpoint before phase 6.32 - " + (Get-Date -Format "yyyy-MM-dd HH:mm:ss"))
 
-Write-Host "Applying Phase 6.31 - Delivery Closeout, Release Readiness, and Ops Coordination pack..." -ForegroundColor Cyan
+Write-Host "Applying Phase 6.32 - Executive Readout, Portfolio View, and Final Ops Surfaces pack..." -ForegroundColor Cyan
 
 $web = Join-Path $RootDir "apps\web\veritas-atlas-web\src"
 
-Write-File (Join-Path $web "components\ReleaseReadinessPanel.tsx") @'
-type ReleaseReadinessItem = {
+Write-File (Join-Path $web "components\ExecutiveReadoutPanel.tsx") @'
+type ExecutiveReadoutItem = {
+  label: string;
+  value: string;
+};
+
+export function ExecutiveReadoutPanel({
+  items,
+}: {
+  items: ExecutiveReadoutItem[];
+}) {
+  return (
+    <div style={panelStyle}>
+      <h3 style={{ marginTop: 0 }}>Executive Readout</h3>
+      <ul style={{ marginBottom: 0 }}>
+        {items.map((item) => (
+          <li key={item.label}>
+            <strong>{item.label}</strong>: {item.value}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+const panelStyle: React.CSSProperties = {
+  border: "1px solid #ddd",
+  borderRadius: 14,
+  padding: 16,
+};
+'@
+
+Write-File (Join-Path $web "components\PortfolioRollupPanel.tsx") @'
+type PortfolioMetric = {
+  label: string;
+  value: number;
+};
+
+export function PortfolioRollupPanel({
+  metrics,
+}: {
+  metrics: PortfolioMetric[];
+}) {
+  return (
+    <div style={panelStyle}>
+      <h3 style={{ marginTop: 0 }}>Portfolio Rollup</h3>
+      <div style={gridStyle}>
+        {metrics.map((metric) => (
+          <div key={metric.label} style={cardStyle}>
+            <span style={{ color: "#666" }}>{metric.label}</span>
+            <strong style={{ fontSize: 28 }}>{metric.value}</strong>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+const panelStyle: React.CSSProperties = {
+  border: "1px solid #ddd",
+  borderRadius: 14,
+  padding: 16,
+};
+
+const gridStyle: React.CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
+  gap: 12,
+};
+
+const cardStyle: React.CSSProperties = {
+  border: "1px solid #eee",
+  borderRadius: 12,
+  padding: 12,
+  display: "grid",
+  gap: 8,
+};
+'@
+
+Write-File (Join-Path $web "components\OpsFinalizationPanel.tsx") @'
+type FinalizationItem = {
   label: string;
   status: string;
 };
 
-export function ReleaseReadinessPanel({
+export function OpsFinalizationPanel({
   items,
 }: {
-  items: ReleaseReadinessItem[];
+  items: FinalizationItem[];
 }) {
   return (
     <div style={panelStyle}>
-      <h3 style={{ marginTop: 0 }}>Release Readiness</h3>
+      <h3 style={{ marginTop: 0 }}>Ops Finalization</h3>
       <ul style={{ marginBottom: 0 }}>
         {items.map((item) => (
           <li key={item.label}>
@@ -157,165 +236,112 @@ const panelStyle: React.CSSProperties = {
 };
 '@
 
-Write-File (Join-Path $web "components\DeliveryCheckpointPanel.tsx") @'
-type DeliveryCheckpoint = {
-  label: string;
-  detail: string;
-};
-
-export function DeliveryCheckpointPanel({
-  items,
-}: {
-  items: DeliveryCheckpoint[];
-}) {
-  return (
-    <div style={panelStyle}>
-      <h3 style={{ marginTop: 0 }}>Delivery Checkpoints</h3>
-      <ul style={{ marginBottom: 0 }}>
-        {items.map((item) => (
-          <li key={item.label}>
-            <strong>{item.label}</strong>: {item.detail}
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
-}
-
-const panelStyle: React.CSSProperties = {
-  border: "1px solid #ddd",
-  borderRadius: 14,
-  padding: 16,
-};
-'@
-
-Write-File (Join-Path $web "components\OpsCoordinationMatrixPanel.tsx") @'
-type OpsCoordinationItem = {
-  workspace: string;
-  nextAction: string;
-};
-
-export function OpsCoordinationMatrixPanel({
-  items,
-}: {
-  items: OpsCoordinationItem[];
-}) {
-  return (
-    <div style={panelStyle}>
-      <h3 style={{ marginTop: 0 }}>Ops Coordination Matrix</h3>
-      <ul style={{ marginBottom: 0 }}>
-        {items.map((item) => (
-          <li key={item.workspace}>
-            {item.workspace} - {item.nextAction}
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
-}
-
-const panelStyle: React.CSSProperties = {
-  border: "1px solid #ddd",
-  borderRadius: 14,
-  padding: 16,
-};
-'@
-
-Write-File (Join-Path $web "pages\ReleaseReadinessHubPage.tsx") @'
+Write-File (Join-Path $web "pages\ExecutiveReadoutWorkspacePage.tsx") @'
 import { Link } from "react-router-dom";
-import { ReleaseReadinessPanel } from "../components/ReleaseReadinessPanel";
+import { useClaims } from "../hooks/useClaims";
+import { useContradictions } from "../hooks/useContradictions";
+import { ExecutiveReadoutPanel } from "../components/ExecutiveReadoutPanel";
 
-export function ReleaseReadinessHubPage() {
+export function ExecutiveReadoutWorkspacePage() {
+  const claimsQuery = useClaims();
+  const contradictionsQuery = useContradictions();
+
   const items = [
-    { label: "Claims workflow", status: "Ready" },
-    { label: "Contradiction workflow", status: "Ready" },
-    { label: "Review surfaces", status: "Ready" },
-    { label: "Publication governance", status: "In progress" },
-    { label: "Narrative layer", status: "In progress" },
+    { label: "Claims visible", value: String(claimsQuery.data?.items.length ?? 0) },
+    { label: "Contradictions visible", value: String(contradictionsQuery.data?.items.length ?? 0) },
+    { label: "Delivery state", value: "Operational prototype" },
+    { label: "Readiness mode", value: "Expansion + stabilization" },
   ];
 
   return (
     <div style={{ fontFamily: "Arial, sans-serif", padding: 24 }}>
       <header style={{ marginBottom: 24 }}>
-        <h1 style={{ margin: 0 }}>Release Readiness Hub</h1>
+        <h1 style={{ margin: 0 }}>Executive Readout Workspace</h1>
         <p style={{ color: "#555" }}>
-          Central release-readiness surface across operational, review, and publication layers.
+          High-level rollup across the current Veritas Atlas operational system.
         </p>
         <nav style={{ display: "flex", gap: 16, marginTop: 12, flexWrap: "wrap" }}>
           <Link to="/">Home</Link>
+          <Link to="/executive-readout-workspace">Executive Readout</Link>
           <Link to="/release-readiness-hub">Release Readiness Hub</Link>
-          <Link to="/publication-governance">Publication Governance</Link>
-          <Link to="/readiness-radar-workspace">Readiness Radar</Link>
+          <Link to="/ops-coordination-center">Ops Coordination</Link>
         </nav>
       </header>
 
-      <ReleaseReadinessPanel items={items} />
+      <ExecutiveReadoutPanel items={items} />
     </div>
   );
 }
 '@
 
-Write-File (Join-Path $web "pages\DeliveryCloseoutWorkspacePage.tsx") @'
+Write-File (Join-Path $web "pages\OperationalPortfolioPage.tsx") @'
 import { Link } from "react-router-dom";
-import { DeliveryCheckpointPanel } from "../components/DeliveryCheckpointPanel";
+import { useCases } from "../hooks/useCases";
+import { useClaims } from "../hooks/useClaims";
+import { useContradictions } from "../hooks/useContradictions";
+import { PortfolioRollupPanel } from "../components/PortfolioRollupPanel";
 
-export function DeliveryCloseoutWorkspacePage() {
-  const items = [
-    { label: "Core entity workflows", detail: "Operational" },
-    { label: "Case explorer and workbench", detail: "Operational" },
-    { label: "Review and publication pack", detail: "Operational shell ready" },
-    { label: "Decision intelligence layer", detail: "Operational shell ready" },
-    { label: "Release governance", detail: "Needs final business wiring" },
+export function OperationalPortfolioPage() {
+  const casesQuery = useCases();
+  const claimsQuery = useClaims();
+  const contradictionsQuery = useContradictions();
+
+  const metrics = [
+    { label: "Cases", value: casesQuery.data?.items.length ?? 0 },
+    { label: "Claims", value: claimsQuery.data?.items.length ?? 0 },
+    { label: "Contradictions", value: contradictionsQuery.data?.items.length ?? 0 },
+    { label: "Open Review Work", value: contradictionsQuery.data?.items.filter(x => x.status !== "Resolved").length ?? 0 },
   ];
 
   return (
     <div style={{ fontFamily: "Arial, sans-serif", padding: 24 }}>
       <header style={{ marginBottom: 24 }}>
-        <h1 style={{ margin: 0 }}>Delivery Closeout Workspace</h1>
+        <h1 style={{ margin: 0 }}>Operational Portfolio</h1>
         <p style={{ color: "#555" }}>
-          Workspace for tracking implementation closeout and remaining readiness gaps.
+          Rollup across the major operational entities in the platform.
         </p>
         <nav style={{ display: "flex", gap: 16, marginTop: 12, flexWrap: "wrap" }}>
+          <Link to="/operational-portfolio">Operational Portfolio</Link>
+          <Link to="/case-explorer">Case Explorer</Link>
+          <Link to="/knowledge-graph-hub">Knowledge Graph Hub</Link>
+        </nav>
+      </header>
+
+      <PortfolioRollupPanel metrics={metrics} />
+    </div>
+  );
+}
+'@
+
+Write-File (Join-Path $web "pages\OpsFinalizationWorkspacePage.tsx") @'
+import { Link } from "react-router-dom";
+import { OpsFinalizationPanel } from "../components/OpsFinalizationPanel";
+
+export function OpsFinalizationWorkspacePage() {
+  const items = [
+    { label: "Core entity pages", status: "Ready" },
+    { label: "Case explorer surfaces", status: "Ready" },
+    { label: "Contradiction workflow surfaces", status: "Ready" },
+    { label: "Review and publication shells", status: "Ready" },
+    { label: "Decision and readiness layers", status: "Ready" },
+    { label: "Final business-depth pass", status: "Pending" },
+  ];
+
+  return (
+    <div style={{ fontFamily: "Arial, sans-serif", padding: 24 }}>
+      <header style={{ marginBottom: 24 }}>
+        <h1 style={{ margin: 0 }}>Ops Finalization Workspace</h1>
+        <p style={{ color: "#555" }}>
+          Final surface for consolidating operational completion before deeper backend and business logic passes.
+        </p>
+        <nav style={{ display: "flex", gap: 16, marginTop: 12, flexWrap: "wrap" }}>
+          <Link to="/ops-finalization-workspace">Ops Finalization</Link>
           <Link to="/delivery-closeout">Delivery Closeout</Link>
-          <Link to="/delivery-control-tower">Delivery Control Tower</Link>
           <Link to="/release-readiness-hub">Release Readiness Hub</Link>
         </nav>
       </header>
 
-      <DeliveryCheckpointPanel items={items} />
-    </div>
-  );
-}
-'@
-
-Write-File (Join-Path $web "pages\OpsCoordinationCenterPage.tsx") @'
-import { Link } from "react-router-dom";
-import { OpsCoordinationMatrixPanel } from "../components/OpsCoordinationMatrixPanel";
-
-export function OpsCoordinationCenterPage() {
-  const items = [
-    { workspace: "Evidence Flow Studio", nextAction: "Advance evidence into statements and claims" },
-    { workspace: "Truth Review Studio", nextAction: "Validate contradictions and review readiness" },
-    { workspace: "Publication Pipeline", nextAction: "Prepare narrative and governance checks" },
-    { workspace: "Decision Intelligence", nextAction: "Review confidence and explanation surfaces" },
-    { workspace: "Release Readiness Hub", nextAction: "Track final release state" },
-  ];
-
-  return (
-    <div style={{ fontFamily: "Arial, sans-serif", padding: 24 }}>
-      <header style={{ marginBottom: 24 }}>
-        <h1 style={{ margin: 0 }}>Ops Coordination Center</h1>
-        <p style={{ color: "#555" }}>
-          Coordination view for moving work cleanly between operational surfaces.
-        </p>
-        <nav style={{ display: "flex", gap: 16, marginTop: 12, flexWrap: "wrap" }}>
-          <Link to="/ops-coordination-center">Ops Coordination Center</Link>
-          <Link to="/operational-handoff">Operational Handoff</Link>
-          <Link to="/release-readiness-hub">Release Readiness Hub</Link>
-        </nav>
-      </header>
-
-      <OpsCoordinationMatrixPanel items={items} />
+      <OpsFinalizationPanel items={items} />
     </div>
   );
 }
@@ -324,21 +350,21 @@ export function OpsCoordinationCenterPage() {
 $main = Join-Path $web "main.tsx"
 $content = Get-Content $main -Raw
 
-$content = Ensure-ImportLine -Content $content -Anchor 'import { DashboardPage } from "./pages/DashboardPage";' -ImportLine 'import { ReleaseReadinessHubPage } from "./pages/ReleaseReadinessHubPage";'
-$content = Ensure-ImportLine -Content $content -Anchor 'import { ReleaseReadinessHubPage } from "./pages/ReleaseReadinessHubPage";' -ImportLine 'import { DeliveryCloseoutWorkspacePage } from "./pages/DeliveryCloseoutWorkspacePage";'
-$content = Ensure-ImportLine -Content $content -Anchor 'import { DeliveryCloseoutWorkspacePage } from "./pages/DeliveryCloseoutWorkspacePage";' -ImportLine 'import { OpsCoordinationCenterPage } from "./pages/OpsCoordinationCenterPage";'
+$content = Ensure-ImportLine -Content $content -Anchor 'import { DashboardPage } from "./pages/DashboardPage";' -ImportLine 'import { ExecutiveReadoutWorkspacePage } from "./pages/ExecutiveReadoutWorkspacePage";'
+$content = Ensure-ImportLine -Content $content -Anchor 'import { ExecutiveReadoutWorkspacePage } from "./pages/ExecutiveReadoutWorkspacePage";' -ImportLine 'import { OperationalPortfolioPage } from "./pages/OperationalPortfolioPage";'
+$content = Ensure-ImportLine -Content $content -Anchor 'import { OperationalPortfolioPage } from "./pages/OperationalPortfolioPage";' -ImportLine 'import { OpsFinalizationWorkspacePage } from "./pages/OpsFinalizationWorkspacePage";'
 
-$content = Ensure-NavBlock -Content $content -Anchor '<Link to="/knowledge-graph-hub">Knowledge Graph Hub</Link>' -NavBlock '<Link to="/release-readiness-hub">Release Readiness Hub</Link>
-          <Link to="/delivery-closeout">Delivery Closeout</Link>
-          <Link to="/ops-coordination-center">Ops Coordination</Link>' -PresencePattern 'to="/release-readiness-hub"'
+$content = Ensure-NavBlock -Content $content -Anchor '<Link to="/release-readiness-hub">Release Readiness Hub</Link>' -NavBlock '<Link to="/executive-readout-workspace">Executive Readout</Link>
+          <Link to="/operational-portfolio">Operational Portfolio</Link>
+          <Link to="/ops-finalization-workspace">Ops Finalization</Link>' -PresencePattern 'to="/executive-readout-workspace"'
 
-$content = Ensure-RouteBlock -Content $content -AnchorRoute '{ path: "/knowledge-graph-hub", element: <KnowledgeGraphHubPage /> },' -RouteBlock '{ path: "/release-readiness-hub", element: <ReleaseReadinessHubPage /> },
-  { path: "/delivery-closeout", element: <DeliveryCloseoutWorkspacePage /> },
-  { path: "/ops-coordination-center", element: <OpsCoordinationCenterPage /> },' -PresencePattern 'path: "/release-readiness-hub"'
+$content = Ensure-RouteBlock -Content $content -AnchorRoute '{ path: "/release-readiness-hub", element: <ReleaseReadinessHubPage /> },' -RouteBlock '{ path: "/executive-readout-workspace", element: <ExecutiveReadoutWorkspacePage /> },
+  { path: "/operational-portfolio", element: <OperationalPortfolioPage /> },
+  { path: "/ops-finalization-workspace", element: <OpsFinalizationWorkspacePage /> },' -PresencePattern 'path: "/executive-readout-workspace"'
 
 Write-File $main $content
 
 Write-Host "Building..." -ForegroundColor Cyan
 Build-All -RootDir $RootDir
 
-Write-Host "Phase 6.31 DONE" -ForegroundColor Green
+Write-Host "Phase 6.32 DONE" -ForegroundColor Green
