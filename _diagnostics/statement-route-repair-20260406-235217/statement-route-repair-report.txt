@@ -1,0 +1,271 @@
+﻿Statement route repair and smoke test
+Generated: 2026-04-06T23:52:17
+Root: C:\Projects\veritas-atlas
+
+========================================================================================================================
+FILE: StatementsController.cs BEFORE
+========================================================================================================================
+using Microsoft.AspNetCore.Mvc;
+using VeritasAtlas.Application.Contracts.Statements;
+using VeritasAtlas.Infrastructure.Services;
+
+namespace VeritasAtlas.Api.Controllers;
+
+[ApiController]
+[Route("api/statements")]
+public class StatementsController : ControllerBase
+{
+    private readonly StatementService _service;
+
+    public StatementsController(StatementService service)
+    {
+        _service = service;
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> GetStatements([FromQuery] StatementListRequest request)
+    {
+        var (total, items) = await _service.GetStatementsAsync(request.Page, request.PageSize);
+
+        return Ok(new
+        {
+            Total = total,
+            Page = request.Page,
+            PageSize = request.PageSize,
+            Items = items
+        });
+    }
+
+    [HttpGet("{id:guid}")]
+    public async Task<IActionResult> GetStatement(Guid id)
+    {
+        var result = await _service.GetStatementByIdAsync(id);
+
+        if (result == null)
+            return NotFound();
+
+        return Ok(result);
+    }
+}
+
+
+========================================================================================================================
+FILE: StatementsContracts.cs
+========================================================================================================================
+namespace VeritasAtlas.Api.Contracts.Statements;
+
+public sealed record CreateStatementRequest(
+    Guid EvidenceId,
+    string Text,
+    string? CreatedBy);
+
+public sealed record CreateStatementResponse(
+    Guid Id,
+    Guid EvidenceId,
+    Guid? DocumentId,
+    string Text,
+    string Polarity,
+    string Status,
+    string? Topic,
+    DateTime CreatedAtUtc,
+    DateTime UpdatedAtUtc);
+
+
+========================================================================================================================
+FILE: IStatementService.cs
+========================================================================================================================
+using VeritasAtlas.Domain.Entities;
+
+namespace VeritasAtlas.Application.Interfaces;
+
+public interface IStatementService
+{
+    Task<Statement> ExtractStatementAsync(
+        Guid evidenceId,
+        string text,
+        string? createdBy = null,
+        CancellationToken cancellationToken = default);
+}
+
+
+========================================================================================================================
+FILE: StatementService.cs
+========================================================================================================================
+using Microsoft.EntityFrameworkCore;
+using VeritasAtlas.Application.Common;
+using VeritasAtlas.Application.Contracts.Statements;
+using VeritasAtlas.Application.Interfaces;
+using VeritasAtlas.Domain.Entities;
+using VeritasAtlas.Domain.Enums;
+using VeritasAtlas.Domain.ValueObjects;
+using VeritasAtlas.Infrastructure.Persistence;
+
+namespace VeritasAtlas.Infrastructure.Services;
+
+public sealed class StatementService : IStatementService
+{
+    private readonly VeritasAtlasDbContext _dbContext;
+
+    public StatementService(VeritasAtlasDbContext dbContext)
+    {
+        _dbContext = dbContext;
+    }
+
+    public async Task<Statement> ExtractStatementAsync(
+        Guid evidenceId,
+        string text,
+        string? createdBy = null,
+        CancellationToken cancellationToken = default)
+    {
+        var evidence = await _dbContext.Evidences
+            .FirstOrDefaultAsync(x => x.Id == evidenceId, cancellationToken);
+
+        if (evidence is null)
+        {
+            throw new NotFoundException($"Evidence '{evidenceId}' was not found.");
+        }
+
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            throw new ValidationException("Statement text is required.");
+        }
+
+        var normalized = text.Trim();
+
+        var entity = new Statement
+        {
+            EvidenceId = evidenceId,
+            DocumentId = evidence.DocumentId,
+            Text = new StatementText(normalized, normalized),
+            Polarity = StatementPolarity.Affirmative,
+            Status = StatementStatus.Extracted,
+            Topic = "general"
+        };
+
+        _dbContext.Statements.Add(entity);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+
+        return entity;
+    }
+
+    public async Task<(int Total, List<StatementListItemResponse> Items)> GetStatementsAsync(
+        int page,
+        int pageSize)
+    {
+        page = page < 1 ? 1 : page;
+        pageSize = pageSize < 1 ? 20 : pageSize;
+
+        var query = _dbContext.Statements.AsNoTracking();
+
+        var total = await query.CountAsync();
+
+        var items = await query
+            .OrderByDescending(x => x.CreatedAtUtc)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .Select(x => new StatementListItemResponse
+            {
+                Id = x.Id,
+                Text = x.Text.Raw,
+                Topic = x.Topic,
+                Predicate = x.Predicate,
+                Object = x.ObjectValue,
+                Polarity = x.Polarity.ToString(),
+                Status = x.Status.ToString(),
+                CreatedAt = x.CreatedAtUtc
+            })
+            .ToListAsync();
+
+        return (total, items);
+    }
+
+    public async Task<StatementDetailResponse?> GetStatementByIdAsync(Guid id)
+    {
+        return await _dbContext.Statements
+            .AsNoTracking()
+            .Where(x => x.Id == id)
+            .Select(x => new StatementDetailResponse
+            {
+                Id = x.Id,
+                Text = x.Text.Raw,
+                Topic = x.Topic,
+                Predicate = x.Predicate,
+                Object = x.ObjectValue,
+                Polarity = x.Polarity.ToString(),
+                Status = x.Status.ToString(),
+                EvidenceId = x.EvidenceId,
+                PersonId = x.PersonId,
+                CreatedAt = x.CreatedAtUtc
+            })
+            .FirstOrDefaultAsync();
+    }
+}
+
+
+========================================================================================================================
+PROBE POST /api/v1/statements
+========================================================================================================================
+System.Net.WebException: Le serveur distant a retourné une erreur : (404) Introuvable.
+   à Microsoft.PowerShell.Commands.WebRequestPSCmdlet.GetResponse(WebRequest request)
+   à Microsoft.PowerShell.Commands.WebRequestPSCmdlet.ProcessRecord()
+
+========================================================================================================================
+PROBE POST /api/statements
+========================================================================================================================
+System.Net.WebException: Le serveur distant a retourné une erreur : (405) Méthode non autorisée.
+   à Microsoft.PowerShell.Commands.WebRequestPSCmdlet.GetResponse(WebRequest request)
+   à Microsoft.PowerShell.Commands.WebRequestPSCmdlet.ProcessRecord()
+
+========================================================================================================================
+PATCH DECISION
+========================================================================================================================
+No route patch was applied.
+
+========================================================================================================================
+POST /api/v1/sources
+========================================================================================================================
+{
+    "id":  "aa1584b6-fc68-4f57-a323-78f111eda4c9",
+    "name":  "Statement Route Repair Source",
+    "type":  "Article",
+    "reference":  {
+                      "externalId":  null,
+                      "url":  "https://example.com/statement-route-repair",
+                      "domain":  "example.com",
+                      "languageCode":  null
+                  },
+    "status":  "Draft",
+    "createdAtUtc":  "2026-04-06T19:52:37.4787302Z",
+    "updatedAtUtc":  "2026-04-06T19:52:37.478787Z"
+}
+
+========================================================================================================================
+POST /api/v1/documents
+========================================================================================================================
+{
+    "id":  "da2f8c22-014b-45bb-a346-7ea2be899589",
+    "sourceId":  "aa1584b6-fc68-4f57-a323-78f111eda4c9",
+    "title":  "Statement Route Repair Document",
+    "status":  "Draft",
+    "createdAtUtc":  "2026-04-06T19:52:38.994908Z",
+    "updatedAtUtc":  "2026-04-06T19:52:38.9949084Z"
+}
+
+========================================================================================================================
+POST /api/v1/evidence
+========================================================================================================================
+{
+    "id":  "613314f2-baff-461e-80bf-563aac92dac0",
+    "documentId":  "da2f8c22-014b-45bb-a346-7ea2be899589",
+    "quote":  "This is a quoted evidence snippet for statement route repair.",
+    "status":  "Pending",
+    "createdAtUtc":  "2026-04-06T19:52:39.70626Z",
+    "updatedAtUtc":  "2026-04-06T19:52:39.7062601Z"
+}
+
+========================================================================================================================
+POST /api/v1/statements
+========================================================================================================================
+System.Net.WebException: Le serveur distant a retourné une erreur : (404) Introuvable.
+   à Microsoft.PowerShell.Commands.WebRequestPSCmdlet.GetResponse(WebRequest request)
+   à Microsoft.PowerShell.Commands.WebRequestPSCmdlet.ProcessRecord()
