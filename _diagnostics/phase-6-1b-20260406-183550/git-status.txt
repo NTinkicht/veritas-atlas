@@ -1,0 +1,13 @@
+﻿## main
+?? .vs/
+?? Directory.Build.props
+?? Directory.Packages.props
+?? Script.ps1
+?? Script/
+?? VeritasAtlas.slnx
+?? _diagnostics/
+?? apps/
+?? global.json
+?? service-signature-inspection.txt
+?? tests/
+

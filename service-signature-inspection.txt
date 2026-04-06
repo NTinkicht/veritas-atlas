@@ -1,0 +1,40 @@
+﻿Veritas Atlas - Service Signature Inspection
+Generated at: 2026-04-02T02:47:27
+
+===== FILE: C:\Projects\veritas-atlas\apps\api\VeritasAtlas.Application\Interfaces\IDocumentService.cs =====
+
+---- Match for: AddDocumentAsync at line 8 ----
+   5: 
+   6: public interface IDocumentService
+   7: {
+   8:     Task<Document> AddDocumentAsync(
+   9:         Guid sourceId,
+  10:         string title,
+  11:         string content,
+  12:         string? externalReference = null,
+  13:         string? createdBy = null,
+  14:         CancellationToken cancellationToken = default);
+  15: }
+
+===== FILE: C:\Projects\veritas-atlas\apps\api\VeritasAtlas.Application\Interfaces\IEvidenceService.cs =====
+
+---- Match for: AddEvidenceAsync at line 7 ----
+   4: 
+   5: public interface IEvidenceService
+   6: {
+   7:     Task<Evidence> AddEvidenceAsync(
+   8:         Guid documentId,
+   9:         string quote,
+  10:         int? startOffset = null,
+  11:         int? endOffset = null,
+  12:         string? context = null,
+  13:         string? createdBy = null,
+  14:         CancellationToken cancellationToken = default);
+  15: }
+
+===== FILE: DocumentService.cs =====
+Not found under: C:\Projects\veritas-atlas\apps\api\VeritasAtlas.Application
+
+===== FILE: EvidenceService.cs =====
+Not found under: C:\Projects\veritas-atlas\apps\api\VeritasAtlas.Application
+

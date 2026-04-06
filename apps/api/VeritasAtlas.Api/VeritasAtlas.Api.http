@@ -1,0 +1,6 @@
+@VeritasAtlas.Api_HostAddress = http://localhost:5130
+
+GET {{VeritasAtlas.Api_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

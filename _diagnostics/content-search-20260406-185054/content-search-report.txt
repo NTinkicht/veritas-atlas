@@ -1,0 +1,3 @@
+﻿Content search diagnostics
+Generated: 2026-04-06T18:50:54
+Root: C:\Projects\veritas-atlas

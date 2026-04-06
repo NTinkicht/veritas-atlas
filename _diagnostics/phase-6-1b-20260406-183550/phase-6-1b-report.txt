@@ -1,0 +1,883 @@
+﻿Phase 6.1B diagnostics report
+Generated: 2026-04-06T18:35:50
+Root: C:\Projects\veritas-atlas
+
+========================================================================================================================
+GIT STATUS
+========================================================================================================================
+## main
+?? .vs/
+?? Directory.Build.props
+?? Directory.Packages.props
+?? Script.ps1
+?? Script/
+?? VeritasAtlas.slnx
+?? _diagnostics/
+?? apps/
+?? global.json
+?? service-signature-inspection.txt
+?? tests/
+
+
+========================================================================================================================
+CURRENT BUILD OUTPUT
+========================================================================================================================
+  Identification des projets ├á restaurer...
+  Tous les projets sont ├á jour pour la restauration.
+  VeritasAtlas.Domain -> C:\Projects\veritas-atlas\apps\api\VeritasAtlas.Domain\bin\Debug\net10.0\VeritasAtlas.Domain.dll
+  VeritasAtlas.Application -> C:\Projects\veritas-atlas\apps\api\VeritasAtlas.Application\bin\Debug\net10.0\VeritasAtlas.Application.dll
+C:\Projects\veritas-atlas\apps\api\VeritasAtlas.Infrastructure\Extensions\ServiceCollectionExtensions.cs(23,44): error CS0246: Le nom de type ou d'espace de noms 'SourceService' est introuvable (vous manque-t-il une directive using ou une r├⌐f├⌐rence d'assembly┬á?) [C:\Projects\veritas-atlas\apps\api\VeritasAtlas.Infrastructure\VeritasAtlas.Infrastructure.csproj]
+C:\Projects\veritas-atlas\apps\api\VeritasAtlas.Infrastructure\Extensions\ServiceCollectionExtensions.cs(24,46): error CS0246: Le nom de type ou d'espace de noms 'DocumentService' est introuvable (vous manque-t-il une directive using ou une r├⌐f├⌐rence d'assembly┬á?) [C:\Projects\veritas-atlas\apps\api\VeritasAtlas.Infrastructure\VeritasAtlas.Infrastructure.csproj]
+C:\Projects\veritas-atlas\apps\api\VeritasAtlas.Infrastructure\Extensions\ServiceCollectionExtensions.cs(25,46): error CS0246: Le nom de type ou d'espace de noms 'EvidenceService' est introuvable (vous manque-t-il une directive using ou une r├⌐f├⌐rence d'assembly┬á?) [C:\Projects\veritas-atlas\apps\api\VeritasAtlas.Infrastructure\VeritasAtlas.Infrastructure.csproj]
+C:\Projects\veritas-atlas\apps\api\VeritasAtlas.Infrastructure\Services\DocumentService.cs(29,13): error CS0272: Impossible d'utiliser la propri├⌐t├⌐ ou l'indexeur 'Entity.Id' dans ce contexte, car l'accesseur set n'est pas accessible [C:\Projects\veritas-atlas\apps\api\VeritasAtlas.Infrastructure\VeritasAtlas.Infrastructure.csproj]
+C:\Projects\veritas-atlas\apps\api\VeritasAtlas.Infrastructure\Services\DocumentService.cs(32,13): error CS0117: 'Document' ne contient pas de d├⌐finition pour 'Content' [C:\Projects\veritas-atlas\apps\api\VeritasAtlas.Infrastructure\VeritasAtlas.Infrastructure.csproj]
+C:\Projects\veritas-atlas\apps\api\VeritasAtlas.Infrastructure\Services\DocumentService.cs(33,13): error CS0117: 'Document' ne contient pas de d├⌐finition pour 'ExternalReference' [C:\Projects\veritas-atlas\apps\api\VeritasAtlas.Infrastructure\VeritasAtlas.Infrastructure.csproj]
+C:\Projects\veritas-atlas\apps\api\VeritasAtlas.Infrastructure\Services\DocumentService.cs(35,13): error CS0117: 'Document' ne contient pas de d├⌐finition pour 'CreatedBy' [C:\Projects\veritas-atlas\apps\api\VeritasAtlas.Infrastructure\VeritasAtlas.Infrastructure.csproj]
+C:\Projects\veritas-atlas\apps\api\VeritasAtlas.Infrastructure\Services\DocumentService.cs(36,13): error CS0117: 'Document' ne contient pas de d├⌐finition pour 'UpdatedBy' [C:\Projects\veritas-atlas\apps\api\VeritasAtlas.Infrastructure\VeritasAtlas.Infrastructure.csproj]
+C:\Projects\veritas-atlas\apps\api\VeritasAtlas.Infrastructure\Services\DocumentService.cs(37,13): error CS0272: Impossible d'utiliser la propri├⌐t├⌐ ou l'indexeur 'Entity.CreatedAtUtc' dans ce contexte, car l'accesseur set n'est pas accessible [C:\Projects\veritas-atlas\apps\api\VeritasAtlas.Infrastructure\VeritasAtlas.Infrastructure.csproj]
+C:\Projects\veritas-atlas\apps\api\VeritasAtlas.Infrastructure\Services\SourceService.cs(29,13): error CS0272: Impossible d'utiliser la propri├⌐t├⌐ ou l'indexeur 'Entity.Id' dans ce contexte, car l'accesseur set n'est pas accessible [C:\Projects\veritas-atlas\apps\api\VeritasAtlas.Infrastructure\VeritasAtlas.Infrastructure.csproj]
+C:\Projects\veritas-atlas\apps\api\VeritasAtlas.Infrastructure\Services\SourceService.cs(32,75): error CS7036: Parmi les arguments sp├⌐cifi├⌐s, aucun ne correspond au param├¿tre obligatoire 'Url' de 'SourceReference.SourceReference(string?, string?, string?, string?)' [C:\Projects\veritas-atlas\apps\api\VeritasAtlas.Infrastructure\VeritasAtlas.Infrastructure.csproj]
+C:\Projects\veritas-atlas\apps\api\VeritasAtlas.Infrastructure\Services\SourceService.cs(34,13): error CS0117: 'Source' ne contient pas de d├⌐finition pour 'CreatedBy' [C:\Projects\veritas-atlas\apps\api\VeritasAtlas.Infrastructure\VeritasAtlas.Infrastructure.csproj]
+C:\Projects\veritas-atlas\apps\api\VeritasAtlas.Infrastructure\Services\SourceService.cs(35,13): error CS0117: 'Source' ne contient pas de d├⌐finition pour 'UpdatedBy' [C:\Projects\veritas-atlas\apps\api\VeritasAtlas.Infrastructure\VeritasAtlas.Infrastructure.csproj]
+C:\Projects\veritas-atlas\apps\api\VeritasAtlas.Infrastructure\Services\SourceService.cs(36,13): error CS0272: Impossible d'utiliser la propri├⌐t├⌐ ou l'indexeur 'Entity.CreatedAtUtc' dans ce contexte, car l'accesseur set n'est pas accessible [C:\Projects\veritas-atlas\apps\api\VeritasAtlas.Infrastructure\VeritasAtlas.Infrastructure.csproj]
+C:\Projects\veritas-atlas\apps\api\VeritasAtlas.Infrastructure\Services\EvidenceService.cs(31,13): error CS0272: Impossible d'utiliser la propri├⌐t├⌐ ou l'indexeur 'Entity.Id' dans ce contexte, car l'accesseur set n'est pas accessible [C:\Projects\veritas-atlas\apps\api\VeritasAtlas.Infrastructure\VeritasAtlas.Infrastructure.csproj]
+C:\Projects\veritas-atlas\apps\api\VeritasAtlas.Infrastructure\Services\EvidenceService.cs(33,13): error CS0117: 'Evidence' ne contient pas de d├⌐finition pour 'Quote' [C:\Projects\veritas-atlas\apps\api\VeritasAtlas.Infrastructure\VeritasAtlas.Infrastructure.csproj]
+C:\Projects\veritas-atlas\apps\api\VeritasAtlas.Infrastructure\Services\EvidenceService.cs(34,13): error CS0117: 'Evidence' ne contient pas de d├⌐finition pour 'Context' [C:\Projects\veritas-atlas\apps\api\VeritasAtlas.Infrastructure\VeritasAtlas.Infrastructure.csproj]
+C:\Projects\veritas-atlas\apps\api\VeritasAtlas.Infrastructure\Services\EvidenceService.cs(35,37): error CS1503: Argument 1┬á: conversion impossible de 'int?' en 'int' [C:\Projects\veritas-atlas\apps\api\VeritasAtlas.Infrastructure\VeritasAtlas.Infrastructure.csproj]
+C:\Projects\veritas-atlas\apps\api\VeritasAtlas.Infrastructure\Services\EvidenceService.cs(35,50): error CS1503: Argument 2┬á: conversion impossible de 'int?' en 'int' [C:\Projects\veritas-atlas\apps\api\VeritasAtlas.Infrastructure\VeritasAtlas.Infrastructure.csproj]
+C:\Projects\veritas-atlas\apps\api\VeritasAtlas.Infrastructure\Services\EvidenceService.cs(36,37): error CS0117: 'EvidenceStatus' ne contient pas de d├⌐finition pour 'Active' [C:\Projects\veritas-atlas\apps\api\VeritasAtlas.Infrastructure\VeritasAtlas.Infrastructure.csproj]
+C:\Projects\veritas-atlas\apps\api\VeritasAtlas.Infrastructure\Services\EvidenceService.cs(37,13): error CS0117: 'Evidence' ne contient pas de d├⌐finition pour 'CreatedBy' [C:\Projects\veritas-atlas\apps\api\VeritasAtlas.Infrastructure\VeritasAtlas.Infrastructure.csproj]
+C:\Projects\veritas-atlas\apps\api\VeritasAtlas.Infrastructure\Services\EvidenceService.cs(38,13): error CS0117: 'Evidence' ne contient pas de d├⌐finition pour 'UpdatedBy' [C:\Projects\veritas-atlas\apps\api\VeritasAtlas.Infrastructure\VeritasAtlas.Infrastructure.csproj]
+C:\Projects\veritas-atlas\apps\api\VeritasAtlas.Infrastructure\Services\EvidenceService.cs(39,13): error CS0272: Impossible d'utiliser la propri├⌐t├⌐ ou l'indexeur 'Entity.CreatedAtUtc' dans ce contexte, car l'accesseur set n'est pas accessible [C:\Projects\veritas-atlas\apps\api\VeritasAtlas.Infrastructure\VeritasAtlas.Infrastructure.csproj]
+C:\Projects\veritas-atlas\apps\api\VeritasAtlas.Infrastructure\Services\EvidenceService.cs(29,26): error CS9035: Le membre obligatoire 'Evidence.Content' doit ├¬tre d├⌐fini dans lΓÇÖinitialiseur dΓÇÖobjet ou le constructeur dΓÇÖattribut. [C:\Projects\veritas-atlas\apps\api\VeritasAtlas.Infrastructure\VeritasAtlas.Infrastructure.csproj]
+C:\Projects\veritas-atlas\apps\api\VeritasAtlas.Infrastructure\Services\EvidenceService.cs(43,20): error CS1061: 'VeritasAtlasDbContext' ne contient pas de d├⌐finition pour 'Evidence' et aucune m├⌐thode d'extension accessible 'Evidence' acceptant un premier argument de type 'VeritasAtlasDbContext' n'a ├⌐t├⌐ trouv├⌐e (une directive using ou une r├⌐f├⌐rence d'assembly est-elle manquante┬á?) [C:\Projects\veritas-atlas\apps\api\VeritasAtlas.Infrastructure\VeritasAtlas.Infrastructure.csproj]
+C:\Projects\veritas-atlas\apps\api\VeritasAtlas.Infrastructure\Services\EvidenceService.cs(57,32): error CS1061: 'VeritasAtlasDbContext' ne contient pas de d├⌐finition pour 'Evidence' et aucune m├⌐thode d'extension accessible 'Evidence' acceptant un premier argument de type 'VeritasAtlasDbContext' n'a ├⌐t├⌐ trouv├⌐e (une directive using ou une r├⌐f├⌐rence d'assembly est-elle manquante┬á?) [C:\Projects\veritas-atlas\apps\api\VeritasAtlas.Infrastructure\VeritasAtlas.Infrastructure.csproj]
+C:\Projects\veritas-atlas\apps\api\VeritasAtlas.Infrastructure\Services\EvidenceService.cs(59,39): error CS1061: 'TEntity' ne contient pas de d├⌐finition pour 'CreatedAtUtc' et aucune m├⌐thode d'extension accessible 'CreatedAtUtc' acceptant un premier argument de type 'TEntity' n'a ├⌐t├⌐ trouv├⌐e (une directive using ou une r├⌐f├⌐rence d'assembly est-elle manquante┬á?) [C:\Projects\veritas-atlas\apps\api\VeritasAtlas.Infrastructure\VeritasAtlas.Infrastructure.csproj]
+
+├ëCHEC de la build.
+
+C:\Projects\veritas-atlas\apps\api\VeritasAtlas.Infrastructure\Extensions\ServiceCollectionExtensions.cs(23,44): error CS0246: Le nom de type ou d'espace de noms 'SourceService' est introuvable (vous manque-t-il une directive using ou une r├⌐f├⌐rence d'assembly┬á?) [C:\Projects\veritas-atlas\apps\api\VeritasAtlas.Infrastructure\VeritasAtlas.Infrastructure.csproj]
+C:\Projects\veritas-atlas\apps\api\VeritasAtlas.Infrastructure\Extensions\ServiceCollectionExtensions.cs(24,46): error CS0246: Le nom de type ou d'espace de noms 'DocumentService' est introuvable (vous manque-t-il une directive using ou une r├⌐f├⌐rence d'assembly┬á?) [C:\Projects\veritas-atlas\apps\api\VeritasAtlas.Infrastructure\VeritasAtlas.Infrastructure.csproj]
+C:\Projects\veritas-atlas\apps\api\VeritasAtlas.Infrastructure\Extensions\ServiceCollectionExtensions.cs(25,46): error CS0246: Le nom de type ou d'espace de noms 'EvidenceService' est introuvable (vous manque-t-il une directive using ou une r├⌐f├⌐rence d'assembly┬á?) [C:\Projects\veritas-atlas\apps\api\VeritasAtlas.Infrastructure\VeritasAtlas.Infrastructure.csproj]
+C:\Projects\veritas-atlas\apps\api\VeritasAtlas.Infrastructure\Services\DocumentService.cs(29,13): error CS0272: Impossible d'utiliser la propri├⌐t├⌐ ou l'indexeur 'Entity.Id' dans ce contexte, car l'accesseur set n'est pas accessible [C:\Projects\veritas-atlas\apps\api\VeritasAtlas.Infrastructure\VeritasAtlas.Infrastructure.csproj]
+C:\Projects\veritas-atlas\apps\api\VeritasAtlas.Infrastructure\Services\DocumentService.cs(32,13): error CS0117: 'Document' ne contient pas de d├⌐finition pour 'Content' [C:\Projects\veritas-atlas\apps\api\VeritasAtlas.Infrastructure\VeritasAtlas.Infrastructure.csproj]
+C:\Projects\veritas-atlas\apps\api\VeritasAtlas.Infrastructure\Services\DocumentService.cs(33,13): error CS0117: 'Document' ne contient pas de d├⌐finition pour 'ExternalReference' [C:\Projects\veritas-atlas\apps\api\VeritasAtlas.Infrastructure\VeritasAtlas.Infrastructure.csproj]
+C:\Projects\veritas-atlas\apps\api\VeritasAtlas.Infrastructure\Services\DocumentService.cs(35,13): error CS0117: 'Document' ne contient pas de d├⌐finition pour 'CreatedBy' [C:\Projects\veritas-atlas\apps\api\VeritasAtlas.Infrastructure\VeritasAtlas.Infrastructure.csproj]
+C:\Projects\veritas-atlas\apps\api\VeritasAtlas.Infrastructure\Services\DocumentService.cs(36,13): error CS0117: 'Document' ne contient pas de d├⌐finition pour 'UpdatedBy' [C:\Projects\veritas-atlas\apps\api\VeritasAtlas.Infrastructure\VeritasAtlas.Infrastructure.csproj]
+C:\Projects\veritas-atlas\apps\api\VeritasAtlas.Infrastructure\Services\DocumentService.cs(37,13): error CS0272: Impossible d'utiliser la propri├⌐t├⌐ ou l'indexeur 'Entity.CreatedAtUtc' dans ce contexte, car l'accesseur set n'est pas accessible [C:\Projects\veritas-atlas\apps\api\VeritasAtlas.Infrastructure\VeritasAtlas.Infrastructure.csproj]
+C:\Projects\veritas-atlas\apps\api\VeritasAtlas.Infrastructure\Services\SourceService.cs(29,13): error CS0272: Impossible d'utiliser la propri├⌐t├⌐ ou l'indexeur 'Entity.Id' dans ce contexte, car l'accesseur set n'est pas accessible [C:\Projects\veritas-atlas\apps\api\VeritasAtlas.Infrastructure\VeritasAtlas.Infrastructure.csproj]
+C:\Projects\veritas-atlas\apps\api\VeritasAtlas.Infrastructure\Services\SourceService.cs(32,75): error CS7036: Parmi les arguments sp├⌐cifi├⌐s, aucun ne correspond au param├¿tre obligatoire 'Url' de 'SourceReference.SourceReference(string?, string?, string?, string?)' [C:\Projects\veritas-atlas\apps\api\VeritasAtlas.Infrastructure\VeritasAtlas.Infrastructure.csproj]
+C:\Projects\veritas-atlas\apps\api\VeritasAtlas.Infrastructure\Services\SourceService.cs(34,13): error CS0117: 'Source' ne contient pas de d├⌐finition pour 'CreatedBy' [C:\Projects\veritas-atlas\apps\api\VeritasAtlas.Infrastructure\VeritasAtlas.Infrastructure.csproj]
+C:\Projects\veritas-atlas\apps\api\VeritasAtlas.Infrastructure\Services\SourceService.cs(35,13): error CS0117: 'Source' ne contient pas de d├⌐finition pour 'UpdatedBy' [C:\Projects\veritas-atlas\apps\api\VeritasAtlas.Infrastructure\VeritasAtlas.Infrastructure.csproj]
+C:\Projects\veritas-atlas\apps\api\VeritasAtlas.Infrastructure\Services\SourceService.cs(36,13): error CS0272: Impossible d'utiliser la propri├⌐t├⌐ ou l'indexeur 'Entity.CreatedAtUtc' dans ce contexte, car l'accesseur set n'est pas accessible [C:\Projects\veritas-atlas\apps\api\VeritasAtlas.Infrastructure\VeritasAtlas.Infrastructure.csproj]
+C:\Projects\veritas-atlas\apps\api\VeritasAtlas.Infrastructure\Services\EvidenceService.cs(31,13): error CS0272: Impossible d'utiliser la propri├⌐t├⌐ ou l'indexeur 'Entity.Id' dans ce contexte, car l'accesseur set n'est pas accessible [C:\Projects\veritas-atlas\apps\api\VeritasAtlas.Infrastructure\VeritasAtlas.Infrastructure.csproj]
+C:\Projects\veritas-atlas\apps\api\VeritasAtlas.Infrastructure\Services\EvidenceService.cs(33,13): error CS0117: 'Evidence' ne contient pas de d├⌐finition pour 'Quote' [C:\Projects\veritas-atlas\apps\api\VeritasAtlas.Infrastructure\VeritasAtlas.Infrastructure.csproj]
+C:\Projects\veritas-atlas\apps\api\VeritasAtlas.Infrastructure\Services\EvidenceService.cs(34,13): error CS0117: 'Evidence' ne contient pas de d├⌐finition pour 'Context' [C:\Projects\veritas-atlas\apps\api\VeritasAtlas.Infrastructure\VeritasAtlas.Infrastructure.csproj]
+C:\Projects\veritas-atlas\apps\api\VeritasAtlas.Infrastructure\Services\EvidenceService.cs(35,37): error CS1503: Argument 1┬á: conversion impossible de 'int?' en 'int' [C:\Projects\veritas-atlas\apps\api\VeritasAtlas.Infrastructure\VeritasAtlas.Infrastructure.csproj]
+C:\Projects\veritas-atlas\apps\api\VeritasAtlas.Infrastructure\Services\EvidenceService.cs(35,50): error CS1503: Argument 2┬á: conversion impossible de 'int?' en 'int' [C:\Projects\veritas-atlas\apps\api\VeritasAtlas.Infrastructure\VeritasAtlas.Infrastructure.csproj]
+C:\Projects\veritas-atlas\apps\api\VeritasAtlas.Infrastructure\Services\EvidenceService.cs(36,37): error CS0117: 'EvidenceStatus' ne contient pas de d├⌐finition pour 'Active' [C:\Projects\veritas-atlas\apps\api\VeritasAtlas.Infrastructure\VeritasAtlas.Infrastructure.csproj]
+C:\Projects\veritas-atlas\apps\api\VeritasAtlas.Infrastructure\Services\EvidenceService.cs(37,13): error CS0117: 'Evidence' ne contient pas de d├⌐finition pour 'CreatedBy' [C:\Projects\veritas-atlas\apps\api\VeritasAtlas.Infrastructure\VeritasAtlas.Infrastructure.csproj]
+C:\Projects\veritas-atlas\apps\api\VeritasAtlas.Infrastructure\Services\EvidenceService.cs(38,13): error CS0117: 'Evidence' ne contient pas de d├⌐finition pour 'UpdatedBy' [C:\Projects\veritas-atlas\apps\api\VeritasAtlas.Infrastructure\VeritasAtlas.Infrastructure.csproj]
+C:\Projects\veritas-atlas\apps\api\VeritasAtlas.Infrastructure\Services\EvidenceService.cs(39,13): error CS0272: Impossible d'utiliser la propri├⌐t├⌐ ou l'indexeur 'Entity.CreatedAtUtc' dans ce contexte, car l'accesseur set n'est pas accessible [C:\Projects\veritas-atlas\apps\api\VeritasAtlas.Infrastructure\VeritasAtlas.Infrastructure.csproj]
+C:\Projects\veritas-atlas\apps\api\VeritasAtlas.Infrastructure\Services\EvidenceService.cs(29,26): error CS9035: Le membre obligatoire 'Evidence.Content' doit ├¬tre d├⌐fini dans lΓÇÖinitialiseur dΓÇÖobjet ou le constructeur dΓÇÖattribut. [C:\Projects\veritas-atlas\apps\api\VeritasAtlas.Infrastructure\VeritasAtlas.Infrastructure.csproj]
+C:\Projects\veritas-atlas\apps\api\VeritasAtlas.Infrastructure\Services\EvidenceService.cs(43,20): error CS1061: 'VeritasAtlasDbContext' ne contient pas de d├⌐finition pour 'Evidence' et aucune m├⌐thode d'extension accessible 'Evidence' acceptant un premier argument de type 'VeritasAtlasDbContext' n'a ├⌐t├⌐ trouv├⌐e (une directive using ou une r├⌐f├⌐rence d'assembly est-elle manquante┬á?) [C:\Projects\veritas-atlas\apps\api\VeritasAtlas.Infrastructure\VeritasAtlas.Infrastructure.csproj]
+C:\Projects\veritas-atlas\apps\api\VeritasAtlas.Infrastructure\Services\EvidenceService.cs(57,32): error CS1061: 'VeritasAtlasDbContext' ne contient pas de d├⌐finition pour 'Evidence' et aucune m├⌐thode d'extension accessible 'Evidence' acceptant un premier argument de type 'VeritasAtlasDbContext' n'a ├⌐t├⌐ trouv├⌐e (une directive using ou une r├⌐f├⌐rence d'assembly est-elle manquante┬á?) [C:\Projects\veritas-atlas\apps\api\VeritasAtlas.Infrastructure\VeritasAtlas.Infrastructure.csproj]
+C:\Projects\veritas-atlas\apps\api\VeritasAtlas.Infrastructure\Services\EvidenceService.cs(59,39): error CS1061: 'TEntity' ne contient pas de d├⌐finition pour 'CreatedAtUtc' et aucune m├⌐thode d'extension accessible 'CreatedAtUtc' acceptant un premier argument de type 'TEntity' n'a ├⌐t├⌐ trouv├⌐e (une directive using ou une r├⌐f├⌐rence d'assembly est-elle manquante┬á?) [C:\Projects\veritas-atlas\apps\api\VeritasAtlas.Infrastructure\VeritasAtlas.Infrastructure.csproj]
+    0 Avertissement(s)
+    27 Erreur(s)
+
+Temps ├⌐coul├⌐ 00:00:08.26
+
+
+========================================================================================================================
+FILE: apps/api/VeritasAtlas.Application/Models/PagedListResult.cs
+========================================================================================================================
+namespace VeritasAtlas.Application.Models;
+
+public sealed class PagedListResult<T>
+{
+    public IReadOnlyCollection<T> Items { get; init; } = Array.Empty<T>();
+    public int Page { get; init; }
+    public int PageSize { get; init; }
+    public int TotalCount { get; init; }
+    public int TotalPages { get; init; }
+}
+
+
+========================================================================================================================
+FILE: apps/api/VeritasAtlas.Application/Interfaces/ISourceService.cs
+========================================================================================================================
+using VeritasAtlas.Application.Models;
+using VeritasAtlas.Domain.Entities;
+using VeritasAtlas.Domain.Enums;
+
+namespace VeritasAtlas.Application.Interfaces;
+
+public interface ISourceService
+{
+    Task<Source> RegisterSourceAsync(
+        string name,
+        SourceType type,
+        string reference,
+        string? createdBy = null,
+        CancellationToken cancellationToken = default);
+
+    Task<PagedListResult<Source>> GetSourcesAsync(
+        int page,
+        int pageSize,
+        CancellationToken cancellationToken = default);
+}
+
+
+========================================================================================================================
+FILE: apps/api/VeritasAtlas.Application/Interfaces/IDocumentService.cs
+========================================================================================================================
+using VeritasAtlas.Application.Models;
+using VeritasAtlas.Domain.Entities;
+
+namespace VeritasAtlas.Application.Interfaces;
+
+public interface IDocumentService
+{
+    Task<Document> AddDocumentAsync(
+        Guid sourceId,
+        string title,
+        string content,
+        string? externalReference = null,
+        string? createdBy = null,
+        CancellationToken cancellationToken = default);
+
+    Task<PagedListResult<Document>> GetDocumentsAsync(
+        int page,
+        int pageSize,
+        CancellationToken cancellationToken = default);
+}
+
+
+========================================================================================================================
+FILE: apps/api/VeritasAtlas.Application/Interfaces/IEvidenceService.cs
+========================================================================================================================
+using VeritasAtlas.Application.Models;
+using VeritasAtlas.Domain.Entities;
+
+namespace VeritasAtlas.Application.Interfaces;
+
+public interface IEvidenceService
+{
+    Task<Evidence> AddEvidenceAsync(
+        Guid documentId,
+        string quote,
+        int? startOffset = null,
+        int? endOffset = null,
+        string? context = null,
+        string? createdBy = null,
+        CancellationToken cancellationToken = default);
+
+    Task<PagedListResult<Evidence>> GetEvidenceAsync(
+        int page,
+        int pageSize,
+        CancellationToken cancellationToken = default);
+}
+
+
+========================================================================================================================
+FILE: apps/api/VeritasAtlas.Infrastructure/Services/SourceService.cs
+========================================================================================================================
+using Microsoft.EntityFrameworkCore;
+using VeritasAtlas.Application.Interfaces;
+using VeritasAtlas.Application.Models;
+using VeritasAtlas.Domain.Entities;
+using VeritasAtlas.Domain.Enums;
+using VeritasAtlas.Domain.ValueObjects;
+using VeritasAtlas.Infrastructure.Persistence;
+
+namespace VeritasAtlas.Application.Services;
+
+public sealed class SourceService : ISourceService
+{
+    private readonly VeritasAtlasDbContext _dbContext;
+
+    public SourceService(VeritasAtlasDbContext dbContext)
+    {
+        _dbContext = dbContext;
+    }
+
+    public async Task<Source> RegisterSourceAsync(
+        string name,
+        SourceType type,
+        string reference,
+        string? createdBy = null,
+        CancellationToken cancellationToken = default)
+    {
+        var entity = new Source
+        {
+            Id = Guid.NewGuid(),
+            Name = name,
+            Type = type,
+            Reference = string.IsNullOrWhiteSpace(reference) ? null : new SourceReference(reference),
+            Status = SourceStatus.Active,
+            CreatedBy = createdBy,
+            UpdatedBy = createdBy,
+            CreatedAtUtc = DateTime.UtcNow,
+            UpdatedAtUtc = DateTime.UtcNow
+        };
+
+        _dbContext.Sources.Add(entity);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+
+        return entity;
+    }
+
+    public async Task<PagedListResult<Source>> GetSourcesAsync(
+        int page,
+        int pageSize,
+        CancellationToken cancellationToken = default)
+    {
+        page = page < 1 ? 1 : page;
+        pageSize = pageSize < 1 ? 20 : pageSize;
+
+        var query = _dbContext.Sources
+            .AsNoTracking()
+            .OrderByDescending(x => x.CreatedAtUtc);
+
+        var totalCount = await query.CountAsync(cancellationToken);
+        var items = await query
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync(cancellationToken);
+
+        return new PagedListResult<Source>
+        {
+            Items = items,
+            Page = page,
+            PageSize = pageSize,
+            TotalCount = totalCount,
+            TotalPages = totalCount == 0 ? 0 : (int)Math.Ceiling(totalCount / (double)pageSize)
+        };
+    }
+}
+
+
+========================================================================================================================
+FILE: apps/api/VeritasAtlas.Infrastructure/Services/DocumentService.cs
+========================================================================================================================
+using Microsoft.EntityFrameworkCore;
+using VeritasAtlas.Application.Interfaces;
+using VeritasAtlas.Application.Models;
+using VeritasAtlas.Domain.Entities;
+using VeritasAtlas.Domain.Enums;
+using VeritasAtlas.Infrastructure.Persistence;
+
+namespace VeritasAtlas.Application.Services;
+
+public sealed class DocumentService : IDocumentService
+{
+    private readonly VeritasAtlasDbContext _dbContext;
+
+    public DocumentService(VeritasAtlasDbContext dbContext)
+    {
+        _dbContext = dbContext;
+    }
+
+    public async Task<Document> AddDocumentAsync(
+        Guid sourceId,
+        string title,
+        string content,
+        string? externalReference = null,
+        string? createdBy = null,
+        CancellationToken cancellationToken = default)
+    {
+        var entity = new Document
+        {
+            Id = Guid.NewGuid(),
+            SourceId = sourceId,
+            Title = title,
+            Content = content,
+            ExternalReference = externalReference,
+            Status = DocumentStatus.Active,
+            CreatedBy = createdBy,
+            UpdatedBy = createdBy,
+            CreatedAtUtc = DateTime.UtcNow,
+            UpdatedAtUtc = DateTime.UtcNow
+        };
+
+        _dbContext.Documents.Add(entity);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+
+        return entity;
+    }
+
+    public async Task<PagedListResult<Document>> GetDocumentsAsync(
+        int page,
+        int pageSize,
+        CancellationToken cancellationToken = default)
+    {
+        page = page < 1 ? 1 : page;
+        pageSize = pageSize < 1 ? 20 : pageSize;
+
+        var query = _dbContext.Documents
+            .AsNoTracking()
+            .OrderByDescending(x => x.CreatedAtUtc);
+
+        var totalCount = await query.CountAsync(cancellationToken);
+        var items = await query
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync(cancellationToken);
+
+        return new PagedListResult<Document>
+        {
+            Items = items,
+            Page = page,
+            PageSize = pageSize,
+            TotalCount = totalCount,
+            TotalPages = totalCount == 0 ? 0 : (int)Math.Ceiling(totalCount / (double)pageSize)
+        };
+    }
+}
+
+
+========================================================================================================================
+FILE: apps/api/VeritasAtlas.Infrastructure/Services/EvidenceService.cs
+========================================================================================================================
+using Microsoft.EntityFrameworkCore;
+using VeritasAtlas.Application.Interfaces;
+using VeritasAtlas.Application.Models;
+using VeritasAtlas.Domain.Entities;
+using VeritasAtlas.Domain.Enums;
+using VeritasAtlas.Domain.ValueObjects;
+using VeritasAtlas.Infrastructure.Persistence;
+
+namespace VeritasAtlas.Application.Services;
+
+public sealed class EvidenceService : IEvidenceService
+{
+    private readonly VeritasAtlasDbContext _dbContext;
+
+    public EvidenceService(VeritasAtlasDbContext dbContext)
+    {
+        _dbContext = dbContext;
+    }
+
+    public async Task<Evidence> AddEvidenceAsync(
+        Guid documentId,
+        string quote,
+        int? startOffset = null,
+        int? endOffset = null,
+        string? context = null,
+        string? createdBy = null,
+        CancellationToken cancellationToken = default)
+    {
+        var entity = new Evidence
+        {
+            Id = Guid.NewGuid(),
+            DocumentId = documentId,
+            Quote = quote,
+            Context = context,
+            Span = new DocumentSpan(startOffset, endOffset),
+            Status = EvidenceStatus.Active,
+            CreatedBy = createdBy,
+            UpdatedBy = createdBy,
+            CreatedAtUtc = DateTime.UtcNow,
+            UpdatedAtUtc = DateTime.UtcNow
+        };
+
+        _dbContext.Evidence.Add(entity);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+
+        return entity;
+    }
+
+    public async Task<PagedListResult<Evidence>> GetEvidenceAsync(
+        int page,
+        int pageSize,
+        CancellationToken cancellationToken = default)
+    {
+        page = page < 1 ? 1 : page;
+        pageSize = pageSize < 1 ? 20 : pageSize;
+
+        var query = _dbContext.Evidence
+            .AsNoTracking()
+            .OrderByDescending(x => x.CreatedAtUtc);
+
+        var totalCount = await query.CountAsync(cancellationToken);
+        var items = await query
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync(cancellationToken);
+
+        return new PagedListResult<Evidence>
+        {
+            Items = items,
+            Page = page,
+            PageSize = pageSize,
+            TotalCount = totalCount,
+            TotalPages = totalCount == 0 ? 0 : (int)Math.Ceiling(totalCount / (double)pageSize)
+        };
+    }
+}
+
+
+========================================================================================================================
+FILE: apps/api/VeritasAtlas.Api/Controllers/SourcesController.cs
+========================================================================================================================
+using Microsoft.AspNetCore.Mvc;
+using VeritasAtlas.Api.Contracts.Sources;
+using VeritasAtlas.Application.Interfaces;
+using VeritasAtlas.Domain.Enums;
+
+namespace VeritasAtlas.Api.Controllers;
+
+[ApiController]
+[Route("api/v1/sources")]
+public sealed class SourcesController : ControllerBase
+{
+    private readonly ISourceService _sourceService;
+
+    public SourcesController(ISourceService sourceService)
+    {
+        _sourceService = sourceService;
+    }
+
+    [HttpGet]
+    public async Task<ActionResult<GetSourcesResponse>> GetSources(
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 20,
+        CancellationToken cancellationToken = default)
+    {
+        var result = await _sourceService.GetSourcesAsync(page, pageSize, cancellationToken);
+
+        var items = result.Items
+            .Select(entity => new GetSourcesItemResponse(
+                entity.Id,
+                entity.Name,
+                entity.Type.ToString(),
+                entity.Reference?.ToString(),
+                entity.Status.ToString(),
+                entity.CreatedAtUtc,
+                entity.UpdatedAtUtc))
+            .ToArray();
+
+        return Ok(new GetSourcesResponse(
+            items,
+            result.Page,
+            result.PageSize,
+            result.TotalCount,
+            result.TotalPages));
+    }
+
+    [HttpPost]
+    public async Task<ActionResult<CreateSourceResponse>> CreateSource(
+        [FromBody] CreateSourceRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        if (!Enum.TryParse<SourceType>(request.Type, true, out var sourceType))
+        {
+            return BadRequest(new { message = "Invalid source type." });
+        }
+
+        var entity = await _sourceService.RegisterSourceAsync(
+            request.Name,
+            sourceType,
+            request.Reference ?? string.Empty,
+            request.CreatedBy,
+            cancellationToken);
+
+        var response = new CreateSourceResponse(
+            entity.Id,
+            entity.Name,
+            entity.Type.ToString(),
+            entity.Reference?.ToString(),
+            entity.Status.ToString(),
+            entity.CreatedAtUtc,
+            entity.UpdatedAtUtc);
+
+        return Ok(response);
+    }
+}
+
+
+========================================================================================================================
+FILE: apps/api/VeritasAtlas.Api/Controllers/DocumentsController.cs
+========================================================================================================================
+using Microsoft.AspNetCore.Mvc;
+using VeritasAtlas.Api.Contracts.Documents;
+using VeritasAtlas.Application.Interfaces;
+
+namespace VeritasAtlas.Api.Controllers;
+
+[ApiController]
+[Route("api/v1/documents")]
+public sealed class DocumentsController : ControllerBase
+{
+    private readonly IDocumentService _documentService;
+
+    public DocumentsController(IDocumentService documentService)
+    {
+        _documentService = documentService;
+    }
+
+    [HttpGet]
+    public async Task<ActionResult<GetDocumentsResponse>> GetDocuments(
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 20,
+        CancellationToken cancellationToken = default)
+    {
+        var result = await _documentService.GetDocumentsAsync(page, pageSize, cancellationToken);
+
+        var items = result.Items
+            .Select(entity => new GetDocumentsItemResponse(
+                entity.Id,
+                entity.SourceId,
+                entity.Title,
+                entity.Status.ToString(),
+                entity.CreatedAtUtc,
+                entity.UpdatedAtUtc))
+            .ToArray();
+
+        return Ok(new GetDocumentsResponse(
+            items,
+            result.Page,
+            result.PageSize,
+            result.TotalCount,
+            result.TotalPages));
+    }
+
+    [HttpPost]
+    public async Task<ActionResult<CreateDocumentResponse>> CreateDocument(
+        [FromBody] CreateDocumentRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var entity = await _documentService.AddDocumentAsync(
+            request.SourceId,
+            request.Title,
+            request.Content,
+            request.ExternalReference,
+            request.CreatedBy,
+            cancellationToken);
+
+        var response = new CreateDocumentResponse(
+            entity.Id,
+            entity.SourceId,
+            entity.Title,
+            entity.Status.ToString(),
+            entity.CreatedAtUtc,
+            entity.UpdatedAtUtc);
+
+        return Ok(response);
+    }
+}
+
+
+========================================================================================================================
+FILE: apps/api/VeritasAtlas.Api/Controllers/EvidenceController.cs
+========================================================================================================================
+using Microsoft.AspNetCore.Mvc;
+using VeritasAtlas.Api.Contracts.Evidence;
+using VeritasAtlas.Application.Interfaces;
+
+namespace VeritasAtlas.Api.Controllers;
+
+[ApiController]
+[Route("api/v1/evidence")]
+public sealed class EvidenceController : ControllerBase
+{
+    private readonly IEvidenceService _evidenceService;
+
+    public EvidenceController(IEvidenceService evidenceService)
+    {
+        _evidenceService = evidenceService;
+    }
+
+    [HttpGet]
+    public async Task<ActionResult<GetEvidenceResponse>> GetEvidence(
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 20,
+        CancellationToken cancellationToken = default)
+    {
+        var result = await _evidenceService.GetEvidenceAsync(page, pageSize, cancellationToken);
+
+        var items = result.Items
+            .Select(entity => new GetEvidenceItemResponse(
+                entity.Id,
+                entity.DocumentId,
+                entity.Status.ToString(),
+                entity.CreatedAtUtc,
+                entity.UpdatedAtUtc))
+            .ToArray();
+
+        return Ok(new GetEvidenceResponse(
+            items,
+            result.Page,
+            result.PageSize,
+            result.TotalCount,
+            result.TotalPages));
+    }
+
+    [HttpPost]
+    public async Task<ActionResult<CreateEvidenceResponse>> CreateEvidence(
+        [FromBody] CreateEvidenceRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var entity = await _evidenceService.AddEvidenceAsync(
+            request.DocumentId,
+            request.Quote,
+            request.StartOffset,
+            request.EndOffset,
+            request.Context,
+            request.CreatedBy,
+            cancellationToken);
+
+        var response = new CreateEvidenceResponse(
+            entity.Id,
+            entity.DocumentId,
+            request.Quote,
+            entity.Status.ToString(),
+            entity.CreatedAtUtc,
+            entity.UpdatedAtUtc);
+
+        return Ok(response);
+    }
+}
+
+
+========================================================================================================================
+FILE: apps/web/veritas-atlas-web/src/api/sources.ts
+========================================================================================================================
+import { apiGet } from "./client";
+
+export type SourceItem = {
+  id: string;
+  name: string;
+  type: string;
+  reference: string | null;
+  status: string;
+  createdAtUtc: string;
+  updatedAtUtc: string;
+};
+
+export type SourcesResponse = {
+  items: SourceItem[];
+  page: number;
+  pageSize: number;
+  totalCount: number;
+  totalPages: number;
+};
+
+export async function getSources(): Promise<SourcesResponse> {
+  return apiGet<SourcesResponse>("/api/v1/sources?page=1&pageSize=50");
+}
+
+
+========================================================================================================================
+FILE: apps/web/veritas-atlas-web/src/api/documents.ts
+========================================================================================================================
+import { apiGet } from "./client";
+
+export type DocumentItem = {
+  id: string;
+  sourceId: string;
+  title: string;
+  status: string;
+  createdAtUtc: string;
+  updatedAtUtc: string;
+};
+
+export type DocumentsResponse = {
+  items: DocumentItem[];
+  page: number;
+  pageSize: number;
+  totalCount: number;
+  totalPages: number;
+};
+
+export async function getDocuments(): Promise<DocumentsResponse> {
+  return apiGet<DocumentsResponse>("/api/v1/documents?page=1&pageSize=50");
+}
+
+
+========================================================================================================================
+FILE: apps/web/veritas-atlas-web/src/api/evidenceList.ts
+========================================================================================================================
+import { apiGet } from "./client";
+
+export type EvidenceItem = {
+  id: string;
+  documentId: string | null;
+  status: string;
+  createdAtUtc: string;
+  updatedAtUtc: string;
+};
+
+export type EvidenceResponse = {
+  items: EvidenceItem[];
+  page: number;
+  pageSize: number;
+  totalCount: number;
+  totalPages: number;
+};
+
+export async function getEvidenceList(): Promise<EvidenceResponse> {
+  return apiGet<EvidenceResponse>("/api/v1/evidence?page=1&pageSize=50");
+}
+
+
+========================================================================================================================
+FILE: apps/api/VeritasAtlas.Infrastructure/Extensions/ServiceCollectionExtensions.cs
+========================================================================================================================
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using VeritasAtlas.Application.Interfaces;
+using VeritasAtlas.Infrastructure.Persistence;
+using VeritasAtlas.Infrastructure.Services;
+
+namespace VeritasAtlas.Infrastructure.Extensions;
+
+public static class ServiceCollectionExtensions
+{
+    public static IServiceCollection AddVeritasAtlasInfrastructure(
+        this IServiceCollection services,
+        IConfiguration configuration)
+    {
+        var connectionString = configuration.GetConnectionString("DefaultConnection")
+            ?? throw new InvalidOperationException("Connection string 'DefaultConnection' was not found.");
+
+        services.AddDbContext<VeritasAtlasDbContext>(options =>
+            options.UseNpgsql(connectionString));
+
+        services.AddScoped<IPersonService, PersonService>();
+        services.AddScoped<ISourceService, SourceService>();
+        services.AddScoped<IDocumentService, DocumentService>();
+        services.AddScoped<IEvidenceService, EvidenceService>();
+        services.AddScoped<IStatementService, StatementService>();
+        services.AddScoped<IClaimService, ClaimService>();
+        services.AddScoped<IContradictionService, ContradictionService>();
+        services.AddScoped<ICaseService, CaseService>();
+        services.AddScoped<IConfidenceService, ConfidenceService>();
+        services.AddScoped<IAgentRunService, AgentRunService>();
+        services.AddScoped<IReviewService, ReviewService>();
+        services.AddScoped<IPublicationService, PublicationService>();
+
+        return services;
+    }
+}
+
+
+========================================================================================================================
+FILE: apps/api/VeritasAtlas.Infrastructure/Persistence/VeritasAtlasDbContext.cs
+========================================================================================================================
+using Microsoft.EntityFrameworkCore;
+using VeritasAtlas.Domain.Entities;
+using VeritasAtlas.Infrastructure.Configurations;
+
+namespace VeritasAtlas.Infrastructure.Persistence;
+
+public sealed class VeritasAtlasDbContext : DbContext
+{
+    public VeritasAtlasDbContext(DbContextOptions<VeritasAtlasDbContext> options) : base(options)
+    {
+    }
+
+    public DbSet<Person> Persons => Set<Person>();
+    public DbSet<Alias> Aliases => Set<Alias>();
+    public DbSet<Source> Sources => Set<Source>();
+    public DbSet<Document> Documents => Set<Document>();
+    public DbSet<Evidence> Evidences => Set<Evidence>();
+    public DbSet<Statement> Statements => Set<Statement>();
+    public DbSet<Claim> Claims => Set<Claim>();
+    public DbSet<Contradiction> Contradictions => Set<Contradiction>();
+    public DbSet<Case> Cases => Set<Case>();
+    public DbSet<ConfidenceScore> ConfidenceScores => Set<ConfidenceScore>();
+    public DbSet<AgentRun> AgentRuns => Set<AgentRun>();
+    public DbSet<Review> Reviews => Set<Review>();
+    public DbSet<Publication> Publications => Set<Publication>();
+
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+        modelBuilder.ApplyConfiguration(new PersonConfiguration());
+        modelBuilder.ApplyConfiguration(new AliasConfiguration());
+        modelBuilder.ApplyConfiguration(new SourceConfiguration());
+        modelBuilder.ApplyConfiguration(new DocumentConfiguration());
+        modelBuilder.ApplyConfiguration(new EvidenceConfiguration());
+        modelBuilder.ApplyConfiguration(new StatementConfiguration());
+        modelBuilder.ApplyConfiguration(new ClaimConfiguration());
+        modelBuilder.ApplyConfiguration(new ContradictionConfiguration());
+        modelBuilder.ApplyConfiguration(new CaseConfiguration());
+        modelBuilder.ApplyConfiguration(new ConfidenceScoreConfiguration());
+        modelBuilder.ApplyConfiguration(new AgentRunConfiguration());
+        modelBuilder.ApplyConfiguration(new ReviewConfiguration());
+        modelBuilder.ApplyConfiguration(new PublicationConfiguration());
+
+        base.OnModelCreating(modelBuilder);
+    }
+}
+
+
+========================================================================================================================
+FILE: apps/api/VeritasAtlas.Domain/Entities/Source.cs
+========================================================================================================================
+[MISSING]
+
+========================================================================================================================
+FILE: apps/api/VeritasAtlas.Domain/Entities/Document.cs
+========================================================================================================================
+[MISSING]
+
+========================================================================================================================
+FILE: apps/api/VeritasAtlas.Domain/Entities/Evidence.cs
+========================================================================================================================
+[MISSING]
+
+========================================================================================================================
+FILE: apps/api/VeritasAtlas.Domain/ValueObjects/SourceReference.cs
+========================================================================================================================
+[MISSING]
+
+========================================================================================================================
+FILE: apps/api/VeritasAtlas.Domain/ValueObjects/DocumentSpan.cs
+========================================================================================================================
+[MISSING]
+
+========================================================================================================================
+FILE: apps/api/VeritasAtlas.Domain/Enums/SourceStatus.cs
+========================================================================================================================
+[MISSING]
+
+========================================================================================================================
+FILE: apps/api/VeritasAtlas.Domain/Enums/DocumentStatus.cs
+========================================================================================================================
+[MISSING]
+
+========================================================================================================================
+FILE: apps/api/VeritasAtlas.Domain/Enums/EvidenceStatus.cs
+========================================================================================================================
+[MISSING]
+
+========================================================================================================================
+ALL SERVICE FILES FOUND
+========================================================================================================================
+C:\Projects\veritas-atlas\apps\api\VeritasAtlas.Application\Interfaces\IAgentRunService.cs
+C:\Projects\veritas-atlas\apps\api\VeritasAtlas.Application\Interfaces\ICaseService.cs
+C:\Projects\veritas-atlas\apps\api\VeritasAtlas.Application\Interfaces\IClaimService.cs
+C:\Projects\veritas-atlas\apps\api\VeritasAtlas.Application\Interfaces\IConfidenceService.cs
+C:\Projects\veritas-atlas\apps\api\VeritasAtlas.Application\Interfaces\IContradictionService.cs
+C:\Projects\veritas-atlas\apps\api\VeritasAtlas.Application\Interfaces\IDocumentService.cs
+C:\Projects\veritas-atlas\apps\api\VeritasAtlas.Application\Interfaces\IEvidenceService.cs
+C:\Projects\veritas-atlas\apps\api\VeritasAtlas.Application\Interfaces\IPersonService.cs
+C:\Projects\veritas-atlas\apps\api\VeritasAtlas.Application\Interfaces\IPublicationService.cs
+C:\Projects\veritas-atlas\apps\api\VeritasAtlas.Application\Interfaces\IReviewService.cs
+C:\Projects\veritas-atlas\apps\api\VeritasAtlas.Application\Interfaces\ISourceService.cs
+C:\Projects\veritas-atlas\apps\api\VeritasAtlas.Application\Interfaces\IStatementService.cs
+C:\Projects\veritas-atlas\apps\api\VeritasAtlas.Infrastructure\Services\AgentRunService.cs
+C:\Projects\veritas-atlas\apps\api\VeritasAtlas.Infrastructure\Services\CaseService.cs
+C:\Projects\veritas-atlas\apps\api\VeritasAtlas.Infrastructure\Services\ClaimService.cs
+C:\Projects\veritas-atlas\apps\api\VeritasAtlas.Infrastructure\Services\ConfidenceService.cs
+C:\Projects\veritas-atlas\apps\api\VeritasAtlas.Infrastructure\Services\ContradictionService.cs
+C:\Projects\veritas-atlas\apps\api\VeritasAtlas.Infrastructure\Services\DocumentService.cs
+C:\Projects\veritas-atlas\apps\api\VeritasAtlas.Infrastructure\Services\EvidenceService.cs
+C:\Projects\veritas-atlas\apps\api\VeritasAtlas.Infrastructure\Services\PersonService.cs
+C:\Projects\veritas-atlas\apps\api\VeritasAtlas.Infrastructure\Services\PublicationService.cs
+C:\Projects\veritas-atlas\apps\api\VeritasAtlas.Infrastructure\Services\ReviewService.cs
+C:\Projects\veritas-atlas\apps\api\VeritasAtlas.Infrastructure\Services\SourceService.cs
+C:\Projects\veritas-atlas\apps\api\VeritasAtlas.Infrastructure\Services\StatementService.cs

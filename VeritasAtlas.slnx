@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/apps/" />
+  <Folder Name="/apps/api/">
+    <Project Path="apps/api/VeritasAtlas.Api/VeritasAtlas.Api.csproj" />
+    <Project Path="apps/api/VeritasAtlas.Application/VeritasAtlas.Application.csproj" />
+    <Project Path="apps/api/VeritasAtlas.Domain/VeritasAtlas.Domain.csproj" />
+    <Project Path="apps/api/VeritasAtlas.Infrastructure/VeritasAtlas.Infrastructure.csproj" />
+  </Folder>
+</Solution>

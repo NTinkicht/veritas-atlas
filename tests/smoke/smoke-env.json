@@ -1,0 +1,9 @@
+﻿{
+  "name": "local-dev",
+  "baseUrl": "https://localhost:7091",
+  "startupTimeoutSeconds": 60,
+  "notes": [
+    "Use this file as the default local API smoke environment.",
+    "Update the baseUrl if your launch profile changes."
+  ]
+}

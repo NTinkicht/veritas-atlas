@@ -1,0 +1,36 @@
+﻿Document repair diagnostics
+Generated: 2026-04-06T18:45:50
+Root: C:\Projects\veritas-atlas
+
+========================================================================================================================
+Document entity: NOT FOUND
+========================================================================================================================
+[MISSING]
+
+========================================================================================================================
+Base entity: C:\Projects\veritas-atlas\apps\api\VeritasAtlas.Domain\Common\Entity.cs
+========================================================================================================================
+using System;
+
+namespace VeritasAtlas.Domain.Common
+{
+    public abstract class Entity
+    {
+        protected Entity()
+        {
+            Id = Guid.NewGuid();
+            CreatedAtUtc = DateTime.UtcNow;
+            UpdatedAtUtc = DateTime.UtcNow;
+        }
+
+        public Guid Id { get; protected set; }
+        public DateTime CreatedAtUtc { get; protected set; }
+        public DateTime UpdatedAtUtc { get; set; }
+    }
+}
+
+
+========================================================================================================================
+Document configuration: NOT FOUND
+========================================================================================================================
+[MISSING]

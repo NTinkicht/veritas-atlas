@@ -1,0 +1,334 @@
+API CONTRACT SNAPSHOT
+Generated: 2026-04-06T19:09:10
+
+====================================================
+FILE: apps\api\VeritasAtlas.Api\Controllers\SourcesController.cs
+====================================================
+using Microsoft.AspNetCore.Mvc;
+using VeritasAtlas.Api.Contracts.Sources;
+using VeritasAtlas.Application.Interfaces;
+using VeritasAtlas.Domain.Enums;
+
+namespace VeritasAtlas.Api.Controllers;
+
+[ApiController]
+[Route("api/v1/sources")]
+public sealed class SourcesController : ControllerBase
+{
+    private readonly ISourceService _sourceService;
+
+    public SourcesController(ISourceService sourceService)
+    {
+        _sourceService = sourceService;
+    }
+
+    [HttpGet]
+    public async Task<ActionResult<GetSourcesResponse>> GetSources(
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 20,
+        CancellationToken cancellationToken = default)
+    {
+        var result = await _sourceService.GetSourcesAsync(page, pageSize, cancellationToken);
+
+        var items = result.Items
+            .Select(entity => new GetSourcesItemResponse(
+                entity.Id,
+                entity.Name,
+                entity.Type.ToString(),
+                entity.Reference?.ToString(),
+                entity.Status.ToString(),
+                entity.CreatedAtUtc,
+                entity.UpdatedAtUtc))
+            .ToArray();
+
+        return Ok(new GetSourcesResponse(
+            items,
+            result.Page,
+            result.PageSize,
+            result.TotalCount,
+            result.TotalPages));
+    }
+
+    [HttpPost]
+    public async Task<ActionResult<CreateSourceResponse>> CreateSource(
+        [FromBody] CreateSourceRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        if (!Enum.TryParse<SourceType>(request.Type, true, out var sourceType))
+        {
+            return BadRequest(new { message = "Invalid source type." });
+        }
+
+        var entity = await _sourceService.RegisterSourceAsync(
+            request.Name,
+            sourceType,
+            request.Reference ?? string.Empty,
+            request.CreatedBy,
+            cancellationToken);
+
+        var response = new CreateSourceResponse(
+            entity.Id,
+            entity.Name,
+            entity.Type.ToString(),
+            entity.Reference?.ToString(),
+            entity.Status.ToString(),
+            entity.CreatedAtUtc,
+            entity.UpdatedAtUtc);
+
+        return Ok(response);
+    }
+}
+
+
+====================================================
+FILE: apps\api\VeritasAtlas.Api\Controllers\DocumentsController.cs
+====================================================
+using Microsoft.AspNetCore.Mvc;
+using VeritasAtlas.Api.Contracts.Documents;
+using VeritasAtlas.Application.Interfaces;
+
+namespace VeritasAtlas.Api.Controllers;
+
+[ApiController]
+[Route("api/v1/documents")]
+public sealed class DocumentsController : ControllerBase
+{
+    private readonly IDocumentService _documentService;
+
+    public DocumentsController(IDocumentService documentService)
+    {
+        _documentService = documentService;
+    }
+
+    [HttpGet]
+    public async Task<ActionResult<GetDocumentsResponse>> GetDocuments(
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 20,
+        CancellationToken cancellationToken = default)
+    {
+        var result = await _documentService.GetDocumentsAsync(page, pageSize, cancellationToken);
+
+        var items = result.Items
+            .Select(entity => new GetDocumentsItemResponse(
+                entity.Id,
+                entity.SourceId,
+                entity.Title,
+                entity.Status.ToString(),
+                entity.CreatedAtUtc,
+                entity.UpdatedAtUtc))
+            .ToArray();
+
+        return Ok(new GetDocumentsResponse(
+            items,
+            result.Page,
+            result.PageSize,
+            result.TotalCount,
+            result.TotalPages));
+    }
+
+    [HttpPost]
+    public async Task<ActionResult<CreateDocumentResponse>> CreateDocument(
+        [FromBody] CreateDocumentRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var entity = await _documentService.AddDocumentAsync(
+            request.SourceId,
+            request.Title,
+            request.Content,
+            request.ExternalReference,
+            request.CreatedBy,
+            cancellationToken);
+
+        var response = new CreateDocumentResponse(
+            entity.Id,
+            entity.SourceId,
+            entity.Title,
+            entity.Status.ToString(),
+            entity.CreatedAtUtc,
+            entity.UpdatedAtUtc);
+
+        return Ok(response);
+    }
+}
+
+
+====================================================
+FILE: apps\api\VeritasAtlas.Api\Controllers\EvidenceController.cs
+====================================================
+using Microsoft.AspNetCore.Mvc;
+using VeritasAtlas.Api.Contracts.Evidence;
+using VeritasAtlas.Application.Interfaces;
+
+namespace VeritasAtlas.Api.Controllers;
+
+[ApiController]
+[Route("api/v1/evidence")]
+public sealed class EvidenceController : ControllerBase
+{
+    private readonly IEvidenceService _evidenceService;
+
+    public EvidenceController(IEvidenceService evidenceService)
+    {
+        _evidenceService = evidenceService;
+    }
+
+    [HttpGet]
+    public async Task<ActionResult<GetEvidenceResponse>> GetEvidence(
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 20,
+        CancellationToken cancellationToken = default)
+    {
+        var result = await _evidenceService.GetEvidenceAsync(page, pageSize, cancellationToken);
+
+        var items = result.Items
+            .Select(entity => new GetEvidenceItemResponse(
+                entity.Id,
+                entity.DocumentId,
+                entity.Status.ToString(),
+                entity.CreatedAtUtc,
+                entity.UpdatedAtUtc))
+            .ToArray();
+
+        return Ok(new GetEvidenceResponse(
+            items,
+            result.Page,
+            result.PageSize,
+            result.TotalCount,
+            result.TotalPages));
+    }
+
+    [HttpPost]
+    public async Task<ActionResult<CreateEvidenceResponse>> CreateEvidence(
+        [FromBody] CreateEvidenceRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var entity = await _evidenceService.AddEvidenceAsync(
+            request.DocumentId,
+            request.Quote,
+            request.StartOffset,
+            request.EndOffset,
+            request.Context,
+            request.CreatedBy,
+            cancellationToken);
+
+        var response = new CreateEvidenceResponse(
+            entity.Id,
+            entity.DocumentId,
+            request.Quote,
+            entity.Status.ToString(),
+            entity.CreatedAtUtc,
+            entity.UpdatedAtUtc);
+
+        return Ok(response);
+    }
+}
+
+
+====================================================
+FILE: apps\api\VeritasAtlas.Api\Contracts\SourcesContracts.cs
+====================================================
+namespace VeritasAtlas.Api.Contracts.Sources;
+
+public sealed record CreateSourceRequest(
+    string Name,
+    string Type,
+    string? Reference,
+    string? CreatedBy);
+
+public sealed record CreateSourceResponse(
+    Guid Id,
+    string Name,
+    string Type,
+    string? Reference,
+    string Status,
+    DateTime CreatedAtUtc,
+    DateTime UpdatedAtUtc);
+
+public sealed record GetSourcesItemResponse(
+    Guid Id,
+    string Name,
+    string Type,
+    string? Reference,
+    string Status,
+    DateTime CreatedAtUtc,
+    DateTime UpdatedAtUtc);
+
+public sealed record GetSourcesResponse(
+    IReadOnlyCollection<GetSourcesItemResponse> Items,
+    int Page,
+    int PageSize,
+    int TotalCount,
+    int TotalPages);
+
+
+====================================================
+FILE: apps\api\VeritasAtlas.Api\Contracts\DocumentsContracts.cs
+====================================================
+namespace VeritasAtlas.Api.Contracts.Documents;
+
+public sealed record CreateDocumentRequest(
+    Guid SourceId,
+    string Title,
+    string Content,
+    string? ExternalReference,
+    string? CreatedBy);
+
+public sealed record CreateDocumentResponse(
+    Guid Id,
+    Guid SourceId,
+    string Title,
+    string Status,
+    DateTime CreatedAtUtc,
+    DateTime UpdatedAtUtc);
+
+public sealed record GetDocumentsItemResponse(
+    Guid Id,
+    Guid SourceId,
+    string Title,
+    string Status,
+    DateTime CreatedAtUtc,
+    DateTime UpdatedAtUtc);
+
+public sealed record GetDocumentsResponse(
+    IReadOnlyCollection<GetDocumentsItemResponse> Items,
+    int Page,
+    int PageSize,
+    int TotalCount,
+    int TotalPages);
+
+
+====================================================
+FILE: apps\api\VeritasAtlas.Api\Contracts\EvidenceContracts.cs
+====================================================
+namespace VeritasAtlas.Api.Contracts.Evidence;
+
+public sealed record CreateEvidenceRequest(
+    Guid DocumentId,
+    string Quote,
+    int? StartOffset,
+    int? EndOffset,
+    string? Context,
+    string? CreatedBy);
+
+public sealed record CreateEvidenceResponse(
+    Guid Id,
+    Guid? DocumentId,
+    string Quote,
+    string Status,
+    DateTime CreatedAtUtc,
+    DateTime UpdatedAtUtc);
+
+public sealed record GetEvidenceItemResponse(
+    Guid Id,
+    Guid? DocumentId,
+    string Status,
+    DateTime CreatedAtUtc,
+    DateTime UpdatedAtUtc);
+
+public sealed record GetEvidenceResponse(
+    IReadOnlyCollection<GetEvidenceItemResponse> Items,
+    int Page,
+    int PageSize,
+    int TotalCount,
+    int TotalPages);
+
