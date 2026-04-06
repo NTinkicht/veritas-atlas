@@ -45,6 +45,9 @@ import { PublicationDeskPage } from "./pages/PublicationDeskPage";
 import { CaseDetailPage } from "./pages/CaseDetailPage";
 import { ReviewsPage } from "./pages/ReviewsPage";
 import { DashboardPage } from "./pages/DashboardPage";
+import { SystemReadinessMapPage } from "./pages/SystemReadinessMapPage";
+import { OperatorCockpitPage } from "./pages/OperatorCockpitPage";
+import { FinalControlCenterPage } from "./pages/FinalControlCenterPage";
 import { ExecutiveReadoutWorkspacePage } from "./pages/ExecutiveReadoutWorkspacePage";
 import { OperationalPortfolioPage } from "./pages/OperationalPortfolioPage";
 import { OpsFinalizationWorkspacePage } from "./pages/OpsFinalizationWorkspacePage";
@@ -95,6 +98,9 @@ function Layout({ children }: { children: React.ReactNode }) {
           <Link to="/decision-intelligence">Decision Intelligence</Link>
 <Link to="/knowledge-graph-hub">Knowledge Graph Hub</Link>
 <Link to="/release-readiness-hub">Release Readiness Hub</Link>
+<Link to="/system-readiness-map">System Readiness Map</Link>
+          <Link to="/operator-cockpit">Operator Cockpit</Link>
+          <Link to="/final-control-center">Final Control Center</Link>
 <Link to="/executive-readout-workspace">Executive Readout</Link>
           <Link to="/operational-portfolio">Operational Portfolio</Link>
           <Link to="/ops-finalization-workspace">Ops Finalization</Link>
@@ -248,6 +254,9 @@ const router = createBrowserRouter([
   { path: "/decision-intelligence", element: <DecisionIntelligencePage /> },
 { path: "/knowledge-graph-hub", element: <KnowledgeGraphHubPage /> },
 { path: "/release-readiness-hub", element: <ReleaseReadinessHubPage /> },
+{ path: "/system-readiness-map", element: <SystemReadinessMapPage /> },
+  { path: "/operator-cockpit", element: <OperatorCockpitPage /> },
+  { path: "/final-control-center", element: <FinalControlCenterPage /> },
 { path: "/executive-readout-workspace", element: <ExecutiveReadoutWorkspacePage /> },
   { path: "/operational-portfolio", element: <OperationalPortfolioPage /> },
   { path: "/ops-finalization-workspace", element: <OpsFinalizationWorkspacePage /> },
