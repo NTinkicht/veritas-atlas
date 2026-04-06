@@ -45,6 +45,9 @@ import { PublicationDeskPage } from "./pages/PublicationDeskPage";
 import { CaseDetailPage } from "./pages/CaseDetailPage";
 import { ReviewsPage } from "./pages/ReviewsPage";
 import { DashboardPage } from "./pages/DashboardPage";
+import { KnowledgeGraphHubPage } from "./pages/KnowledgeGraphHubPage";
+import { PublicationGovernanceWorkspacePage } from "./pages/PublicationGovernanceWorkspacePage";
+import { ReadinessRadarWorkspacePage } from "./pages/ReadinessRadarWorkspacePage";
 import { EvidenceFlowStudioPage } from "./pages/EvidenceFlowStudioPage";
 import { OperationalHandoffPage } from "./pages/OperationalHandoffPage";
 import { DecisionQueuePage } from "./pages/DecisionQueuePage";
@@ -84,6 +87,9 @@ function Layout({ children }: { children: React.ReactNode }) {
           <Link to="/">Home</Link>
           <Link to="/dashboard">Dashboard</Link>
           <Link to="/decision-intelligence">Decision Intelligence</Link>
+<Link to="/knowledge-graph-hub">Knowledge Graph Hub</Link>
+          <Link to="/publication-governance">Publication Governance</Link>
+          <Link to="/readiness-radar-workspace">Readiness Radar</Link>
 <Link to="/evidence-flow-studio">Evidence Flow Studio</Link>
           <Link to="/operational-handoff">Operational Handoff</Link>
           <Link to="/decision-queue">Decision Queue</Link>
@@ -228,6 +234,9 @@ const router = createBrowserRouter([
   { path: "/", element: <HomePage /> },
   { path: "/dashboard", element: <DashboardPage /> },
   { path: "/decision-intelligence", element: <DecisionIntelligencePage /> },
+{ path: "/knowledge-graph-hub", element: <KnowledgeGraphHubPage /> },
+  { path: "/publication-governance", element: <PublicationGovernanceWorkspacePage /> },
+  { path: "/readiness-radar-workspace", element: <ReadinessRadarWorkspacePage /> },
 { path: "/evidence-flow-studio", element: <EvidenceFlowStudioPage /> },
   { path: "/operational-handoff", element: <OperationalHandoffPage /> },
   { path: "/decision-queue", element: <DecisionQueuePage /> },
