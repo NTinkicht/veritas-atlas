@@ -74,364 +74,127 @@ function Build-All {
     }
 }
 
-function Ensure-ImportLine {
-    param(
-        [string]$Content,
-        [string]$Anchor,
-        [string]$ImportLine
-    )
-
-    if ($Content -match [regex]::Escape($ImportLine)) {
-        return $Content
-    }
-
-    return $Content -replace [regex]::Escape($Anchor), ($Anchor + [Environment]::NewLine + $ImportLine)
-}
-
-function Ensure-NavBlock {
-    param(
-        [string]$Content,
-        [string]$Anchor,
-        [string]$NavBlock,
-        [string]$PresencePattern
-    )
-
-    if ($Content -match $PresencePattern) {
-        return $Content
-    }
-
-    return $Content -replace [regex]::Escape($Anchor), ($Anchor + [Environment]::NewLine + $NavBlock)
-}
-
-function Ensure-RouteBlock {
-    param(
-        [string]$Content,
-        [string]$AnchorRoute,
-        [string]$RouteBlock,
-        [string]$PresencePattern
-    )
-
-    if ($Content -match $PresencePattern) {
-        return $Content
-    }
-
-    return $Content -replace [regex]::Escape($AnchorRoute), ($AnchorRoute + [Environment]::NewLine + $RouteBlock)
-}
-
 Write-Host "Checkpointing current code with git..." -ForegroundColor Cyan
-Git-Checkpoint -Message ("checkpoint before phase 6.35 - " + (Get-Date -Format "yyyy-MM-dd HH:mm:ss"))
+Git-Checkpoint -Message ("checkpoint before phase 7.1 - " + (Get-Date -Format "yyyy-MM-dd HH:mm:ss"))
 
-Write-Host "Applying Phase 6.35 - Final UI completion pack..." -ForegroundColor Cyan
+Write-Host "Applying Phase 7.1 - backend depth starter: smoke tests, diagnostics, and delivery report..." -ForegroundColor Cyan
 
-$web = Join-Path $RootDir "apps\web\veritas-atlas-web\src"
+$root = $RootDir
+$diag = Join-Path $root "_diagnostics\phase-7-1"
+Ensure-Dir $diag
 
-Write-File (Join-Path $web "components\AppSurfaceCatalogPanel.tsx") @'
-import { Link } from "react-router-dom";
+$scriptPath = Join-Path $root "tools\smoke\Run-VeritasAtlas-Smoke.ps1"
+$reportPath = Join-Path $diag "phase-7-1-readiness-report.md"
 
-type CatalogItem = {
-  label: string;
-  route: string;
-  description: string;
-};
+Write-File $scriptPath @'
+param(
+    [Parameter(Mandatory = $true)]
+    [string]$RootDir,
+    [string]$BaseUrl = "http://localhost:5209"
+)
 
-export function AppSurfaceCatalogPanel({
-  items,
-}: {
-  items: CatalogItem[];
-}) {
-  return (
-    <div style={panelStyle}>
-      <h3 style={{ marginTop: 0 }}>App Surface Catalog</h3>
-      <div style={gridStyle}>
-        {items.map((item) => (
-          <Link key={item.route} to={item.route} style={cardStyle}>
-            <strong>{item.label}</strong>
-            <span>{item.route}</span>
-            <p style={{ margin: 0, color: "#555" }}>{item.description}</p>
-          </Link>
-        ))}
-      </div>
-    </div>
-  );
+$ErrorActionPreference = "Stop"
+
+function Ensure-Dir {
+    param([string]$Path)
+    if (-not (Test-Path $Path)) {
+        New-Item -ItemType Directory -Path $Path -Force | Out-Null
+    }
 }
 
-const panelStyle: React.CSSProperties = {
-  border: "1px solid #ddd",
-  borderRadius: 14,
-  padding: 16,
-};
-
-const gridStyle: React.CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
-  gap: 12,
-};
-
-const cardStyle: React.CSSProperties = {
-  border: "1px solid #eee",
-  borderRadius: 12,
-  padding: 14,
-  display: "grid",
-  gap: 6,
-  textDecoration: "none",
-  color: "inherit",
-};
-'@
-
-Write-File (Join-Path $web "components\CompletionChecklistPanel.tsx") @'
-type ChecklistItem = {
-  label: string;
-  status: string;
-};
-
-export function CompletionChecklistPanel({
-  items,
-}: {
-  items: ChecklistItem[];
-}) {
-  return (
-    <div style={panelStyle}>
-      <h3 style={{ marginTop: 0 }}>Completion Checklist</h3>
-      <ul style={{ marginBottom: 0 }}>
-        {items.map((item) => (
-          <li key={item.label}>
-            {item.label} - {item.status}
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
+function Append-Line {
+    param(
+        [string]$Path,
+        [string]$Text
+    )
+    Add-Content -Path $Path -Value $Text
 }
 
-const panelStyle: React.CSSProperties = {
-  border: "1px solid #ddd",
-  borderRadius: 14,
-  padding: 16,
-};
-'@
+$timestamp = Get-Date -Format "yyyyMMdd-HHmmss"
+$diag = Join-Path $RootDir "_diagnostics\smoke-$timestamp"
+Ensure-Dir $diag
+$report = Join-Path $diag "smoke-report.md"
+$apiLog = Join-Path $diag "api.log"
 
-Write-File (Join-Path $web "components\ReferenceLinksPanel.tsx") @'
-import { Link } from "react-router-dom";
+Set-Content -Path $report -Value "# Veritas Atlas Smoke Report`r`n" -Encoding UTF8
+Append-Line -Path $report -Text ("Generated: " + (Get-Date -Format "yyyy-MM-dd HH:mm:ss"))
+Append-Line -Path $report -Text ""
 
-type RefItem = {
-  label: string;
-  route: string;
-};
+Push-Location (Join-Path $RootDir "apps\api\VeritasAtlas.Api")
+$apiProcess = $null
+try {
+    $apiProcess = Start-Process "dotnet" -ArgumentList "run" -RedirectStandardOutput $apiLog -RedirectStandardError $apiLog -PassThru
+    Start-Sleep -Seconds 8
 
-export function ReferenceLinksPanel({
-  items,
-}: {
-  items: RefItem[];
-}) {
-  return (
-    <div style={panelStyle}>
-      <h3 style={{ marginTop: 0 }}>Reference Links</h3>
-      <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-        {items.map((item) => (
-          <Link key={item.route} to={item.route}>
-            {item.label}
-          </Link>
-        ))}
-      </div>
-    </div>
-  );
+    $checks = @(
+        @{ Name = "Health"; Url = "$BaseUrl/health" },
+        @{ Name = "Database Health"; Url = "$BaseUrl/health/db" },
+        @{ Name = "Cases"; Url = "$BaseUrl/api/v1/cases?page=1&pageSize=5" },
+        @{ Name = "Sources"; Url = "$BaseUrl/api/v1/sources?page=1&pageSize=5" },
+        @{ Name = "Documents"; Url = "$BaseUrl/api/v1/documents?page=1&pageSize=5" },
+        @{ Name = "Evidence"; Url = "$BaseUrl/api/v1/evidence?page=1&pageSize=5" },
+        @{ Name = "Statements"; Url = "$BaseUrl/api/v1/statements?page=1&pageSize=5" },
+        @{ Name = "Claims"; Url = "$BaseUrl/api/v1/claims?page=1&pageSize=5" },
+        @{ Name = "Contradictions"; Url = "$BaseUrl/api/v1/contradictions?page=1&pageSize=5" }
+    )
+
+    foreach ($check in $checks) {
+        try {
+            $response = Invoke-WebRequest -Uri $check.Url -Method Get -UseBasicParsing -TimeoutSec 15
+            Append-Line -Path $report -Text ("## " + $check.Name)
+            Append-Line -Path $report -Text ("- StatusCode: " + $response.StatusCode)
+            Append-Line -Path $report -Text ("- Url: " + $check.Url)
+            Append-Line -Path $report -Text ""
+        }
+        catch {
+            Append-Line -Path $report -Text ("## " + $check.Name)
+            Append-Line -Path $report -Text ("- FAILED: " + $_.Exception.Message)
+            Append-Line -Path $report -Text ("- Url: " + $check.Url)
+            Append-Line -Path $report -Text ""
+        }
+    }
+
+    Append-Line -Path $report -Text "## API log"
+    Append-Line -Path $report -Text ""
+    if (Test-Path $apiLog) {
+        Append-Line -Path $report -Text '```'
+        Append-Line -Path $report -Text (Get-Content $apiLog -Raw)
+        Append-Line -Path $report -Text '```'
+    }
 }
-
-const panelStyle: React.CSSProperties = {
-  border: "1px solid #ddd",
-  borderRadius: 14,
-  padding: 16,
-};
-'@
-
-Write-File (Join-Path $web "pages\AppSurfaceCatalogPage.tsx") @'
-import { AppSurfaceCatalogPanel } from "../components/AppSurfaceCatalogPanel";
-
-export function AppSurfaceCatalogPage() {
-  const items = [
-    { label: "Case Explorer", route: "/case-explorer", description: "Primary case navigation and workbench entry." },
-    { label: "Truth Review Studio", route: "/truth-review-studio", description: "Claims and contradictions review surface." },
-    { label: "Publication Pipeline", route: "/publication-pipeline", description: "Publication preparation and routing shell." },
-    { label: "Decision Intelligence", route: "/decision-intelligence", description: "Confidence and decision explanation surface." },
-    { label: "Release Readiness Hub", route: "/release-readiness-hub", description: "Release and readiness overview." },
-    { label: "Operator Cockpit", route: "/operator-cockpit", description: "Central operator jump-off surface." },
-    { label: "Platform Atlas", route: "/platform-atlas", description: "Platform-level orientation and state summary." },
-    { label: "Workspace Map", route: "/workspace-map", description: "Route-level map of major workspaces." },
-  ];
-
-  return (
-    <div style={{ fontFamily: "Arial, sans-serif", padding: 24 }}>
-      <h1 style={{ marginTop: 0 }}>App Surface Catalog</h1>
-      <p style={{ color: "#555" }}>
-        Final catalog of the major frontend surfaces now present in Veritas Atlas.
-      </p>
-      <AppSurfaceCatalogPanel items={items} />
-    </div>
-  );
+finally {
+    Pop-Location
+    if ($apiProcess -and -not $apiProcess.HasExited) {
+        Stop-Process -Id $apiProcess.Id -Force
+    }
 }
 '@
 
-Write-File (Join-Path $web "pages\UICompletionCenterPage.tsx") @'
-import { CompletionChecklistPanel } from "../components/CompletionChecklistPanel";
-import { ReferenceLinksPanel } from "../components/ReferenceLinksPanel";
+Write-File $reportPath @'
+# Phase 7.1 Readiness Report
 
-export function UICompletionCenterPage() {
-  const checklist = [
-    { label: "Core entity pages", status: "Complete" },
-    { label: "Case explorer surfaces", status: "Complete" },
-    { label: "Contradiction and review surfaces", status: "Complete" },
-    { label: "Publication and governance shells", status: "Complete" },
-    { label: "Readiness and executive surfaces", status: "Complete" },
-    { label: "Deep business logic wiring", status: "Pending deeper pass" },
-  ];
+This phase moves beyond broad UI expansion and starts the deeper implementation track.
 
-  const links = [
-    { label: "App Surface Catalog", route: "/app-surface-catalog" },
-    { label: "Release Readiness Hub", route: "/release-readiness-hub" },
-    { label: "System Readiness Map", route: "/system-readiness-map" },
-    { label: "Final Control Center", route: "/final-control-center" },
-  ];
+## Added
+- Smoke test runner script
+- Delivery diagnostics folder
+- Readiness report scaffold
 
-  return (
-    <div style={{ fontFamily: "Arial, sans-serif", padding: 24 }}>
-      <h1 style={{ marginTop: 0 }}>UI Completion Center</h1>
-      <p style={{ color: "#555" }}>
-        Final consolidation view for the completed frontend shell and the remaining deeper implementation work.
-      </p>
+## Purpose
+- verify API startup
+- verify key list endpoints
+- capture logs
+- establish a repeatable backend validation loop
 
-      <div style={gridStyle}>
-        <CompletionChecklistPanel items={checklist} />
-        <ReferenceLinksPanel items={links} />
-      </div>
-    </div>
-  );
-}
-
-const gridStyle: React.CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "1fr 1fr",
-  gap: 16,
-};
+## Next recommended track
+- real review write actions
+- real contradiction resolution actions
+- publication state transitions
+- confidence scoring backend
+- end-to-end seeded data scenario
 '@
-
-Write-File (Join-Path $web "pages\NavigationIndexPage.tsx") @'
-import { Link } from "react-router-dom";
-
-export function NavigationIndexPage() {
-  const groups = [
-    {
-      title: "Core Work",
-      items: [
-        { label: "Cases", route: "/cases" },
-        { label: "Case Explorer", route: "/case-explorer" },
-        { label: "Claims", route: "/claims" },
-        { label: "Contradictions", route: "/contradictions" },
-      ],
-    },
-    {
-      title: "Review and Publication",
-      items: [
-        { label: "Truth Review Studio", route: "/truth-review-studio" },
-        { label: "Review Decision Board", route: "/review-decision-board" },
-        { label: "Publication Pipeline", route: "/publication-pipeline" },
-        { label: "Publication Governance", route: "/publication-governance" },
-      ],
-    },
-    {
-      title: "Oversight and Readiness",
-      items: [
-        { label: "Decision Intelligence", route: "/decision-intelligence" },
-        { label: "Release Readiness Hub", route: "/release-readiness-hub" },
-        { label: "System Readiness Map", route: "/system-readiness-map" },
-        { label: "Executive Readout", route: "/executive-readout-workspace" },
-      ],
-    },
-  ];
-
-  return (
-    <div style={{ fontFamily: "Arial, sans-serif", padding: 24 }}>
-      <h1 style={{ marginTop: 0 }}>Navigation Index</h1>
-      <p style={{ color: "#555" }}>
-        Organized route index across the current Veritas Atlas frontend.
-      </p>
-
-      <div style={gridStyle}>
-        {groups.map((group) => (
-          <div key={group.title} style={panelStyle}>
-            <h3 style={{ marginTop: 0 }}>{group.title}</h3>
-            <ul style={{ marginBottom: 0 }}>
-              {group.items.map((item) => (
-                <li key={item.route}>
-                  <Link to={item.route}>{item.label}</Link>
-                </li>
-              ))}
-            </ul>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-const gridStyle: React.CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
-  gap: 16,
-};
-
-const panelStyle: React.CSSProperties = {
-  border: "1px solid #ddd",
-  borderRadius: 14,
-  padding: 16,
-};
-'@
-
-Write-File (Join-Path $web "pages\FrontendClosurePage.tsx") @'
-import { CompletionChecklistPanel } from "../components/CompletionChecklistPanel";
-
-export function FrontendClosurePage() {
-  const items = [
-    { label: "UI breadth across workspaces", status: "Locked" },
-    { label: "Operator and executive navigation", status: "Locked" },
-    { label: "Review, contradiction, publication shells", status: "Locked" },
-    { label: "Final frontend consolidation", status: "Locked" },
-    { label: "Future priority", status: "Backend depth and business logic" },
-  ];
-
-  return (
-    <div style={{ fontFamily: "Arial, sans-serif", padding: 24 }}>
-      <h1 style={{ marginTop: 0 }}>Frontend Closure</h1>
-      <p style={{ color: "#555" }}>
-        Final UI closure surface marking the transition from broad UI expansion into deeper implementation work.
-      </p>
-
-      <CompletionChecklistPanel items={items} />
-    </div>
-  );
-}
-'@
-
-$main = Join-Path $web "main.tsx"
-$content = Get-Content $main -Raw
-
-$content = Ensure-ImportLine -Content $content -Anchor 'import { DashboardPage } from "./pages/DashboardPage";' -ImportLine 'import { AppSurfaceCatalogPage } from "./pages/AppSurfaceCatalogPage";'
-$content = Ensure-ImportLine -Content $content -Anchor 'import { AppSurfaceCatalogPage } from "./pages/AppSurfaceCatalogPage";' -ImportLine 'import { UICompletionCenterPage } from "./pages/UICompletionCenterPage";'
-$content = Ensure-ImportLine -Content $content -Anchor 'import { UICompletionCenterPage } from "./pages/UICompletionCenterPage";' -ImportLine 'import { NavigationIndexPage } from "./pages/NavigationIndexPage";'
-$content = Ensure-ImportLine -Content $content -Anchor 'import { NavigationIndexPage } from "./pages/NavigationIndexPage";' -ImportLine 'import { FrontendClosurePage } from "./pages/FrontendClosurePage";'
-
-$content = Ensure-NavBlock -Content $content -Anchor '<Link to="/platform-atlas">Platform Atlas</Link>' -NavBlock '<Link to="/app-surface-catalog">App Surface Catalog</Link>
-          <Link to="/ui-completion-center">UI Completion Center</Link>
-          <Link to="/navigation-index">Navigation Index</Link>
-          <Link to="/frontend-closure">Frontend Closure</Link>' -PresencePattern 'to="/app-surface-catalog"'
-
-$content = Ensure-RouteBlock -Content $content -AnchorRoute '{ path: "/platform-atlas", element: <PlatformAtlasPage /> },' -RouteBlock '{ path: "/app-surface-catalog", element: <AppSurfaceCatalogPage /> },
-  { path: "/ui-completion-center", element: <UICompletionCenterPage /> },
-  { path: "/navigation-index", element: <NavigationIndexPage /> },
-  { path: "/frontend-closure", element: <FrontendClosurePage /> },' -PresencePattern 'path: "/app-surface-catalog"'
-
-Write-File $main $content
 
 Write-Host "Building..." -ForegroundColor Cyan
 Build-All -RootDir $RootDir
 
-Write-Host "Phase 6.35 DONE" -ForegroundColor Green
+Write-Host "Phase 7.1 DONE" -ForegroundColor Green

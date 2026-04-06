@@ -45,6 +45,10 @@ import { PublicationDeskPage } from "./pages/PublicationDeskPage";
 import { CaseDetailPage } from "./pages/CaseDetailPage";
 import { ReviewsPage } from "./pages/ReviewsPage";
 import { DashboardPage } from "./pages/DashboardPage";
+import { AppSurfaceCatalogPage } from "./pages/AppSurfaceCatalogPage";
+import { UICompletionCenterPage } from "./pages/UICompletionCenterPage";
+import { NavigationIndexPage } from "./pages/NavigationIndexPage";
+import { FrontendClosurePage } from "./pages/FrontendClosurePage";
 import { PlatformAtlasPage } from "./pages/PlatformAtlasPage";
 import { WorkspaceMapPage } from "./pages/WorkspaceMapPage";
 import { RouteRegistryPage } from "./pages/RouteRegistryPage";
@@ -103,6 +107,10 @@ function Layout({ children }: { children: React.ReactNode }) {
 <Link to="/release-readiness-hub">Release Readiness Hub</Link>
 <Link to="/system-readiness-map">System Readiness Map</Link>
 <Link to="/platform-atlas">Platform Atlas</Link>
+<Link to="/app-surface-catalog">App Surface Catalog</Link>
+          <Link to="/ui-completion-center">UI Completion Center</Link>
+          <Link to="/navigation-index">Navigation Index</Link>
+          <Link to="/frontend-closure">Frontend Closure</Link>
           <Link to="/workspace-map">Workspace Map</Link>
           <Link to="/route-registry">Route Registry</Link>
           <Link to="/operator-cockpit">Operator Cockpit</Link>
@@ -262,6 +270,10 @@ const router = createBrowserRouter([
 { path: "/release-readiness-hub", element: <ReleaseReadinessHubPage /> },
 { path: "/system-readiness-map", element: <SystemReadinessMapPage /> },
 { path: "/platform-atlas", element: <PlatformAtlasPage /> },
+{ path: "/app-surface-catalog", element: <AppSurfaceCatalogPage /> },
+  { path: "/ui-completion-center", element: <UICompletionCenterPage /> },
+  { path: "/navigation-index", element: <NavigationIndexPage /> },
+  { path: "/frontend-closure", element: <FrontendClosurePage /> },
   { path: "/workspace-map", element: <WorkspaceMapPage /> },
   { path: "/route-registry", element: <RouteRegistryPage /> },
   { path: "/operator-cockpit", element: <OperatorCockpitPage /> },
