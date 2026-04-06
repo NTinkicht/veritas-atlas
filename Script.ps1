@@ -119,30 +119,83 @@ function Ensure-RouteBlock {
 }
 
 Write-Host "Checkpointing current code with git..." -ForegroundColor Cyan
-Git-Checkpoint -Message ("checkpoint before phase 6.34 - " + (Get-Date -Format "yyyy-MM-dd HH:mm:ss"))
+Git-Checkpoint -Message ("checkpoint before phase 6.35 - " + (Get-Date -Format "yyyy-MM-dd HH:mm:ss"))
 
-Write-Host "Applying Phase 6.34 - platform atlas, workspace map, and route registry pack..." -ForegroundColor Cyan
+Write-Host "Applying Phase 6.35 - Final UI completion pack..." -ForegroundColor Cyan
 
 $web = Join-Path $RootDir "apps\web\veritas-atlas-web\src"
 
-Write-File (Join-Path $web "components\PlatformAtlasSummaryPanel.tsx") @'
-type AtlasMetric = {
+Write-File (Join-Path $web "components\AppSurfaceCatalogPanel.tsx") @'
+import { Link } from "react-router-dom";
+
+type CatalogItem = {
   label: string;
-  value: string;
+  route: string;
+  description: string;
 };
 
-export function PlatformAtlasSummaryPanel({
-  metrics,
+export function AppSurfaceCatalogPanel({
+  items,
 }: {
-  metrics: AtlasMetric[];
+  items: CatalogItem[];
 }) {
   return (
     <div style={panelStyle}>
-      <h3 style={{ marginTop: 0 }}>Platform Atlas Summary</h3>
+      <h3 style={{ marginTop: 0 }}>App Surface Catalog</h3>
+      <div style={gridStyle}>
+        {items.map((item) => (
+          <Link key={item.route} to={item.route} style={cardStyle}>
+            <strong>{item.label}</strong>
+            <span>{item.route}</span>
+            <p style={{ margin: 0, color: "#555" }}>{item.description}</p>
+          </Link>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+const panelStyle: React.CSSProperties = {
+  border: "1px solid #ddd",
+  borderRadius: 14,
+  padding: 16,
+};
+
+const gridStyle: React.CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
+  gap: 12,
+};
+
+const cardStyle: React.CSSProperties = {
+  border: "1px solid #eee",
+  borderRadius: 12,
+  padding: 14,
+  display: "grid",
+  gap: 6,
+  textDecoration: "none",
+  color: "inherit",
+};
+'@
+
+Write-File (Join-Path $web "components\CompletionChecklistPanel.tsx") @'
+type ChecklistItem = {
+  label: string;
+  status: string;
+};
+
+export function CompletionChecklistPanel({
+  items,
+}: {
+  items: ChecklistItem[];
+}) {
+  return (
+    <div style={panelStyle}>
+      <h3 style={{ marginTop: 0 }}>Completion Checklist</h3>
       <ul style={{ marginBottom: 0 }}>
-        {metrics.map((metric) => (
-          <li key={metric.label}>
-            <strong>{metric.label}</strong>: {metric.value}
+        {items.map((item) => (
+          <li key={item.label}>
+            {item.label} - {item.status}
           </li>
         ))}
       </ul>
@@ -157,27 +210,29 @@ const panelStyle: React.CSSProperties = {
 };
 '@
 
-Write-File (Join-Path $web "components\WorkspaceMapPanel.tsx") @'
-type WorkspaceMapItem = {
+Write-File (Join-Path $web "components\ReferenceLinksPanel.tsx") @'
+import { Link } from "react-router-dom";
+
+type RefItem = {
   label: string;
   route: string;
 };
 
-export function WorkspaceMapPanel({
+export function ReferenceLinksPanel({
   items,
 }: {
-  items: WorkspaceMapItem[];
+  items: RefItem[];
 }) {
   return (
     <div style={panelStyle}>
-      <h3 style={{ marginTop: 0 }}>Workspace Map</h3>
-      <ul style={{ marginBottom: 0 }}>
+      <h3 style={{ marginTop: 0 }}>Reference Links</h3>
+      <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
         {items.map((item) => (
-          <li key={item.route}>
-            {item.label} - {item.route}
-          </li>
+          <Link key={item.route} to={item.route}>
+            {item.label}
+          </Link>
         ))}
-      </ul>
+      </div>
     </div>
   );
 }
@@ -189,132 +244,168 @@ const panelStyle: React.CSSProperties = {
 };
 '@
 
-Write-File (Join-Path $web "components\RouteRegistryPanel.tsx") @'
-type RouteRegistryItem = {
-  category: string;
-  count: number;
-};
+Write-File (Join-Path $web "pages\AppSurfaceCatalogPage.tsx") @'
+import { AppSurfaceCatalogPanel } from "../components/AppSurfaceCatalogPanel";
 
-export function RouteRegistryPanel({
-  items,
-}: {
-  items: RouteRegistryItem[];
-}) {
-  return (
-    <div style={panelStyle}>
-      <h3 style={{ marginTop: 0 }}>Route Registry</h3>
-      <ul style={{ marginBottom: 0 }}>
-        {items.map((item) => (
-          <li key={item.category}>
-            {item.category}: {item.count}
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
-}
-
-const panelStyle: React.CSSProperties = {
-  border: "1px solid #ddd",
-  borderRadius: 14,
-  padding: 16,
-};
-'@
-
-Write-File (Join-Path $web "pages\PlatformAtlasPage.tsx") @'
-import { Link } from "react-router-dom";
-import { PlatformAtlasSummaryPanel } from "../components/PlatformAtlasSummaryPanel";
-
-export function PlatformAtlasPage() {
-  const metrics = [
-    { label: "Current state", value: "Operational prototype" },
-    { label: "Core vertical slices", value: "Claims, contradictions, review shell" },
-    { label: "UI surface breadth", value: "High" },
-    { label: "Next depth focus", value: "Backend and business logic" },
+export function AppSurfaceCatalogPage() {
+  const items = [
+    { label: "Case Explorer", route: "/case-explorer", description: "Primary case navigation and workbench entry." },
+    { label: "Truth Review Studio", route: "/truth-review-studio", description: "Claims and contradictions review surface." },
+    { label: "Publication Pipeline", route: "/publication-pipeline", description: "Publication preparation and routing shell." },
+    { label: "Decision Intelligence", route: "/decision-intelligence", description: "Confidence and decision explanation surface." },
+    { label: "Release Readiness Hub", route: "/release-readiness-hub", description: "Release and readiness overview." },
+    { label: "Operator Cockpit", route: "/operator-cockpit", description: "Central operator jump-off surface." },
+    { label: "Platform Atlas", route: "/platform-atlas", description: "Platform-level orientation and state summary." },
+    { label: "Workspace Map", route: "/workspace-map", description: "Route-level map of major workspaces." },
   ];
 
   return (
     <div style={{ fontFamily: "Arial, sans-serif", padding: 24 }}>
-      <header style={{ marginBottom: 24 }}>
-        <h1 style={{ margin: 0 }}>Platform Atlas</h1>
-        <p style={{ color: "#555" }}>
-          Consolidated picture of the Veritas Atlas platform and its current operational footprint.
-        </p>
-        <nav style={{ display: "flex", gap: 16, marginTop: 12, flexWrap: "wrap" }}>
-          <Link to="/">Home</Link>
-          <Link to="/platform-atlas">Platform Atlas</Link>
-          <Link to="/system-readiness-map">System Readiness Map</Link>
-          <Link to="/executive-readout-workspace">Executive Readout</Link>
-        </nav>
-      </header>
-
-      <PlatformAtlasSummaryPanel metrics={metrics} />
+      <h1 style={{ marginTop: 0 }}>App Surface Catalog</h1>
+      <p style={{ color: "#555" }}>
+        Final catalog of the major frontend surfaces now present in Veritas Atlas.
+      </p>
+      <AppSurfaceCatalogPanel items={items} />
     </div>
   );
 }
 '@
 
-Write-File (Join-Path $web "pages\WorkspaceMapPage.tsx") @'
-import { Link } from "react-router-dom";
-import { WorkspaceMapPanel } from "../components/WorkspaceMapPanel";
+Write-File (Join-Path $web "pages\UICompletionCenterPage.tsx") @'
+import { CompletionChecklistPanel } from "../components/CompletionChecklistPanel";
+import { ReferenceLinksPanel } from "../components/ReferenceLinksPanel";
 
-export function WorkspaceMapPage() {
-  const items = [
-    { label: "Case Explorer", route: "/case-explorer" },
-    { label: "Truth Review Studio", route: "/truth-review-studio" },
-    { label: "Publication Pipeline", route: "/publication-pipeline" },
-    { label: "Decision Intelligence", route: "/decision-intelligence" },
+export function UICompletionCenterPage() {
+  const checklist = [
+    { label: "Core entity pages", status: "Complete" },
+    { label: "Case explorer surfaces", status: "Complete" },
+    { label: "Contradiction and review surfaces", status: "Complete" },
+    { label: "Publication and governance shells", status: "Complete" },
+    { label: "Readiness and executive surfaces", status: "Complete" },
+    { label: "Deep business logic wiring", status: "Pending deeper pass" },
+  ];
+
+  const links = [
+    { label: "App Surface Catalog", route: "/app-surface-catalog" },
     { label: "Release Readiness Hub", route: "/release-readiness-hub" },
-    { label: "Operator Cockpit", route: "/operator-cockpit" },
+    { label: "System Readiness Map", route: "/system-readiness-map" },
+    { label: "Final Control Center", route: "/final-control-center" },
   ];
 
   return (
     <div style={{ fontFamily: "Arial, sans-serif", padding: 24 }}>
-      <header style={{ marginBottom: 24 }}>
-        <h1 style={{ margin: 0 }}>Workspace Map</h1>
-        <p style={{ color: "#555" }}>
-          Quick navigation map across the major operational workspaces already present in the product.
-        </p>
-        <nav style={{ display: "flex", gap: 16, marginTop: 12, flexWrap: "wrap" }}>
-          <Link to="/workspace-map">Workspace Map</Link>
-          <Link to="/operator-cockpit">Operator Cockpit</Link>
-          <Link to="/ops-coordination-center">Ops Coordination</Link>
-        </nav>
-      </header>
+      <h1 style={{ marginTop: 0 }}>UI Completion Center</h1>
+      <p style={{ color: "#555" }}>
+        Final consolidation view for the completed frontend shell and the remaining deeper implementation work.
+      </p>
 
-      <WorkspaceMapPanel items={items} />
+      <div style={gridStyle}>
+        <CompletionChecklistPanel items={checklist} />
+        <ReferenceLinksPanel items={links} />
+      </div>
     </div>
   );
 }
+
+const gridStyle: React.CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "1fr 1fr",
+  gap: 16,
+};
 '@
 
-Write-File (Join-Path $web "pages\RouteRegistryPage.tsx") @'
+Write-File (Join-Path $web "pages\NavigationIndexPage.tsx") @'
 import { Link } from "react-router-dom";
-import { RouteRegistryPanel } from "../components/RouteRegistryPanel";
 
-export function RouteRegistryPage() {
-  const items = [
-    { category: "Core entity pages", count: 12 },
-    { category: "Review and contradiction pages", count: 10 },
-    { category: "Publication and governance pages", count: 10 },
-    { category: "Executive and readiness pages", count: 10 },
+export function NavigationIndexPage() {
+  const groups = [
+    {
+      title: "Core Work",
+      items: [
+        { label: "Cases", route: "/cases" },
+        { label: "Case Explorer", route: "/case-explorer" },
+        { label: "Claims", route: "/claims" },
+        { label: "Contradictions", route: "/contradictions" },
+      ],
+    },
+    {
+      title: "Review and Publication",
+      items: [
+        { label: "Truth Review Studio", route: "/truth-review-studio" },
+        { label: "Review Decision Board", route: "/review-decision-board" },
+        { label: "Publication Pipeline", route: "/publication-pipeline" },
+        { label: "Publication Governance", route: "/publication-governance" },
+      ],
+    },
+    {
+      title: "Oversight and Readiness",
+      items: [
+        { label: "Decision Intelligence", route: "/decision-intelligence" },
+        { label: "Release Readiness Hub", route: "/release-readiness-hub" },
+        { label: "System Readiness Map", route: "/system-readiness-map" },
+        { label: "Executive Readout", route: "/executive-readout-workspace" },
+      ],
+    },
   ];
 
   return (
     <div style={{ fontFamily: "Arial, sans-serif", padding: 24 }}>
-      <header style={{ marginBottom: 24 }}>
-        <h1 style={{ margin: 0 }}>Route Registry</h1>
-        <p style={{ color: "#555" }}>
-          Registry-style summary of the current operational route families inside the frontend.
-        </p>
-        <nav style={{ display: "flex", gap: 16, marginTop: 12, flexWrap: "wrap" }}>
-          <Link to="/route-registry">Route Registry</Link>
-          <Link to="/platform-atlas">Platform Atlas</Link>
-          <Link to="/workspace-map">Workspace Map</Link>
-        </nav>
-      </header>
+      <h1 style={{ marginTop: 0 }}>Navigation Index</h1>
+      <p style={{ color: "#555" }}>
+        Organized route index across the current Veritas Atlas frontend.
+      </p>
 
-      <RouteRegistryPanel items={items} />
+      <div style={gridStyle}>
+        {groups.map((group) => (
+          <div key={group.title} style={panelStyle}>
+            <h3 style={{ marginTop: 0 }}>{group.title}</h3>
+            <ul style={{ marginBottom: 0 }}>
+              {group.items.map((item) => (
+                <li key={item.route}>
+                  <Link to={item.route}>{item.label}</Link>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+const gridStyle: React.CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
+  gap: 16,
+};
+
+const panelStyle: React.CSSProperties = {
+  border: "1px solid #ddd",
+  borderRadius: 14,
+  padding: 16,
+};
+'@
+
+Write-File (Join-Path $web "pages\FrontendClosurePage.tsx") @'
+import { CompletionChecklistPanel } from "../components/CompletionChecklistPanel";
+
+export function FrontendClosurePage() {
+  const items = [
+    { label: "UI breadth across workspaces", status: "Locked" },
+    { label: "Operator and executive navigation", status: "Locked" },
+    { label: "Review, contradiction, publication shells", status: "Locked" },
+    { label: "Final frontend consolidation", status: "Locked" },
+    { label: "Future priority", status: "Backend depth and business logic" },
+  ];
+
+  return (
+    <div style={{ fontFamily: "Arial, sans-serif", padding: 24 }}>
+      <h1 style={{ marginTop: 0 }}>Frontend Closure</h1>
+      <p style={{ color: "#555" }}>
+        Final UI closure surface marking the transition from broad UI expansion into deeper implementation work.
+      </p>
+
+      <CompletionChecklistPanel items={items} />
     </div>
   );
 }
@@ -323,21 +414,24 @@ export function RouteRegistryPage() {
 $main = Join-Path $web "main.tsx"
 $content = Get-Content $main -Raw
 
-$content = Ensure-ImportLine -Content $content -Anchor 'import { DashboardPage } from "./pages/DashboardPage";' -ImportLine 'import { PlatformAtlasPage } from "./pages/PlatformAtlasPage";'
-$content = Ensure-ImportLine -Content $content -Anchor 'import { PlatformAtlasPage } from "./pages/PlatformAtlasPage";' -ImportLine 'import { WorkspaceMapPage } from "./pages/WorkspaceMapPage";'
-$content = Ensure-ImportLine -Content $content -Anchor 'import { WorkspaceMapPage } from "./pages/WorkspaceMapPage";' -ImportLine 'import { RouteRegistryPage } from "./pages/RouteRegistryPage";'
+$content = Ensure-ImportLine -Content $content -Anchor 'import { DashboardPage } from "./pages/DashboardPage";' -ImportLine 'import { AppSurfaceCatalogPage } from "./pages/AppSurfaceCatalogPage";'
+$content = Ensure-ImportLine -Content $content -Anchor 'import { AppSurfaceCatalogPage } from "./pages/AppSurfaceCatalogPage";' -ImportLine 'import { UICompletionCenterPage } from "./pages/UICompletionCenterPage";'
+$content = Ensure-ImportLine -Content $content -Anchor 'import { UICompletionCenterPage } from "./pages/UICompletionCenterPage";' -ImportLine 'import { NavigationIndexPage } from "./pages/NavigationIndexPage";'
+$content = Ensure-ImportLine -Content $content -Anchor 'import { NavigationIndexPage } from "./pages/NavigationIndexPage";' -ImportLine 'import { FrontendClosurePage } from "./pages/FrontendClosurePage";'
 
-$content = Ensure-NavBlock -Content $content -Anchor '<Link to="/system-readiness-map">System Readiness Map</Link>' -NavBlock '<Link to="/platform-atlas">Platform Atlas</Link>
-          <Link to="/workspace-map">Workspace Map</Link>
-          <Link to="/route-registry">Route Registry</Link>' -PresencePattern 'to="/platform-atlas"'
+$content = Ensure-NavBlock -Content $content -Anchor '<Link to="/platform-atlas">Platform Atlas</Link>' -NavBlock '<Link to="/app-surface-catalog">App Surface Catalog</Link>
+          <Link to="/ui-completion-center">UI Completion Center</Link>
+          <Link to="/navigation-index">Navigation Index</Link>
+          <Link to="/frontend-closure">Frontend Closure</Link>' -PresencePattern 'to="/app-surface-catalog"'
 
-$content = Ensure-RouteBlock -Content $content -AnchorRoute '{ path: "/system-readiness-map", element: <SystemReadinessMapPage /> },' -RouteBlock '{ path: "/platform-atlas", element: <PlatformAtlasPage /> },
-  { path: "/workspace-map", element: <WorkspaceMapPage /> },
-  { path: "/route-registry", element: <RouteRegistryPage /> },' -PresencePattern 'path: "/platform-atlas"'
+$content = Ensure-RouteBlock -Content $content -AnchorRoute '{ path: "/platform-atlas", element: <PlatformAtlasPage /> },' -RouteBlock '{ path: "/app-surface-catalog", element: <AppSurfaceCatalogPage /> },
+  { path: "/ui-completion-center", element: <UICompletionCenterPage /> },
+  { path: "/navigation-index", element: <NavigationIndexPage /> },
+  { path: "/frontend-closure", element: <FrontendClosurePage /> },' -PresencePattern 'path: "/app-surface-catalog"'
 
 Write-File $main $content
 
 Write-Host "Building..." -ForegroundColor Cyan
 Build-All -RootDir $RootDir
 
-Write-Host "Phase 6.34 DONE" -ForegroundColor Green
+Write-Host "Phase 6.35 DONE" -ForegroundColor Green

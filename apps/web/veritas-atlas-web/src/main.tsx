@@ -45,6 +45,9 @@ import { PublicationDeskPage } from "./pages/PublicationDeskPage";
 import { CaseDetailPage } from "./pages/CaseDetailPage";
 import { ReviewsPage } from "./pages/ReviewsPage";
 import { DashboardPage } from "./pages/DashboardPage";
+import { PlatformAtlasPage } from "./pages/PlatformAtlasPage";
+import { WorkspaceMapPage } from "./pages/WorkspaceMapPage";
+import { RouteRegistryPage } from "./pages/RouteRegistryPage";
 import { SystemReadinessMapPage } from "./pages/SystemReadinessMapPage";
 import { OperatorCockpitPage } from "./pages/OperatorCockpitPage";
 import { FinalControlCenterPage } from "./pages/FinalControlCenterPage";
@@ -99,6 +102,9 @@ function Layout({ children }: { children: React.ReactNode }) {
 <Link to="/knowledge-graph-hub">Knowledge Graph Hub</Link>
 <Link to="/release-readiness-hub">Release Readiness Hub</Link>
 <Link to="/system-readiness-map">System Readiness Map</Link>
+<Link to="/platform-atlas">Platform Atlas</Link>
+          <Link to="/workspace-map">Workspace Map</Link>
+          <Link to="/route-registry">Route Registry</Link>
           <Link to="/operator-cockpit">Operator Cockpit</Link>
           <Link to="/final-control-center">Final Control Center</Link>
 <Link to="/executive-readout-workspace">Executive Readout</Link>
@@ -255,6 +261,9 @@ const router = createBrowserRouter([
 { path: "/knowledge-graph-hub", element: <KnowledgeGraphHubPage /> },
 { path: "/release-readiness-hub", element: <ReleaseReadinessHubPage /> },
 { path: "/system-readiness-map", element: <SystemReadinessMapPage /> },
+{ path: "/platform-atlas", element: <PlatformAtlasPage /> },
+  { path: "/workspace-map", element: <WorkspaceMapPage /> },
+  { path: "/route-registry", element: <RouteRegistryPage /> },
   { path: "/operator-cockpit", element: <OperatorCockpitPage /> },
   { path: "/final-control-center", element: <FinalControlCenterPage /> },
 { path: "/executive-readout-workspace", element: <ExecutiveReadoutWorkspacePage /> },
