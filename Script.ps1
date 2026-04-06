@@ -13,6 +13,17 @@ function Ensure-Directory {
     }
 }
 
+function Write-Utf8File {
+    param(
+        [string]$Path,
+        [string]$Content
+    )
+    $parent = Split-Path -Parent $Path
+    Ensure-Directory $parent
+    Set-Content -Path $Path -Value $Content -Encoding UTF8
+    Write-Host "Wrote: $Path" -ForegroundColor Green
+}
+
 function Add-Section {
     param(
         [string]$OutputPath,
@@ -45,69 +56,9 @@ function Wait-ForApi {
     return $false
 }
 
-function Invoke-JsonRequestDetailed {
-    param(
-        [string]$Method,
-        [string]$Uri,
-        [string]$BodyJson
-    )
-
-    try {
-        $response = Invoke-WebRequest `
-            -Method $Method `
-            -Uri $Uri `
-            -ContentType "application/json" `
-            -Body $BodyJson `
-            -UseBasicParsing
-
-        return @{
-            Success = $true
-            StatusCode = [int]$response.StatusCode
-            Body = $response.Content
-        }
-    }
-    catch {
-        $statusCode = ""
-        $body = ""
-        $message = $_.Exception.Message
-
-        if ($_.Exception.Response -ne $null) {
-            try {
-                $statusCode = [int]$_.Exception.Response.StatusCode
-            }
-            catch {
-                $statusCode = "unknown"
-            }
-
-            try {
-                $stream = $_.Exception.Response.GetResponseStream()
-                if ($stream -ne $null) {
-                    $reader = New-Object System.IO.StreamReader($stream)
-                    $body = $reader.ReadToEnd()
-                    $reader.Dispose()
-                }
-            }
-            catch {
-                $body = "[unable to read response body]"
-            }
-        }
-
-        return @{
-            Success = $false
-            StatusCode = $statusCode
-            Body = $body
-            Error = $message
-        }
-    }
-}
-
 $solutionPath = Join-Path $RootDir "VeritasAtlas.slnx"
 $apiProjectPath = Join-Path $RootDir $ApiProject
-
 $controllerPath = Join-Path $RootDir "apps\api\VeritasAtlas.Api\Controllers\StatementsController.cs"
-$contractsPath = Join-Path $RootDir "apps\api\VeritasAtlas.Api\Contracts\StatementsContracts.cs"
-$interfacePath = Join-Path $RootDir "apps\api\VeritasAtlas.Application\Interfaces\IStatementService.cs"
-$servicePath = Join-Path $RootDir "apps\api\VeritasAtlas.Infrastructure\Services\StatementService.cs"
 
 if (-not (Test-Path $solutionPath)) {
     throw "Solution file not found: $solutionPath"
@@ -128,29 +79,107 @@ if ($LASTEXITCODE -ne 0) {
     throw "git add failed."
 }
 
-$commitMessage = "checkpoint before statement endpoint diagnostics - $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')"
+$commitMessage = "checkpoint before statements controller restore - $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')"
 git commit -m $commitMessage 2>$null
 if ($LASTEXITCODE -ne 0) {
-    Write-Host "No new commit created. Continuing with diagnostics." -ForegroundColor Yellow
+    Write-Host "No new commit created. Continuing with restore." -ForegroundColor Yellow
 }
 else {
     Write-Host "Created git commit: $commitMessage" -ForegroundColor Green
 }
 
+$controllerContent = @'
+using Microsoft.AspNetCore.Mvc;
+using VeritasAtlas.Api.Contracts.Statements;
+using VeritasAtlas.Application.Contracts.Statements;
+using VeritasAtlas.Application.Interfaces;
+using VeritasAtlas.Infrastructure.Services;
+
+namespace VeritasAtlas.Api.Controllers;
+
+[ApiController]
+[Route("api/v1/statements")]
+public class StatementsController : ControllerBase
+{
+    private readonly IStatementService _statementService;
+    private readonly StatementService _statementQueryService;
+
+    public StatementsController(
+        IStatementService statementService,
+        StatementService statementQueryService)
+    {
+        _statementService = statementService;
+        _statementQueryService = statementQueryService;
+    }
+
+    [HttpPost]
+    public async Task<ActionResult<CreateStatementResponse>> CreateStatement(
+        [FromBody] CreateStatementRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var entity = await _statementService.ExtractStatementAsync(
+            request.EvidenceId,
+            request.Text,
+            request.CreatedBy,
+            cancellationToken);
+
+        var response = new CreateStatementResponse(
+            entity.Id,
+            entity.EvidenceId,
+            entity.DocumentId,
+            entity.Text.ToString(),
+            entity.Polarity.ToString(),
+            entity.Status.ToString(),
+            entity.Topic,
+            entity.CreatedAtUtc,
+            entity.UpdatedAtUtc);
+
+        return Ok(response);
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> GetStatements([FromQuery] StatementListRequest request)
+    {
+        var (total, items) = await _statementQueryService.GetStatementsAsync(request.Page, request.PageSize);
+
+        return Ok(new
+        {
+            Total = total,
+            Page = request.Page,
+            PageSize = request.PageSize,
+            Items = items
+        });
+    }
+
+    [HttpGet("{id:guid}")]
+    public async Task<IActionResult> GetStatement(Guid id)
+    {
+        var result = await _statementQueryService.GetStatementByIdAsync(id);
+
+        if (result == null)
+        {
+            return NotFound();
+        }
+
+        return Ok(result);
+    }
+}
+'@
+
+Write-Host ""
+Write-Host "Restoring StatementsController..." -ForegroundColor Cyan
+Write-Utf8File -Path $controllerPath -Content $controllerContent
+
 $timestamp = Get-Date -Format "yyyyMMdd-HHmmss"
-$diagDir = Join-Path $RootDir "_diagnostics\statement-endpoint-diagnostics-$timestamp"
+$diagDir = Join-Path $RootDir "_diagnostics\statements-controller-restore-$timestamp"
 Ensure-Directory $diagDir
 
-$reportPath = Join-Path $diagDir "statement-endpoint-diagnostics-report.txt"
+$reportPath = Join-Path $diagDir "statements-controller-restore-report.txt"
 $stdoutPath = Join-Path $diagDir "api-stdout.log"
 $stderrPath = Join-Path $diagDir "api-stderr.log"
 
-Set-Content -Path $reportPath -Value "Statement endpoint diagnostics`r`nGenerated: $(Get-Date -Format s)`r`nRoot: $RootDir" -Encoding UTF8
-
-Add-Section -OutputPath $reportPath -Title "FILE: StatementsController.cs" -Content (Get-Content $controllerPath -Raw)
-Add-Section -OutputPath $reportPath -Title "FILE: StatementsContracts.cs" -Content (Get-Content $contractsPath -Raw)
-Add-Section -OutputPath $reportPath -Title "FILE: IStatementService.cs" -Content (Get-Content $interfacePath -Raw)
-Add-Section -OutputPath $reportPath -Title "FILE: StatementService.cs" -Content (Get-Content $servicePath -Raw)
+Set-Content -Path $reportPath -Value "Statements controller restore smoke test`r`nGenerated: $(Get-Date -Format s)`r`nRoot: $RootDir" -Encoding UTF8
+Add-Section -OutputPath $reportPath -Title "StatementsController.cs" -Content $controllerContent
 
 Write-Host ""
 Write-Host "Building..." -ForegroundColor Cyan
@@ -178,25 +207,56 @@ try {
         throw "API did not become ready."
     }
 
-    Write-Host "API is reachable." -ForegroundColor Green
-
-    $statementBody = @{
-        evidenceId = "00000000-0000-0000-0000-000000000001"
-        text = "Diagnostic statement probe"
-        createdBy = "statement-diagnostics"
+    $sourceBody = @{
+        name = "Statement Restore Source"
+        type = "Article"
+        reference = "https://example.com/statement-restore"
+        createdBy = "statement-restore"
     } | ConvertTo-Json -Depth 5
 
-    $probeV1 = Invoke-JsonRequestDetailed -Method "Post" -Uri "$BaseUrl/api/v1/statements" -BodyJson $statementBody
-    Add-Section -OutputPath $reportPath -Title "POST /api/v1/statements" -Content (($probeV1 | ConvertTo-Json -Depth 10))
+    $sourceResponse = Invoke-RestMethod -Method Post -Uri "$BaseUrl/api/v1/sources" -ContentType "application/json" -Body $sourceBody
+    Add-Section -OutputPath $reportPath -Title "POST /api/v1/sources" -Content (($sourceResponse | ConvertTo-Json -Depth 10))
 
-    $probePlain = Invoke-JsonRequestDetailed -Method "Post" -Uri "$BaseUrl/api/statements" -BodyJson $statementBody
-    Add-Section -OutputPath $reportPath -Title "POST /api/statements" -Content (($probePlain | ConvertTo-Json -Depth 10))
+    $documentBody = @{
+        sourceId = $sourceResponse.id
+        title = "Statement Restore Document"
+        content = "This document is used for the statement controller restore smoke test."
+        externalReference = "statement-restore-doc-001"
+        createdBy = "statement-restore"
+    } | ConvertTo-Json -Depth 5
 
-    Add-Section -OutputPath $reportPath -Title "API STDOUT" -Content (if (Test-Path $stdoutPath) { Get-Content $stdoutPath -Raw } else { "[missing]" })
-    Add-Section -OutputPath $reportPath -Title "API STDERR" -Content (if (Test-Path $stderrPath) { Get-Content $stderrPath -Raw } else { "[missing]" })
+    $documentResponse = Invoke-RestMethod -Method Post -Uri "$BaseUrl/api/v1/documents" -ContentType "application/json" -Body $documentBody
+    Add-Section -OutputPath $reportPath -Title "POST /api/v1/documents" -Content (($documentResponse | ConvertTo-Json -Depth 10))
+
+    $evidenceBody = @{
+        documentId = $documentResponse.id
+        quote = "This is a quoted evidence snippet for the statement restore smoke test."
+        startOffset = 0
+        endOffset = 69
+        context = "Additional evidence context."
+        createdBy = "statement-restore"
+    } | ConvertTo-Json -Depth 5
+
+    $evidenceResponse = Invoke-RestMethod -Method Post -Uri "$BaseUrl/api/v1/evidence" -ContentType "application/json" -Body $evidenceBody
+    Add-Section -OutputPath $reportPath -Title "POST /api/v1/evidence" -Content (($evidenceResponse | ConvertTo-Json -Depth 10))
+
+    $statementBody = @{
+        evidenceId = $evidenceResponse.id
+        text = "The subject made a statement during the restored endpoint test."
+        createdBy = "statement-restore"
+    } | ConvertTo-Json -Depth 5
+
+    $statementCreate = Invoke-RestMethod -Method Post -Uri "$BaseUrl/api/v1/statements" -ContentType "application/json" -Body $statementBody
+    Add-Section -OutputPath $reportPath -Title "POST /api/v1/statements" -Content (($statementCreate | ConvertTo-Json -Depth 10))
+
+    $statementList = Invoke-RestMethod -Method Get -Uri "$BaseUrl/api/v1/statements?page=1&pageSize=10"
+    Add-Section -OutputPath $reportPath -Title "GET /api/v1/statements" -Content (($statementList | ConvertTo-Json -Depth 10))
+
+    $statementDetail = Invoke-RestMethod -Method Get -Uri "$BaseUrl/api/v1/statements/$($statementCreate.id)"
+    Add-Section -OutputPath $reportPath -Title "GET /api/v1/statements/{id}" -Content (($statementDetail | ConvertTo-Json -Depth 10))
 
     Write-Host ""
-    Write-Host "Diagnostics completed." -ForegroundColor Green
+    Write-Host "Statements controller restore completed successfully." -ForegroundColor Green
     Write-Host "Report: $reportPath" -ForegroundColor Cyan
 }
 finally {
