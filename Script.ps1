@@ -118,6 +118,26 @@ function Ensure-ImportLine {
     return $Content -replace [regex]::Escape($Anchor), ($Anchor + [Environment]::NewLine + $ImportLine)
 }
 
+function Remove-DuplicateLines {
+    param([Parameter(Mandatory = $true)][string]$Content)
+
+    $lines = $Content -split "`r?`n"
+    $seen = New-Object System.Collections.Generic.HashSet[string]
+    $result = New-Object System.Collections.Generic.List[string]
+
+    foreach ($line in $lines) {
+        $trimmed = $line.Trim()
+        if ($trimmed.StartsWith("import {") -or $trimmed.StartsWith('{ path: "/')) {
+            if (-not $seen.Add($trimmed)) {
+                continue
+            }
+        }
+        $result.Add($line)
+    }
+
+    return [string]::Join([Environment]::NewLine, $result)
+}
+
 function Ensure-NavBlock {
     param(
         [Parameter(Mandatory = $true)][string]$Content,
@@ -148,243 +168,89 @@ function Ensure-RouteBlock {
     return $Content -replace [regex]::Escape($AnchorRoute), ($AnchorRoute + [Environment]::NewLine + $RouteBlock)
 }
 
-Write-Host "Checkpointing current code with git..."
-Git-Checkpoint -Message ("checkpoint before phase 6.20 - " + (Get-Date -Format "yyyy-MM-dd HH:mm:ss"))
+function Get-StatusClass {
+    param([string]$Text)
 
-Write-Host "Applying Phase 6.20 - Large Scope - Analytics and AI Operations Control Pack..."
+    if ($Text -match 'placeholder|ready for|future|planned|monitor|board|console|control|summary|status|timeline|radar|overview') {
+        return "Operational shell / placeholder-heavy"
+    }
+
+    if ($Text -match 'create|list|detail|workspace|browse|claims|statements|evidence|documents|sources') {
+        return "Likely data-driven operational page"
+    }
+
+    return "Unknown / inspect manually"
+}
+
+Write-Host "Checkpointing current code with git..."
+Git-Checkpoint -Message ("checkpoint before stabilization audit - " + (Get-Date -Format "yyyy-MM-dd HH:mm:ss"))
+
+Write-Host "Applying stabilization and audit phase..."
 
 $webRoot = Join-Path $RootDir "apps\web\veritas-atlas-web\src"
-
-$analyticsCenterPath = Join-Path $webRoot "pages\AnalyticsCenterPage.tsx"
-$agentRunsBoardPath = Join-Path $webRoot "pages\AgentRunsBoardPage.tsx"
-$caseFlowMapPath = Join-Path $webRoot "pages\CaseFlowMapPage.tsx"
-$qualityRadarPath = Join-Path $webRoot "pages\QualityRadarPage.tsx"
-$analyticsSummaryPanelPath = Join-Path $webRoot "components\AnalyticsSummaryPanel.tsx"
-$agentUtilizationPanelPath = Join-Path $webRoot "components\AgentUtilizationPanel.tsx"
 $mainPath = Join-Path $webRoot "main.tsx"
-
-Write-Utf8File -Path $analyticsSummaryPanelPath -Content @'
-export function AnalyticsSummaryPanel() {
-  return (
-    <div style={{ border: "1px solid #ddd", borderRadius: 12, padding: 16 }}>
-      <h3 style={{ marginTop: 0 }}>Analytics Summary</h3>
-      <ul style={{ marginBottom: 0 }}>
-        <li>Operational throughput: placeholder</li>
-        <li>Review load trend: placeholder</li>
-        <li>Publication readiness trend: placeholder</li>
-      </ul>
-    </div>
-  );
-}
-'@
-
-Write-Utf8File -Path $agentUtilizationPanelPath -Content @'
-export function AgentUtilizationPanel() {
-  return (
-    <div style={{ border: "1px solid #ddd", borderRadius: 12, padding: 16 }}>
-      <h3 style={{ marginTop: 0 }}>Agent Utilization</h3>
-      <ul style={{ marginBottom: 0 }}>
-        <li>Extraction workload: placeholder</li>
-        <li>Contradiction workload: placeholder</li>
-        <li>Confidence workload: placeholder</li>
-      </ul>
-    </div>
-  );
-}
-'@
-
-Write-Utf8File -Path $analyticsCenterPath -Content @'
-import { Link } from "react-router-dom";
-import { AnalyticsSummaryPanel } from "../components/AnalyticsSummaryPanel";
-import { AgentUtilizationPanel } from "../components/AgentUtilizationPanel";
-
-export function AnalyticsCenterPage() {
-  return (
-    <div style={{ padding: 24, fontFamily: "Arial, sans-serif" }}>
-      <h1>Analytics Center</h1>
-      <p>Central analytics surface for operational throughput, review pressure, and AI workload visibility.</p>
-
-      <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 20 }}>
-        <Link to="/operations-intelligence">Operations Intelligence</Link>
-        <Link to="/executive-overview">Executive Overview</Link>
-        <Link to="/agent-runs-board">Agent Runs Board</Link>
-        <Link to="/quality-radar">Quality Radar</Link>
-        <Link to="/case-flow-map">Case Flow Map</Link>
-      </div>
-
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 24 }}>
-        <AnalyticsSummaryPanel />
-        <AgentUtilizationPanel />
-      </div>
-
-      <section style={panelStyle}>
-        <h2 style={{ marginTop: 0 }}>Analytics priorities</h2>
-        <ul style={{ marginBottom: 0 }}>
-          <li>Surface throughput bottlenecks early</li>
-          <li>Track review versus publication readiness balance</li>
-          <li>Monitor AI workload concentration and idle capacity</li>
-        </ul>
-      </section>
-    </div>
-  );
-}
-
-const panelStyle: React.CSSProperties = {
-  border: "1px solid #ddd",
-  borderRadius: 14,
-  padding: 16,
-};
-'@
-
-Write-Utf8File -Path $agentRunsBoardPath -Content @'
-import { Link } from "react-router-dom";
-
-export function AgentRunsBoardPage() {
-  const runs = [
-    { name: "Extraction Agent", status: "Idle", detail: "Awaiting new evidence" },
-    { name: "Contradiction Agent", status: "Running", detail: "Comparing active claims" },
-    { name: "Confidence Agent", status: "Idle", detail: "No pending recalculations" },
-    { name: "Review Support Agent", status: "Placeholder", detail: "Future workflow expansion" }
-  ];
-
-  return (
-    <div style={{ padding: 24, fontFamily: "Arial, sans-serif" }}>
-      <h1>Agent Runs Board</h1>
-      <p>Board view for current and upcoming AI operations across the system.</p>
-
-      <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 20 }}>
-        <Link to="/analytics-center">Analytics Center</Link>
-        <Link to="/operations-intelligence">Operations Intelligence</Link>
-      </div>
-
-      <div style={gridStyle}>
-        {runs.map((run) => (
-          <div key={run.name} style={cardStyle}>
-            <h3 style={{ marginTop: 0 }}>{run.name}</h3>
-            <p><strong>Status:</strong> {run.status}</p>
-            <p style={{ marginBottom: 0 }}>{run.detail}</p>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-const gridStyle: React.CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
-  gap: 16,
-};
-
-const cardStyle: React.CSSProperties = {
-  border: "1px solid #ddd",
-  borderRadius: 14,
-  padding: 16,
-};
-'@
-
-Write-Utf8File -Path $caseFlowMapPath -Content @'
-import { Link } from "react-router-dom";
-
-export function CaseFlowMapPage() {
-  const steps = [
-    "Source registration",
-    "Document intake",
-    "Evidence extraction",
-    "Statement creation",
-    "Claim formulation",
-    "Contradiction preparation",
-    "Review routing",
-    "Publication readiness",
-  ];
-
-  return (
-    <div style={{ padding: 24, fontFamily: "Arial, sans-serif" }}>
-      <h1>Case Flow Map</h1>
-      <p>Visual sequence of how information moves through the Veritas Atlas operational system.</p>
-
-      <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 20 }}>
-        <Link to="/analytics-center">Analytics Center</Link>
-        <Link to="/operations">Operations Hub</Link>
-        <Link to="/review-queue">Review Queue</Link>
-      </div>
-
-      <section style={panelStyle}>
-        <ol style={{ marginBottom: 0, paddingLeft: 20 }}>
-          {steps.map((step) => (
-            <li key={step} style={{ marginBottom: 8 }}>{step}</li>
-          ))}
-        </ol>
-      </section>
-    </div>
-  );
-}
-
-const panelStyle: React.CSSProperties = {
-  border: "1px solid #ddd",
-  borderRadius: 14,
-  padding: 16,
-};
-'@
-
-Write-Utf8File -Path $qualityRadarPath -Content @'
-import { Link } from "react-router-dom";
-
-export function QualityRadarPage() {
-  const dimensions = [
-    "Evidence quality",
-    "Statement clarity",
-    "Claim quality",
-    "Contradiction readiness",
-    "Review traceability",
-    "Publication readiness"
-  ];
-
-  return (
-    <div style={{ padding: 24, fontFamily: "Arial, sans-serif" }}>
-      <h1>Quality Radar</h1>
-      <p>Operational quality dimensions for reviewing system maturity and readiness.</p>
-
-      <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 20 }}>
-        <Link to="/analytics-center">Analytics Center</Link>
-        <Link to="/governance-console">Governance Console</Link>
-        <Link to="/publication-readiness">Publication Readiness</Link>
-      </div>
-
-      <section style={panelStyle}>
-        <ul style={{ marginBottom: 0 }}>
-          {dimensions.map((dimension) => (
-            <li key={dimension}>{dimension} - placeholder</li>
-          ))}
-        </ul>
-      </section>
-    </div>
-  );
-}
-
-const panelStyle: React.CSSProperties = {
-  border: "1px solid #ddd",
-  borderRadius: 14,
-  padding: 16,
-};
-'@
+$pagesDir = Join-Path $webRoot "pages"
 
 $mainContent = Get-Content $mainPath -Raw
 
-$mainContent = Ensure-ImportLine -Content $mainContent -Anchor 'import { DashboardPage } from "./pages/DashboardPage";' -ImportLine 'import { AnalyticsCenterPage } from "./pages/AnalyticsCenterPage";'
+$mainContent = Remove-DuplicateLines -Content $mainContent
+
+$mainContent = Ensure-ImportLine -Content $mainContent -Anchor 'import { DashboardPage } from "./pages/DashboardPage";' -ImportLine 'import { OperationsIntelligencePage } from "./pages/OperationsIntelligencePage";'
+$mainContent = Ensure-ImportLine -Content $mainContent -Anchor 'import { OperationsIntelligencePage } from "./pages/OperationsIntelligencePage";' -ImportLine 'import { InvestigationNavigatorPage } from "./pages/InvestigationNavigatorPage";'
+$mainContent = Ensure-ImportLine -Content $mainContent -Anchor 'import { InvestigationNavigatorPage } from "./pages/InvestigationNavigatorPage";' -ImportLine 'import { GovernanceConsolePage } from "./pages/GovernanceConsolePage";'
+$mainContent = Ensure-ImportLine -Content $mainContent -Anchor 'import { GovernanceConsolePage } from "./pages/GovernanceConsolePage";' -ImportLine 'import { PublicationReadinessBoardPage } from "./pages/PublicationReadinessBoardPage";'
+$mainContent = Ensure-ImportLine -Content $mainContent -Anchor 'import { PublicationReadinessBoardPage } from "./pages/PublicationReadinessBoardPage";' -ImportLine 'import { DecisionLogPage } from "./pages/DecisionLogPage";'
+$mainContent = Ensure-ImportLine -Content $mainContent -Anchor 'import { DecisionLogPage } from "./pages/DecisionLogPage";' -ImportLine 'import { ExecutiveOverviewPage } from "./pages/ExecutiveOverviewPage";'
+$mainContent = Ensure-ImportLine -Content $mainContent -Anchor 'import { ExecutiveOverviewPage } from "./pages/ExecutiveOverviewPage";' -ImportLine 'import { DeliveryControlTowerPage } from "./pages/DeliveryControlTowerPage";'
+$mainContent = Ensure-ImportLine -Content $mainContent -Anchor 'import { DeliveryControlTowerPage } from "./pages/DeliveryControlTowerPage";' -ImportLine 'import { WorkstreamBoardPage } from "./pages/WorkstreamBoardPage";'
+$mainContent = Ensure-ImportLine -Content $mainContent -Anchor 'import { WorkstreamBoardPage } from "./pages/WorkstreamBoardPage";' -ImportLine 'import { EscalationCenterPage } from "./pages/EscalationCenterPage";'
+$mainContent = Ensure-ImportLine -Content $mainContent -Anchor 'import { EscalationCenterPage } from "./pages/EscalationCenterPage";' -ImportLine 'import { AnalyticsCenterPage } from "./pages/AnalyticsCenterPage";'
 $mainContent = Ensure-ImportLine -Content $mainContent -Anchor 'import { AnalyticsCenterPage } from "./pages/AnalyticsCenterPage";' -ImportLine 'import { AgentRunsBoardPage } from "./pages/AgentRunsBoardPage";'
 $mainContent = Ensure-ImportLine -Content $mainContent -Anchor 'import { AgentRunsBoardPage } from "./pages/AgentRunsBoardPage";' -ImportLine 'import { CaseFlowMapPage } from "./pages/CaseFlowMapPage";'
 $mainContent = Ensure-ImportLine -Content $mainContent -Anchor 'import { CaseFlowMapPage } from "./pages/CaseFlowMapPage";' -ImportLine 'import { QualityRadarPage } from "./pages/QualityRadarPage";'
+$mainContent = Ensure-ImportLine -Content $mainContent -Anchor 'import { QualityRadarPage } from "./pages/QualityRadarPage";' -ImportLine 'import { ReviewQueuePage } from "./pages/ReviewQueuePage";'
+$mainContent = Ensure-ImportLine -Content $mainContent -Anchor 'import { ReviewQueuePage } from "./pages/ReviewQueuePage";' -ImportLine 'import { ReviewWorkspacePage } from "./pages/ReviewWorkspacePage";'
+$mainContent = Ensure-ImportLine -Content $mainContent -Anchor 'import { ReviewWorkspacePage } from "./pages/ReviewWorkspacePage";' -ImportLine 'import { PublicationDeskPage } from "./pages/PublicationDeskPage";'
 
-$mainContent = Ensure-NavBlock -Content $mainContent -Anchor '<Link to="/dashboard">Dashboard</Link>' -NavBlock '<Link to="/analytics-center">Analytics Center</Link>
+$mainContent = Ensure-NavBlock -Content $mainContent -Anchor '<Link to="/dashboard">Dashboard</Link>' -NavBlock '<Link to="/operations-intelligence">Operations Intelligence</Link>
+          <Link to="/investigation-navigator">Investigation Navigator</Link>
+          <Link to="/analytics-center">Analytics Center</Link>
+          <Link to="/executive-overview">Executive Overview</Link>' -PresencePattern 'to="/operations-intelligence"'
+
+$mainContent = Ensure-NavBlock -Content $mainContent -Anchor '<Link to="/reviews">Reviews</Link>' -NavBlock '<Link to="/review-queue">Review Queue</Link>
+          <Link to="/review-workspace">Review Workspace</Link>
+          <Link to="/publication-desk">Publication Desk</Link>
+          <Link to="/governance-console">Governance Console</Link>
+          <Link to="/publication-readiness">Publication Readiness</Link>
+          <Link to="/decision-log">Decision Log</Link>' -PresencePattern 'to="/review-queue"'
+
+$mainContent = Ensure-NavBlock -Content $mainContent -Anchor '<Link to="/claims/workspace">Claims Workspace</Link>' -NavBlock '<Link to="/contradictions/workspace">Contradictions Workspace</Link>
+          <Link to="/delivery-control-tower">Delivery Control Tower</Link>
+          <Link to="/workstream-board">Workstream Board</Link>
+          <Link to="/escalation-center">Escalation Center</Link>
           <Link to="/agent-runs-board">Agent Runs Board</Link>
           <Link to="/case-flow-map">Case Flow Map</Link>
-          <Link to="/quality-radar">Quality Radar</Link>' -PresencePattern 'to="/analytics-center"'
+          <Link to="/quality-radar">Quality Radar</Link>' -PresencePattern 'to="/delivery-control-tower"'
 
-$mainContent = Ensure-RouteBlock -Content $mainContent -AnchorRoute '{ path: "/dashboard", element: <DashboardPage /> },' -RouteBlock '{ path: "/analytics-center", element: <AnalyticsCenterPage /> },
+$mainContent = Ensure-RouteBlock -Content $mainContent -AnchorRoute '{ path: "/dashboard", element: <DashboardPage /> },' -RouteBlock '{ path: "/operations-intelligence", element: <OperationsIntelligencePage /> },
+  { path: "/investigation-navigator", element: <InvestigationNavigatorPage /> },
+  { path: "/analytics-center", element: <AnalyticsCenterPage /> },
+  { path: "/executive-overview", element: <ExecutiveOverviewPage /> },' -PresencePattern 'path: "/operations-intelligence"'
+
+$mainContent = Ensure-RouteBlock -Content $mainContent -AnchorRoute '{ path: "/reviews", element: <ReviewsPage /> },' -RouteBlock '{ path: "/review-queue", element: <ReviewQueuePage /> },
+  { path: "/review-workspace", element: <ReviewWorkspacePage /> },
+  { path: "/publication-desk", element: <PublicationDeskPage /> },
+  { path: "/governance-console", element: <GovernanceConsolePage /> },
+  { path: "/publication-readiness", element: <PublicationReadinessBoardPage /> },
+  { path: "/decision-log", element: <DecisionLogPage /> },' -PresencePattern 'path: "/review-queue"'
+
+$mainContent = Ensure-RouteBlock -Content $mainContent -AnchorRoute '{ path: "/claims/workspace", element: <ClaimsWorkspacePage /> },' -RouteBlock '{ path: "/contradictions/workspace", element: <ContradictionsWorkspacePage /> },
+  { path: "/delivery-control-tower", element: <DeliveryControlTowerPage /> },
+  { path: "/workstream-board", element: <WorkstreamBoardPage /> },
+  { path: "/escalation-center", element: <EscalationCenterPage /> },
   { path: "/agent-runs-board", element: <AgentRunsBoardPage /> },
   { path: "/case-flow-map", element: <CaseFlowMapPage /> },
-  { path: "/quality-radar", element: <QualityRadarPage /> },' -PresencePattern 'path: "/analytics-center"'
+  { path: "/quality-radar", element: <QualityRadarPage /> },' -PresencePattern 'path: "/delivery-control-tower"'
 
 Write-Utf8File -Path $mainPath -Content $mainContent
 
@@ -394,4 +260,63 @@ Build-Backend -RootDir $RootDir
 Write-Host "Building frontend..."
 Build-Frontend -RootDir $RootDir
 
-Write-Host "Phase 6.20 applied successfully."
+Write-Host "Generating implementation audit report..."
+
+$diagnosticsDir = Join-Path $RootDir "_diagnostics"
+Ensure-Directory -Path $diagnosticsDir
+$auditPath = Join-Path $diagnosticsDir ("stabilization-audit-" + (Get-Date -Format "yyyyMMdd-HHmmss") + ".md")
+
+$pageFiles = Get-ChildItem -Path $pagesDir -Filter *.tsx | Sort-Object Name
+
+$lines = New-Object System.Collections.Generic.List[string]
+$lines.Add("# Veritas Atlas Stabilization Audit")
+$lines.Add("")
+$lines.Add("Generated: " + (Get-Date -Format "yyyy-MM-dd HH:mm:ss"))
+$lines.Add("")
+$lines.Add("## Build status")
+$lines.Add("")
+$lines.Add("- Backend build: passed")
+$lines.Add("- Frontend build: passed")
+$lines.Add("")
+$lines.Add("## Page inventory")
+$lines.Add("")
+
+foreach ($file in $pageFiles) {
+    $content = Get-Content $file.FullName -Raw
+    $statusClass = Get-StatusClass -Text $content
+
+    $signals = @()
+    if ($content -match 'useClaims|useStatements|useEvidenceList|useSources|useDocuments|useClaimDetail|useStatementDetail|useCaseDetail') {
+        $signals += "uses data hooks"
+    }
+    if ($content -match 'placeholder') {
+        $signals += "contains placeholder text"
+    }
+    if ($content -match 'Workspace') {
+        $signals += "workspace surface"
+    }
+    if ($content -match 'Board|Console|Overview|Center|Tower|Radar|Map|Desk|Queue|Log') {
+        $signals += "control or oversight surface"
+    }
+
+    if ($signals.Count -eq 0) {
+        $signals += "no strong heuristic signals"
+    }
+
+    $lines.Add("### " + $file.Name)
+    $lines.Add("- Classification: " + $statusClass)
+    $lines.Add("- Signals: " + ($signals -join ", "))
+    $lines.Add("")
+}
+
+$lines.Add("## Summary")
+$lines.Add("")
+$lines.Add("- Core data-driven slices are present around sources, documents, evidence, statements, claims, and related workspaces.")
+$lines.Add("- Many later-stage pages are operational surfaces or governance shells and should be treated as partially complete until deeper backend wiring is added.")
+$lines.Add("- Router and navigation were normalized in this stabilization pass.")
+$lines.Add("")
+
+Write-Utf8File -Path $auditPath -Content ([string]::Join([Environment]::NewLine, $lines))
+
+Write-Host "Stabilization and audit phase completed successfully."
+Write-Host "Audit report: $auditPath"

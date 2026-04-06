@@ -41,6 +41,10 @@ import { ReviewQueuePage } from "./pages/ReviewQueuePage";
 import { ReviewWorkspacePage } from "./pages/ReviewWorkspacePage";
 import { PublicationDeskPage } from "./pages/PublicationDeskPage";
 import { DashboardPage } from "./pages/DashboardPage";
+import { AnalyticsCenterPage } from "./pages/AnalyticsCenterPage";
+import { AgentRunsBoardPage } from "./pages/AgentRunsBoardPage";
+import { CaseFlowMapPage } from "./pages/CaseFlowMapPage";
+import { QualityRadarPage } from "./pages/QualityRadarPage";
 import { ExecutiveOverviewPage } from "./pages/ExecutiveOverviewPage";
 import { DeliveryControlTowerPage } from "./pages/DeliveryControlTowerPage";
 import { WorkstreamBoardPage } from "./pages/WorkstreamBoardPage";
@@ -62,6 +66,10 @@ function Layout({ children }: { children: React.ReactNode }) {
         <nav style={{ display: "flex", gap: "16px", marginTop: "12px", flexWrap: "wrap" }}>
           <Link to="/">Home</Link>
           <Link to="/dashboard">Dashboard</Link>
+<Link to="/analytics-center">Analytics Center</Link>
+          <Link to="/agent-runs-board">Agent Runs Board</Link>
+          <Link to="/case-flow-map">Case Flow Map</Link>
+          <Link to="/quality-radar">Quality Radar</Link>
 <Link to="/executive-overview">Executive Overview</Link>
           <Link to="/delivery-control-tower">Delivery Control Tower</Link>
           <Link to="/workstream-board">Workstream Board</Link>
@@ -183,6 +191,10 @@ function HealthPage() {
 const router = createBrowserRouter([
   { path: "/", element: <HomePage /> },
   { path: "/dashboard", element: <DashboardPage /> },
+{ path: "/analytics-center", element: <AnalyticsCenterPage /> },
+  { path: "/agent-runs-board", element: <AgentRunsBoardPage /> },
+  { path: "/case-flow-map", element: <CaseFlowMapPage /> },
+  { path: "/quality-radar", element: <QualityRadarPage /> },
 { path: "/executive-overview", element: <ExecutiveOverviewPage /> },
   { path: "/delivery-control-tower", element: <DeliveryControlTowerPage /> },
   { path: "/workstream-board", element: <WorkstreamBoardPage /> },
