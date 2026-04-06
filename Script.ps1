@@ -119,32 +119,79 @@ function Ensure-RouteBlock {
 }
 
 Write-Host "Checkpointing current code with git..." -ForegroundColor Cyan
-Git-Checkpoint -Message ("checkpoint before phase 6.29 - " + (Get-Date -Format "yyyy-MM-dd HH:mm:ss"))
+Git-Checkpoint -Message ("checkpoint before phase 6.30 - " + (Get-Date -Format "yyyy-MM-dd HH:mm:ss"))
 
-Write-Host "Applying Phase 6.29 - Evidence-to-Decision Flow and Workspace Coordination pack..." -ForegroundColor Cyan
+Write-Host "Applying Phase 6.30 - Knowledge Graph, Publication Governance, and Readiness Pack..." -ForegroundColor Cyan
 
 $web = Join-Path $RootDir "apps\web\veritas-atlas-web\src"
 
-Write-File (Join-Path $web "components\FlowHealthPanel.tsx") @'
-export function FlowHealthPanel({
-  evidenceCount,
-  statementCount,
-  claimCount,
-  contradictionCount,
+Write-File (Join-Path $web "components\KnowledgeGraphSummaryPanel.tsx") @'
+type GraphMetric = {
+  label: string;
+  value: number;
+};
+
+export function KnowledgeGraphSummaryPanel({
+  metrics,
 }: {
-  evidenceCount: number;
-  statementCount: number;
-  claimCount: number;
-  contradictionCount: number;
+  metrics: GraphMetric[];
 }) {
   return (
     <div style={panelStyle}>
-      <h3 style={{ marginTop: 0 }}>Flow Health</h3>
+      <h3 style={{ marginTop: 0 }}>Knowledge Graph Summary</h3>
+      <div style={gridStyle}>
+        {metrics.map((metric) => (
+          <div key={metric.label} style={cardStyle}>
+            <span style={{ color: "#666" }}>{metric.label}</span>
+            <strong style={{ fontSize: 28 }}>{metric.value}</strong>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+const panelStyle: React.CSSProperties = {
+  border: "1px solid #ddd",
+  borderRadius: 14,
+  padding: 16,
+};
+
+const gridStyle: React.CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
+  gap: 12,
+};
+
+const cardStyle: React.CSSProperties = {
+  border: "1px solid #eee",
+  borderRadius: 12,
+  padding: 12,
+  display: "grid",
+  gap: 8,
+};
+'@
+
+Write-File (Join-Path $web "components\PublicationGovernancePanel.tsx") @'
+type GovernanceCheck = {
+  label: string;
+  status: string;
+};
+
+export function PublicationGovernancePanel({
+  checks,
+}: {
+  checks: GovernanceCheck[];
+}) {
+  return (
+    <div style={panelStyle}>
+      <h3 style={{ marginTop: 0 }}>Publication Governance</h3>
       <ul style={{ marginBottom: 0 }}>
-        <li>Evidence items: {evidenceCount}</li>
-        <li>Statements: {statementCount}</li>
-        <li>Claims: {claimCount}</li>
-        <li>Contradictions: {contradictionCount}</li>
+        {checks.map((check) => (
+          <li key={check.label}>
+            {check.label} - {check.status}
+          </li>
+        ))}
       </ul>
     </div>
   );
@@ -157,19 +204,27 @@ const panelStyle: React.CSSProperties = {
 };
 '@
 
-Write-File (Join-Path $web "components\WorkspaceCoordinationPanel.tsx") @'
-import { Link } from "react-router-dom";
+Write-File (Join-Path $web "components\ReadinessRadarPanel.tsx") @'
+type ReadinessItem = {
+  label: string;
+  score: number;
+};
 
-export function WorkspaceCoordinationPanel() {
+export function ReadinessRadarPanel({
+  items,
+}: {
+  items: ReadinessItem[];
+}) {
   return (
     <div style={panelStyle}>
-      <h3 style={{ marginTop: 0 }}>Workspace Coordination</h3>
-      <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-        <Link to="/evidence-flow-studio">Evidence Flow Studio</Link>
-        <Link to="/truth-review-studio">Truth Review Studio</Link>
-        <Link to="/publication-pipeline">Publication Pipeline</Link>
-        <Link to="/decision-intelligence">Decision Intelligence</Link>
-      </div>
+      <h3 style={{ marginTop: 0 }}>Readiness Radar</h3>
+      <ul style={{ marginBottom: 0 }}>
+        {items.map((item) => (
+          <li key={item.label}>
+            {item.label} - {item.score}%
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
@@ -181,217 +236,133 @@ const panelStyle: React.CSSProperties = {
 };
 '@
 
-Write-File (Join-Path $web "pages\EvidenceFlowStudioPage.tsx") @'
+Write-File (Join-Path $web "pages\KnowledgeGraphHubPage.tsx") @'
 import { Link } from "react-router-dom";
-import { useEvidenceList } from "../hooks/useEvidenceList";
-import { useStatements } from "../hooks/useStatements";
 import { useClaims } from "../hooks/useClaims";
+import { useStatements } from "../hooks/useStatements";
 import { useContradictions } from "../hooks/useContradictions";
-import { FlowHealthPanel } from "../components/FlowHealthPanel";
-import { WorkspaceCoordinationPanel } from "../components/WorkspaceCoordinationPanel";
+import { KnowledgeGraphSummaryPanel } from "../components/KnowledgeGraphSummaryPanel";
 
-export function EvidenceFlowStudioPage() {
-  const evidenceQuery = useEvidenceList();
-  const statementsQuery = useStatements();
+export function KnowledgeGraphHubPage() {
   const claimsQuery = useClaims();
+  const statementsQuery = useStatements();
   const contradictionsQuery = useContradictions();
 
-  const evidenceCount = evidenceQuery.data?.items.length ?? 0;
-  const statementCount = statementsQuery.data?.items.length ?? 0;
-  const claimCount = claimsQuery.data?.items.length ?? 0;
-  const contradictionCount = contradictionsQuery.data?.items.length ?? 0;
+  const metrics = [
+    { label: "Claims", value: claimsQuery.data?.items.length ?? 0 },
+    { label: "Statements", value: statementsQuery.data?.items.length ?? 0 },
+    { label: "Contradictions", value: contradictionsQuery.data?.items.length ?? 0 },
+    { label: "Links", value: (claimsQuery.data?.items.length ?? 0) + (contradictionsQuery.data?.items.length ?? 0) },
+  ];
 
   return (
     <div style={{ fontFamily: "Arial, sans-serif", padding: 24 }}>
       <header style={{ marginBottom: 24 }}>
-        <h1 style={{ margin: 0 }}>Evidence Flow Studio</h1>
+        <h1 style={{ margin: 0 }}>Knowledge Graph Hub</h1>
         <p style={{ color: "#555" }}>
-          End-to-end operational view from evidence intake to contradiction handling and decision readiness.
+          Relationship-centered operational view across statements, claims, contradictions, and graph density.
         </p>
-
         <nav style={{ display: "flex", gap: 16, marginTop: 12, flexWrap: "wrap" }}>
           <Link to="/">Home</Link>
-          <Link to="/evidence-flow-studio">Evidence Flow Studio</Link>
-          <Link to="/evidence-trace">Evidence Trace</Link>
-          <Link to="/decision-intelligence">Decision Intelligence</Link>
+          <Link to="/knowledge-graph-hub">Knowledge Graph Hub</Link>
+          <Link to="/entity-graph">Entity Graph</Link>
+          <Link to="/case-explorer">Case Explorer</Link>
         </nav>
       </header>
 
-      <div style={gridStyle}>
-        <FlowHealthPanel
-          evidenceCount={evidenceCount}
-          statementCount={statementCount}
-          claimCount={claimCount}
-          contradictionCount={contradictionCount}
-        />
-        <WorkspaceCoordinationPanel />
-      </div>
-
-      <div style={{ ...panelStyle, marginTop: 20 }}>
-        <h3 style={{ marginTop: 0 }}>Flow Summary</h3>
-        <ol style={{ marginBottom: 0, paddingLeft: 20 }}>
-          <li>Evidence intake and trace verification</li>
-          <li>Statement extraction and normalization</li>
-          <li>Claim formulation and review</li>
-          <li>Contradiction creation and resolution</li>
-          <li>Decision and publication routing</li>
-        </ol>
-      </div>
+      <KnowledgeGraphSummaryPanel metrics={metrics} />
     </div>
   );
 }
-
-const gridStyle: React.CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "1fr 1fr",
-  gap: 16,
-};
-
-const panelStyle: React.CSSProperties = {
-  border: "1px solid #ddd",
-  borderRadius: 14,
-  padding: 16,
-};
 '@
 
-Write-File (Join-Path $web "pages\OperationalHandoffPage.tsx") @'
+Write-File (Join-Path $web "pages\PublicationGovernanceWorkspacePage.tsx") @'
+import { Link } from "react-router-dom";
+import { PublicationGovernancePanel } from "../components/PublicationGovernancePanel";
+
+export function PublicationGovernanceWorkspacePage() {
+  const checks = [
+    { label: "Review outcome documented", status: "Ready" },
+    { label: "Contradiction workflow completed", status: "Ready" },
+    { label: "Narrative prepared", status: "Pending" },
+    { label: "Decision logged", status: "Pending" },
+  ];
+
+  return (
+    <div style={{ fontFamily: "Arial, sans-serif", padding: 24 }}>
+      <header style={{ marginBottom: 24 }}>
+        <h1 style={{ margin: 0 }}>Publication Governance Workspace</h1>
+        <p style={{ color: "#555" }}>
+          Final governance surface before publication routing and release.
+        </p>
+        <nav style={{ display: "flex", gap: 16, marginTop: 12, flexWrap: "wrap" }}>
+          <Link to="/publication-governance">Publication Governance</Link>
+          <Link to="/publication-pipeline">Publication Pipeline</Link>
+          <Link to="/decision-log">Decision Log</Link>
+        </nav>
+      </header>
+
+      <PublicationGovernancePanel checks={checks} />
+    </div>
+  );
+}
+'@
+
+Write-File (Join-Path $web "pages\ReadinessRadarWorkspacePage.tsx") @'
 import { Link } from "react-router-dom";
 import { useClaims } from "../hooks/useClaims";
 import { useContradictions } from "../hooks/useContradictions";
+import { ReadinessRadarPanel } from "../components/ReadinessRadarPanel";
 
-export function OperationalHandoffPage() {
+export function ReadinessRadarWorkspacePage() {
   const claimsQuery = useClaims();
   const contradictionsQuery = useContradictions();
 
-  const claims = claimsQuery.data?.items ?? [];
-  const contradictions = contradictionsQuery.data?.items ?? [];
+  const items = [
+    { label: "Claim review coverage", score: claimsQuery.data?.items.length ? 78 : 0 },
+    { label: "Contradiction resolution", score: contradictionsQuery.data?.items.length ? 64 : 0 },
+    { label: "Publication readiness", score: 55 },
+    { label: "Decision traceability", score: 72 },
+  ];
 
   return (
     <div style={{ fontFamily: "Arial, sans-serif", padding: 24 }}>
       <header style={{ marginBottom: 24 }}>
-        <h1 style={{ margin: 0 }}>Operational Handoff</h1>
+        <h1 style={{ margin: 0 }}>Readiness Radar Workspace</h1>
         <p style={{ color: "#555" }}>
-          Cross-workspace handoff view between review, contradiction resolution, and publication preparation.
+          Operational readiness view across claims, contradictions, decision, and publication stages.
         </p>
-
         <nav style={{ display: "flex", gap: 16, marginTop: 12, flexWrap: "wrap" }}>
-          <Link to="/operational-handoff">Operational Handoff</Link>
-          <Link to="/review-decision-board">Review Decision Board</Link>
-          <Link to="/publication-pipeline">Publication Pipeline</Link>
-        </nav>
-      </header>
-
-      <div style={gridStyle}>
-        <div style={panelStyle}>
-          <h3 style={{ marginTop: 0 }}>Claims Ready For Review</h3>
-          {claims.length === 0 && <p>No claims.</p>}
-          {claims.length > 0 && (
-            <ul style={{ marginBottom: 0 }}>
-              {claims.slice(0, 8).map((item) => (
-                <li key={item.id}>
-                  <Link to={`/claims/${item.id}`}>{item.topic}</Link> - {item.status}
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-
-        <div style={panelStyle}>
-          <h3 style={{ marginTop: 0 }}>Contradictions Ready For Resolution</h3>
-          {contradictions.length === 0 && <p>No contradictions.</p>}
-          {contradictions.length > 0 && (
-            <ul style={{ marginBottom: 0 }}>
-              {contradictions.slice(0, 8).map((item) => (
-                <li key={item.id}>
-                  <Link to={`/contradiction-resolution/${item.id}`}>{item.topic}</Link> - {item.status}
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-const gridStyle: React.CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "1fr 1fr",
-  gap: 16,
-};
-
-const panelStyle: React.CSSProperties = {
-  border: "1px solid #ddd",
-  borderRadius: 14,
-  padding: 16,
-};
-'@
-
-Write-File (Join-Path $web "pages\DecisionQueuePage.tsx") @'
-import { Link } from "react-router-dom";
-import { useClaims } from "../hooks/useClaims";
-
-export function DecisionQueuePage() {
-  const claimsQuery = useClaims();
-  const claims = claimsQuery.data?.items ?? [];
-
-  return (
-    <div style={{ fontFamily: "Arial, sans-serif", padding: 24 }}>
-      <header style={{ marginBottom: 24 }}>
-        <h1 style={{ margin: 0 }}>Decision Queue</h1>
-        <p style={{ color: "#555" }}>
-          Queue view for items approaching final decision and publication readiness.
-        </p>
-
-        <nav style={{ display: "flex", gap: 16, marginTop: 12, flexWrap: "wrap" }}>
-          <Link to="/decision-queue">Decision Queue</Link>
+          <Link to="/readiness-radar-workspace">Readiness Radar</Link>
           <Link to="/decision-intelligence">Decision Intelligence</Link>
-          <Link to="/publication-pipeline">Publication Pipeline</Link>
+          <Link to="/publication-governance">Publication Governance</Link>
         </nav>
       </header>
 
-      <div style={panelStyle}>
-        <h3 style={{ marginTop: 0 }}>Queued Items</h3>
-        {claims.length === 0 && <p>No queued items.</p>}
-        {claims.length > 0 && (
-          <ul style={{ marginBottom: 0 }}>
-            {claims.slice(0, 12).map((item) => (
-              <li key={item.id}>
-                <Link to={`/claims/${item.id}`}>{item.topic}</Link> - {item.status}
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
+      <ReadinessRadarPanel items={items} />
     </div>
   );
 }
-
-const panelStyle: React.CSSProperties = {
-  border: "1px solid #ddd",
-  borderRadius: 14,
-  padding: 16,
-};
 '@
 
 $main = Join-Path $web "main.tsx"
 $content = Get-Content $main -Raw
 
-$content = Ensure-ImportLine -Content $content -Anchor 'import { DashboardPage } from "./pages/DashboardPage";' -ImportLine 'import { EvidenceFlowStudioPage } from "./pages/EvidenceFlowStudioPage";'
-$content = Ensure-ImportLine -Content $content -Anchor 'import { EvidenceFlowStudioPage } from "./pages/EvidenceFlowStudioPage";' -ImportLine 'import { OperationalHandoffPage } from "./pages/OperationalHandoffPage";'
-$content = Ensure-ImportLine -Content $content -Anchor 'import { OperationalHandoffPage } from "./pages/OperationalHandoffPage";' -ImportLine 'import { DecisionQueuePage } from "./pages/DecisionQueuePage";'
+$content = Ensure-ImportLine -Content $content -Anchor 'import { DashboardPage } from "./pages/DashboardPage";' -ImportLine 'import { KnowledgeGraphHubPage } from "./pages/KnowledgeGraphHubPage";'
+$content = Ensure-ImportLine -Content $content -Anchor 'import { KnowledgeGraphHubPage } from "./pages/KnowledgeGraphHubPage";' -ImportLine 'import { PublicationGovernanceWorkspacePage } from "./pages/PublicationGovernanceWorkspacePage";'
+$content = Ensure-ImportLine -Content $content -Anchor 'import { PublicationGovernanceWorkspacePage } from "./pages/PublicationGovernanceWorkspacePage";' -ImportLine 'import { ReadinessRadarWorkspacePage } from "./pages/ReadinessRadarWorkspacePage";'
 
-$content = Ensure-NavBlock -Content $content -Anchor '<Link to="/decision-intelligence">Decision Intelligence</Link>' -NavBlock '<Link to="/evidence-flow-studio">Evidence Flow Studio</Link>
-          <Link to="/operational-handoff">Operational Handoff</Link>
-          <Link to="/decision-queue">Decision Queue</Link>' -PresencePattern 'to="/evidence-flow-studio"'
+$content = Ensure-NavBlock -Content $content -Anchor '<Link to="/decision-intelligence">Decision Intelligence</Link>' -NavBlock '<Link to="/knowledge-graph-hub">Knowledge Graph Hub</Link>
+          <Link to="/publication-governance">Publication Governance</Link>
+          <Link to="/readiness-radar-workspace">Readiness Radar</Link>' -PresencePattern 'to="/knowledge-graph-hub"'
 
-$content = Ensure-RouteBlock -Content $content -AnchorRoute '{ path: "/decision-intelligence", element: <DecisionIntelligencePage /> },' -RouteBlock '{ path: "/evidence-flow-studio", element: <EvidenceFlowStudioPage /> },
-  { path: "/operational-handoff", element: <OperationalHandoffPage /> },
-  { path: "/decision-queue", element: <DecisionQueuePage /> },' -PresencePattern 'path: "/evidence-flow-studio"'
+$content = Ensure-RouteBlock -Content $content -AnchorRoute '{ path: "/decision-intelligence", element: <DecisionIntelligencePage /> },' -RouteBlock '{ path: "/knowledge-graph-hub", element: <KnowledgeGraphHubPage /> },
+  { path: "/publication-governance", element: <PublicationGovernanceWorkspacePage /> },
+  { path: "/readiness-radar-workspace", element: <ReadinessRadarWorkspacePage /> },' -PresencePattern 'path: "/knowledge-graph-hub"'
 
 Write-File $main $content
 
 Write-Host "Building..." -ForegroundColor Cyan
 Build-All -RootDir $RootDir
 
-Write-Host "Phase 6.29 DONE" -ForegroundColor Green
+Write-Host "Phase 6.30 DONE" -ForegroundColor Green

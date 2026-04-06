@@ -45,6 +45,9 @@ import { PublicationDeskPage } from "./pages/PublicationDeskPage";
 import { CaseDetailPage } from "./pages/CaseDetailPage";
 import { ReviewsPage } from "./pages/ReviewsPage";
 import { DashboardPage } from "./pages/DashboardPage";
+import { EvidenceFlowStudioPage } from "./pages/EvidenceFlowStudioPage";
+import { OperationalHandoffPage } from "./pages/OperationalHandoffPage";
+import { DecisionQueuePage } from "./pages/DecisionQueuePage";
 import { DecisionIntelligencePage } from "./pages/DecisionIntelligencePage";
 import { UnifiedSearchWorkspacePage } from "./pages/UnifiedSearchWorkspacePage";
 import { SourceIntelligencePage } from "./pages/SourceIntelligencePage";
@@ -81,6 +84,9 @@ function Layout({ children }: { children: React.ReactNode }) {
           <Link to="/">Home</Link>
           <Link to="/dashboard">Dashboard</Link>
           <Link to="/decision-intelligence">Decision Intelligence</Link>
+<Link to="/evidence-flow-studio">Evidence Flow Studio</Link>
+          <Link to="/operational-handoff">Operational Handoff</Link>
+          <Link to="/decision-queue">Decision Queue</Link>
           <Link to="/intelligence">Intelligence Hub</Link>
           <Link to="/agents">Agent Runs</Link>
           <Link to="/operations-intelligence">Operations Intelligence</Link>
@@ -222,6 +228,9 @@ const router = createBrowserRouter([
   { path: "/", element: <HomePage /> },
   { path: "/dashboard", element: <DashboardPage /> },
   { path: "/decision-intelligence", element: <DecisionIntelligencePage /> },
+{ path: "/evidence-flow-studio", element: <EvidenceFlowStudioPage /> },
+  { path: "/operational-handoff", element: <OperationalHandoffPage /> },
+  { path: "/decision-queue", element: <DecisionQueuePage /> },
   { path: "/intelligence", element: <IntelligenceHubPage /> },
   { path: "/agents", element: <AgentRunsMonitorPage /> },
   { path: "/health", element: <HealthPage /> },
