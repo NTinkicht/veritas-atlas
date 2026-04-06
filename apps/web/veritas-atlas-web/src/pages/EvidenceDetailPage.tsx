@@ -55,7 +55,7 @@ export function EvidenceDetailPage() {
         <h3 style={{ marginTop: 0 }}>Statements</h3>
         <div style={{ display: "flex", gap: "12px", flexWrap: "wrap", marginBottom: "12px" }}>
           <Link to={`/statements/new?evidenceId=${item.id}`} style={actionLinkStyle}>Create Statement for this Evidence</Link>
-          <Link to="/statements" style={actionLinkStyle}>Open Statements</Link>
+          <Link to={`/statements?evidenceId=${item.id}`} style={actionLinkStyle}>View Statements for this Evidence</Link>
         </div>
 
         {statementsQuery.isLoading && <p>Loading statements...</p>}

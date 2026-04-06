@@ -38,12 +38,8 @@ function Write-Utf8File {
 $solutionPath = Join-Path $RootDir "VeritasAtlas.slnx"
 $webRoot = Join-Path $RootDir "apps\web\veritas-atlas-web"
 
-$statementsApiPath = Join-Path $webRoot "src\api\statements.ts"
-$createStatementPagePath = Join-Path $webRoot "src\pages\CreateStatementPage.tsx"
-$statementDetailPagePath = Join-Path $webRoot "src\pages\StatementDetailPage.tsx"
-$statementsPagePath = Join-Path $webRoot "src\pages\StatementsPage.tsx"
 $claimsWorkspacePagePath = Join-Path $webRoot "src\pages\ClaimsWorkspacePage.tsx"
-$evidenceDetailPagePath = Join-Path $webRoot "src\pages\EvidenceDetailPage.tsx"
+$statementsPagePath = Join-Path $webRoot "src\pages\StatementsPage.tsx"
 $mainTsxPath = Join-Path $webRoot "src\main.tsx"
 
 Push-Location $RootDir
@@ -57,10 +53,10 @@ if ($LASTEXITCODE -ne 0) {
     throw "git add failed."
 }
 
-$commitMessage = "repair phase 6.10 script path failure - $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')"
+$commitMessage = "checkpoint before phase 6.11 - $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')"
 git commit -m $commitMessage 2>$null
 if ($LASTEXITCODE -ne 0) {
-    Write-Host "No new commit created. Continuing with repair." -ForegroundColor Yellow
+    Write-Host "No new commit created. Continuing with phase 6.11." -ForegroundColor Yellow
 }
 else {
     Write-Host "Created git commit: $commitMessage" -ForegroundColor Green
@@ -68,241 +64,87 @@ else {
 
 Pop-Location
 
-$statementsApiContent = @'
-import { apiGet } from "./client";
-
-export type StatementItem = {
-  id: string;
-  text: string;
-  topic: string | null;
-  predicate: string | null;
-  object: string | null;
-  polarity: string;
-  status: string;
-  evidenceId?: string | null;
-  createdAt: string;
-};
-
-export type StatementDetail = {
-  id: string;
-  text: string;
-  topic: string | null;
-  predicate: string | null;
-  object: string | null;
-  polarity: string;
-  status: string;
-  evidenceId: string | null;
-  personId: string | null;
-  createdAt: string;
-};
-
-export type StatementsResponse = {
-  total: number;
-  page: number;
-  pageSize: number;
-  items: StatementItem[];
-};
-
-export async function getStatements(): Promise<StatementsResponse> {
-  return apiGet<StatementsResponse>("/api/v1/statements?page=1&pageSize=50");
-}
-
-export async function getStatementById(id: string): Promise<StatementDetail> {
-  return apiGet<StatementDetail>(`/api/v1/statements/${id}`);
-}
-'@
-
-$createStatementPageContent = @'
-import { useState } from "react";
+$claimsWorkspacePageContent = @'
 import { Link, useSearchParams } from "react-router-dom";
-import { useCreateStatement } from "../hooks/useCreateStatement";
+import { useStatementDetail } from "../hooks/useStatementDetail";
 
-export function CreateStatementPage() {
+export function ClaimsWorkspacePage() {
   const [params] = useSearchParams();
-  const initialEvidenceId = params.get("evidenceId") ?? "";
-
-  const [evidenceId, setEvidenceId] = useState(initialEvidenceId);
-  const [text, setText] = useState("");
-  const [createdBy, setCreatedBy] = useState("");
-
-  const mutation = useCreateStatement();
-
-  const submit = async (event: React.FormEvent) => {
-    event.preventDefault();
-
-    await mutation.mutateAsync({
-      evidenceId,
-      text,
-      createdBy: createdBy || undefined,
-    });
-
-    setText("");
-  };
+  const statementId = params.get("statementId") ?? "";
+  const statementQuery = useStatementDetail(statementId || undefined);
 
   return (
-    <div style={{ fontFamily: "Arial, sans-serif", padding: "24px", maxWidth: "760px" }}>
+    <div style={{ fontFamily: "Arial, sans-serif", padding: "24px", maxWidth: "980px" }}>
       <header style={{ marginBottom: "24px" }}>
-        <h1 style={{ margin: 0 }}>Create Statement</h1>
-        <p style={{ color: "#555" }}>Extract a statement from an evidence item.</p>
+        <h1 style={{ margin: 0 }}>Claims Workspace</h1>
+        <p style={{ color: "#555" }}>Working context page for the next claim slice.</p>
         <nav style={{ display: "flex", gap: "16px", marginTop: "12px", flexWrap: "wrap" }}>
           <Link to="/">Home</Link>
-          <Link to="/evidence">Evidence</Link>
           <Link to="/statements">Statements</Link>
+          {statementId && <Link to={`/statements/${statementId}`}>Statement</Link>}
         </nav>
       </header>
 
-      <form onSubmit={submit} style={{ display: "grid", gap: "16px" }}>
-        <label style={labelStyle}>
-          <span>Evidence Id</span>
-          <input
-            value={evidenceId}
-            onChange={(e) => setEvidenceId(e.target.value)}
-            style={inputStyle}
-            placeholder="Enter evidence id"
-            required
-          />
-        </label>
-
-        <label style={labelStyle}>
-          <span>Statement Text</span>
-          <textarea
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            style={{ ...inputStyle, minHeight: "140px", resize: "vertical" }}
-            placeholder="Enter extracted statement text"
-            required
-          />
-        </label>
-
-        <label style={labelStyle}>
-          <span>Created By</span>
-          <input
-            value={createdBy}
-            onChange={(e) => setCreatedBy(e.target.value)}
-            style={inputStyle}
-            placeholder="Optional creator"
-          />
-        </label>
-
-        <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
-          <button type="submit" style={buttonStyle} disabled={mutation.isPending}>
-            {mutation.isPending ? "Creating..." : "Create Statement"}
-          </button>
-          <Link to="/statements" style={linkButtonStyle}>Open Statements</Link>
-        </div>
-      </form>
-
-      {mutation.isError && (
-        <p style={{ color: "crimson", marginTop: "16px" }}>
-          Failed to create statement: {(mutation.error as Error).message}
-        </p>
-      )}
-
-      {mutation.isSuccess && (
-        <div style={successCardStyle}>
-          <p style={{ marginTop: 0 }}><strong>Statement created successfully.</strong></p>
-          <p style={{ marginBottom: "8px" }}>New statement id: {mutation.data.id}</p>
-          <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
-            <Link to={`/statements/${mutation.data.id}`}>Open Statement Detail</Link>
-            {mutation.data.evidenceId && <Link to={`/evidence/${mutation.data.evidenceId}`}>Back to Evidence</Link>}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-const labelStyle: React.CSSProperties = {
-  display: "grid",
-  gap: "8px",
-};
-
-const inputStyle: React.CSSProperties = {
-  width: "100%",
-  boxSizing: "border-box",
-  padding: "10px 12px",
-  borderRadius: "8px",
-  border: "1px solid #ccc",
-  font: "inherit",
-};
-
-const buttonStyle: React.CSSProperties = {
-  padding: "10px 16px",
-  borderRadius: "8px",
-  border: "1px solid #1976d2",
-  background: "#1976d2",
-  color: "white",
-  cursor: "pointer",
-};
-
-const linkButtonStyle: React.CSSProperties = {
-  padding: "10px 16px",
-  borderRadius: "8px",
-  border: "1px solid #1976d2",
-  textDecoration: "none",
-  color: "inherit",
-  display: "inline-flex",
-  alignItems: "center",
-};
-
-const successCardStyle: React.CSSProperties = {
-  marginTop: "20px",
-  padding: "16px",
-  border: "1px solid #d7e8d7",
-  borderRadius: "12px",
-  background: "#f8fff8",
-};
-'@
-
-$statementDetailPageContent = @'
-import { Link, useParams } from "react-router-dom";
-import { useStatementDetail } from "../hooks/useStatementDetail";
-
-export function StatementDetailPage() {
-  const { id } = useParams();
-  const query = useStatementDetail(id);
-
-  if (query.isLoading) {
-    return <div style={{ fontFamily: "Arial, sans-serif", padding: "24px" }}>Loading statement...</div>;
-  }
-
-  if (query.isError) {
-    return <div style={{ fontFamily: "Arial, sans-serif", padding: "24px", color: "crimson" }}>Failed to load statement: {(query.error as Error).message}</div>;
-  }
-
-  if (!query.data) {
-    return <div style={{ fontFamily: "Arial, sans-serif", padding: "24px" }}>Statement not found.</div>;
-  }
-
-  const item = query.data;
-
-  return (
-    <div style={{ fontFamily: "Arial, sans-serif", padding: "24px" }}>
-      <nav style={{ display: "flex", gap: "16px", marginBottom: "20px", flexWrap: "wrap" }}>
-        <Link to="/statements">Back to Statements</Link>
-        {item.evidenceId && <Link to={`/evidence/${item.evidenceId}`}>Evidence</Link>}
-        <Link to={`/claims/workspace?statementId=${item.id}`}>Claims Workspace</Link>
-      </nav>
-
-      <h1 style={{ marginTop: 0 }}>Statement</h1>
-
       <div style={cardStyle}>
-        <Row label="Id" value={item.id} />
-        <Row label="Text" value={item.text} />
-        <Row label="Topic" value={item.topic ?? "N/A"} />
-        <Row label="Predicate" value={item.predicate ?? "N/A"} />
-        <Row label="Object" value={item.object ?? "N/A"} />
-        <Row label="Polarity" value={item.polarity} />
-        <Row label="Status" value={item.status} />
-        <Row label="Evidence Id" value={item.evidenceId ?? "N/A"} />
-        <Row label="Person Id" value={item.personId ?? "N/A"} />
-        <Row label="Created" value={new Date(item.createdAt).toLocaleString()} />
+        <Row label="Statement Id" value={statementId || "N/A"} />
+        <Row label="Workspace Status" value="Ready for claim implementation" />
+        <Row label="Current Scope" value="Statement context, navigation, and planning" />
       </div>
 
-      <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
-        {item.evidenceId && <Link to={`/evidence/${item.evidenceId}`} style={actionLinkStyle}>Open Evidence</Link>}
-        <Link to={`/claims/workspace?statementId=${item.id}`} style={actionLinkStyle}>Open Claims Workspace</Link>
-      </div>
+      {statementId.length === 0 && (
+        <div style={cardStyle}>
+          <h3 style={{ marginTop: 0 }}>No statement selected</h3>
+          <p style={{ marginBottom: 0 }}>
+            Open this page from a statement detail page, or pass <code>?statementId=...</code>.
+          </p>
+        </div>
+      )}
+
+      {statementId.length > 0 && statementQuery.isLoading && (
+        <div style={cardStyle}>
+          <p style={{ margin: 0 }}>Loading statement context...</p>
+        </div>
+      )}
+
+      {statementId.length > 0 && statementQuery.isError && (
+        <div style={cardStyle}>
+          <p style={{ margin: 0, color: "crimson" }}>
+            Failed to load statement context: {(statementQuery.error as Error).message}
+          </p>
+        </div>
+      )}
+
+      {statementId.length > 0 && statementQuery.isSuccess && statementQuery.data && (
+        <>
+          <div style={cardStyle}>
+            <h3 style={{ marginTop: 0 }}>Statement Context</h3>
+            <Row label="Text" value={statementQuery.data.text} />
+            <Row label="Topic" value={statementQuery.data.topic ?? "N/A"} />
+            <Row label="Predicate" value={statementQuery.data.predicate ?? "N/A"} />
+            <Row label="Object" value={statementQuery.data.object ?? "N/A"} />
+            <Row label="Polarity" value={statementQuery.data.polarity} />
+            <Row label="Status" value={statementQuery.data.status} />
+            <Row label="Evidence Id" value={statementQuery.data.evidenceId ?? "N/A"} />
+          </div>
+
+          <div style={cardStyle}>
+            <h3 style={{ marginTop: 0 }}>Planned Claim Actions</h3>
+            <ul style={{ marginBottom: 0 }}>
+              <li>Create claim from the statement text</li>
+              <li>Classify claim type and confidence</li>
+              <li>Link claim to contradictions and review workflows</li>
+            </ul>
+          </div>
+
+          <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
+            <Link to={`/statements/${statementQuery.data.id}`} style={actionLinkStyle}>Back to Statement</Link>
+            {statementQuery.data.evidenceId && (
+              <Link to={`/evidence/${statementQuery.data.evidenceId}`} style={actionLinkStyle}>Open Evidence</Link>
+            )}
+            <Link to={`/statements?topic=${encodeURIComponent(statementQuery.data.topic ?? "")}`} style={actionLinkStyle}>Explore Similar Statements</Link>
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -334,17 +176,17 @@ const actionLinkStyle: React.CSSProperties = {
 
 $statementsPageContent = @'
 import { Link, useSearchParams } from "react-router-dom";
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { useStatements } from "../hooks/useStatements";
 
 export function StatementsPage() {
-  const [params] = useSearchParams();
-  const forcedEvidenceId = params.get("evidenceId") ?? "";
+  const [params, setParams] = useSearchParams();
 
-  const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("All");
-  const [polarityFilter, setPolarityFilter] = useState("All");
-  const [topicFilter, setTopicFilter] = useState("All");
+  const forcedEvidenceId = params.get("evidenceId") ?? "";
+  const search = params.get("search") ?? "";
+  const statusFilter = params.get("status") ?? "All";
+  const polarityFilter = params.get("polarity") ?? "All";
+  const topicFilter = params.get("topic") ?? "All";
 
   const query = useStatements();
   const items = query.data?.items ?? [];
@@ -391,6 +233,16 @@ export function StatementsPage() {
     [items]
   );
 
+  const updateParam = (key: string, value: string) => {
+    const next = new URLSearchParams(params);
+    if (!value || value === "All") {
+      next.delete(key);
+    } else {
+      next.set(key, value);
+    }
+    setParams(next);
+  };
+
   return (
     <div style={{ fontFamily: "Arial, sans-serif", padding: "24px" }}>
       <header style={{ marginBottom: "24px" }}>
@@ -413,21 +265,21 @@ export function StatementsPage() {
       <section style={filterPanelStyle}>
         <input
           value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          onChange={(e) => updateParam("search", e.target.value)}
           placeholder="Search statement text, topic, predicate, or object"
           style={inputStyle}
         />
-        <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} style={selectStyle}>
+        <select value={statusFilter} onChange={(e) => updateParam("status", e.target.value)} style={selectStyle}>
           {statuses.map((value) => (
             <option key={value} value={value}>{value}</option>
           ))}
         </select>
-        <select value={polarityFilter} onChange={(e) => setPolarityFilter(e.target.value)} style={selectStyle}>
+        <select value={polarityFilter} onChange={(e) => updateParam("polarity", e.target.value)} style={selectStyle}>
           {polarities.map((value) => (
             <option key={value} value={value}>{value}</option>
           ))}
         </select>
-        <select value={topicFilter} onChange={(e) => setTopicFilter(e.target.value)} style={selectStyle}>
+        <select value={topicFilter} onChange={(e) => updateParam("topic", e.target.value)} style={selectStyle}>
           {topics.map((value) => (
             <option key={value} value={value}>{value}</option>
           ))}
@@ -559,162 +411,6 @@ const hintCardStyle: React.CSSProperties = {
 };
 '@
 
-$claimsWorkspacePageContent = @'
-import { Link, useSearchParams } from "react-router-dom";
-
-export function ClaimsWorkspacePage() {
-  const [params] = useSearchParams();
-  const statementId = params.get("statementId") ?? "";
-
-  return (
-    <div style={{ fontFamily: "Arial, sans-serif", padding: "24px", maxWidth: "900px" }}>
-      <header style={{ marginBottom: "24px" }}>
-        <h1 style={{ margin: 0 }}>Claims Workspace</h1>
-        <p style={{ color: "#555" }}>Lightweight workspace placeholder for the next claim slice.</p>
-        <nav style={{ display: "flex", gap: "16px", marginTop: "12px", flexWrap: "wrap" }}>
-          <Link to="/">Home</Link>
-          <Link to="/statements">Statements</Link>
-          {statementId && <Link to={`/statements/${statementId}`}>Statement</Link>}
-        </nav>
-      </header>
-
-      <div style={cardStyle}>
-        <Row label="Statement Id" value={statementId || "N/A"} />
-        <Row label="Status" value="Placeholder ready" />
-        <Row label="Next use" value="Claim create/list/detail can be added here next." />
-      </div>
-
-      <div style={cardStyle}>
-        <h3 style={{ marginTop: 0 }}>Planned actions</h3>
-        <ul style={{ marginBottom: 0 }}>
-          <li>Create claim from current statement</li>
-          <li>List claims linked to statement</li>
-          <li>Navigate to contradiction workflows later</li>
-        </ul>
-      </div>
-    </div>
-  );
-}
-
-function Row({ label, value }: { label: string; value: string }) {
-  return (
-    <div style={{ display: "grid", gridTemplateColumns: "180px 1fr", gap: "12px", padding: "6px 0" }}>
-      <strong>{label}</strong>
-      <span>{value}</span>
-    </div>
-  );
-}
-
-const cardStyle: React.CSSProperties = {
-  border: "1px solid #ddd",
-  borderRadius: "12px",
-  padding: "16px",
-  marginBottom: "16px",
-};
-'@
-
-$evidenceDetailPageContent = @'
-import { Link, useParams } from "react-router-dom";
-import { useEvidenceDetail } from "../hooks/useEvidenceDetail";
-import { useStatements } from "../hooks/useStatements";
-
-export function EvidenceDetailPage() {
-  const { id } = useParams();
-  const query = useEvidenceDetail(id);
-  const statementsQuery = useStatements();
-
-  if (query.isLoading) {
-    return <div style={{ fontFamily: "Arial, sans-serif", padding: "24px" }}>Loading evidence...</div>;
-  }
-
-  if (query.isError) {
-    return <div style={{ fontFamily: "Arial, sans-serif", padding: "24px", color: "crimson" }}>Failed to load evidence: {(query.error as Error).message}</div>;
-  }
-
-  if (!query.data) {
-    return <div style={{ fontFamily: "Arial, sans-serif", padding: "24px" }}>Evidence not found.</div>;
-  }
-
-  const item = query.data;
-  const relatedStatements = (statementsQuery.data?.items ?? []).filter((x) => x.evidenceId === item.id);
-
-  return (
-    <div style={{ fontFamily: "Arial, sans-serif", padding: "24px" }}>
-      <nav style={{ display: "flex", gap: "16px", marginBottom: "20px", flexWrap: "wrap" }}>
-        <Link to="/evidence">Back to Evidence</Link>
-        {item.documentId && <Link to={`/documents/${item.documentId}`}>Document</Link>}
-        <Link to="/statements">Statements</Link>
-      </nav>
-
-      <h1 style={{ marginTop: 0 }}>Evidence {item.id}</h1>
-
-      <div style={cardStyle}>
-        <Row label="Id" value={item.id} />
-        <Row label="Source Id" value={item.sourceId} />
-        <Row label="Document Id" value={item.documentId ?? "N/A"} />
-        <Row label="Type" value={item.type} />
-        <Row label="Status" value={item.status} />
-        <Row label="LanguageCode" value={item.languageCode ?? "N/A"} />
-        <Row label="ContentHash" value={item.contentHash ?? "N/A"} />
-        <Row label="Captured" value={item.capturedAtUtc ? new Date(item.capturedAtUtc).toLocaleString() : "N/A"} />
-        <Row label="Span" value={item.span ? `${item.span.startOffset} - ${item.span.endOffset}` : "N/A"} />
-        <Row label="Created" value={new Date(item.createdAtUtc).toLocaleString()} />
-        <Row label="Updated" value={new Date(item.updatedAtUtc).toLocaleString()} />
-      </div>
-
-      <div style={cardStyle}>
-        <h3 style={{ marginTop: 0 }}>Content</h3>
-        <pre style={{ whiteSpace: "pre-wrap", margin: 0, fontFamily: "inherit" }}>{item.content}</pre>
-      </div>
-
-      <div style={cardStyle}>
-        <h3 style={{ marginTop: 0 }}>Statements</h3>
-        <div style={{ display: "flex", gap: "12px", flexWrap: "wrap", marginBottom: "12px" }}>
-          <Link to={`/statements/new?evidenceId=${item.id}`} style={actionLinkStyle}>Create Statement for this Evidence</Link>
-          <Link to={`/statements?evidenceId=${item.id}`} style={actionLinkStyle}>View Statements for this Evidence</Link>
-        </div>
-
-        {statementsQuery.isLoading && <p>Loading statements...</p>}
-        {statementsQuery.isSuccess && relatedStatements.length === 0 && <p>No statements are linked to this evidence yet.</p>}
-        {statementsQuery.isSuccess && relatedStatements.length > 0 && (
-          <ul>
-            {relatedStatements.map((statement) => (
-              <li key={statement.id}>
-                <Link to={`/statements/${statement.id}`}>{statement.text}</Link>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function Row({ label, value }: { label: string; value: string }) {
-  return (
-    <div style={{ display: "grid", gridTemplateColumns: "180px 1fr", gap: "12px", padding: "6px 0" }}>
-      <strong>{label}</strong>
-      <span>{value}</span>
-    </div>
-  );
-}
-
-const cardStyle: React.CSSProperties = {
-  border: "1px solid #ddd",
-  borderRadius: "12px",
-  padding: "16px",
-  marginBottom: "16px",
-};
-
-const actionLinkStyle: React.CSSProperties = {
-  padding: "10px 16px",
-  borderRadius: "8px",
-  border: "1px solid #1976d2",
-  textDecoration: "none",
-  color: "inherit",
-};
-'@
-
 $mainTsxContent = @'
 import React from "react";
 import ReactDOM from "react-dom/client";
@@ -792,7 +488,34 @@ function HomePage() {
     <Layout>
       <h2>Home</h2>
       <p>Statement filtering and claim workspace placeholder are now available.</p>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "16px", marginTop: "20px" }}>
+        <QuickCard title="Sources" text="Browse and manage source records." to="/sources" />
+        <QuickCard title="Documents" text="Open document inventory and linked records." to="/documents" />
+        <QuickCard title="Evidence" text="Inspect evidence and create linked statements." to="/evidence" />
+        <QuickCard title="Statements" text="Filter and review extracted statements." to="/statements" />
+        <QuickCard title="Claims Workspace" text="Prepare the next claim slice." to="/claims/workspace" />
+      </div>
     </Layout>
+  );
+}
+
+function QuickCard({ title, text, to }: { title: string; text: string; to: string }) {
+  return (
+    <Link
+      to={to}
+      style={{
+        border: "1px solid #ddd",
+        borderRadius: "14px",
+        padding: "16px",
+        textDecoration: "none",
+        color: "inherit",
+        display: "block",
+      }}
+    >
+      <strong style={{ display: "block", marginBottom: "8px" }}>{title}</strong>
+      <span>{text}</span>
+    </Link>
   );
 }
 
@@ -877,12 +600,10 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
 '@
 
 Write-Host ""
-Write-Host "Applying Phase 6.10..." -ForegroundColor Cyan
+Write-Host "Applying Phase 6.11..." -ForegroundColor Cyan
 
-Write-Utf8File -Path $statementsPagePath -Content $statementsPageContent
-Write-Utf8File -Path $statementDetailPagePath -Content $statementDetailPageContent
 Write-Utf8File -Path $claimsWorkspacePagePath -Content $claimsWorkspacePageContent
-Write-Utf8File -Path $evidenceDetailPagePath -Content $evidenceDetailPageContent
+Write-Utf8File -Path $statementsPagePath -Content $statementsPageContent
 Write-Utf8File -Path $mainTsxPath -Content $mainTsxContent
 
 Push-Location $RootDir
@@ -906,4 +627,4 @@ if ($LASTEXITCODE -ne 0) {
 Pop-Location
 
 Write-Host ""
-Write-Host "Phase 6.10 completed successfully." -ForegroundColor Green
+Write-Host "Phase 6.11 completed successfully." -ForegroundColor Green

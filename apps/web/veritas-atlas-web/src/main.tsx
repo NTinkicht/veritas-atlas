@@ -29,6 +29,7 @@ import { EvidencePage } from "./pages/EvidencePage";
 import { EvidenceDetailPage } from "./pages/EvidenceDetailPage";
 import { StatementsPage } from "./pages/StatementsPage";
 import { StatementDetailPage } from "./pages/StatementDetailPage";
+import { ClaimsWorkspacePage } from "./pages/ClaimsWorkspacePage";
 import { CaseDetailPage } from "./pages/CaseDetailPage";
 import { ReviewsPage } from "./pages/ReviewsPage";
 import { DashboardPage } from "./pages/DashboardPage";
@@ -56,6 +57,7 @@ function Layout({ children }: { children: React.ReactNode }) {
           <Link to="/documents">Documents</Link>
           <Link to="/evidence">Evidence</Link>
           <Link to="/statements">Statements</Link>
+          <Link to="/claims/workspace">Claims Workspace</Link>
           <Link to="/sources/new">New Source</Link>
           <Link to="/documents/new">New Document</Link>
           <Link to="/evidence/new">New Evidence</Link>
@@ -71,7 +73,7 @@ function HomePage() {
   return (
     <Layout>
       <h2>Home</h2>
-      <p>Statement UX linking is now available.</p>
+      <p>Statement filtering and claim workspace placeholder are now available.</p>
     </Layout>
   );
 }
@@ -144,6 +146,7 @@ const router = createBrowserRouter([
   { path: "/statements", element: <StatementsPage /> },
   { path: "/statements/new", element: <CreateStatementPage /> },
   { path: "/statements/:id", element: <StatementDetailPage /> },
+  { path: "/claims/workspace", element: <ClaimsWorkspacePage /> },
 ]);
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
