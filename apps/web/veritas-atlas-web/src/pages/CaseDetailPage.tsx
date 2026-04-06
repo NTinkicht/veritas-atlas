@@ -34,11 +34,7 @@ export function CaseDetailPage() {
 
     createClaimMutation.mutate(
       {
-        statementId,
-        text: claimText,
-        personId: claimPersonId || null,
-        createdBy: "frontend-user",
-      },
+        statementId, topic: "case-linked claim", normalizedText: claimText, personId: claimPersonId || undefined, isMaterial: true,      },
       {
         onSuccess: () => {
           setStatementId("");
@@ -63,9 +59,7 @@ export function CaseDetailPage() {
         rightClaimId,
         type: contradictionType,
         summary: contradictionSummary,
-        rationale: contradictionRationale || null,
-        createdBy: "frontend-user",
-      },
+        rationale: contradictionRationale || null,      },
       {
         onSuccess: () => {
           setLeftClaimId("");
@@ -444,3 +438,9 @@ const buttonStyle: CSSProperties = {
   border: "1px solid #1976d2",
   cursor: "pointer",
 };
+
+
+
+
+
+

@@ -1,9 +1,11 @@
 ﻿import { Link, useParams } from "react-router-dom";
 import { useStatementDetail } from "../hooks/useStatementDetail";
+import { useClaims } from "../hooks/useClaims";
 
 export function StatementDetailPage() {
   const { id } = useParams();
   const query = useStatementDetail(id);
+  const claimsQuery = useClaims(id);
 
   if (query.isLoading) {
     return <div style={{ fontFamily: "Arial, sans-serif", padding: "24px" }}>Loading statement...</div>;
@@ -42,9 +44,25 @@ export function StatementDetailPage() {
         <Row label="Created" value={new Date(item.createdAt).toLocaleString()} />
       </div>
 
-      <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
-        {item.evidenceId && <Link to={`/evidence/${item.evidenceId}`} style={actionLinkStyle}>Open Evidence</Link>}
-        <Link to={`/claims/workspace?statementId=${item.id}`} style={actionLinkStyle}>Open Claims Workspace</Link>
+      <div style={cardStyle}>
+        <h3 style={{ marginTop: 0 }}>Claims</h3>
+        <div style={{ display: "flex", gap: "12px", flexWrap: "wrap", marginBottom: "12px" }}>
+          <Link to={`/claims/workspace?statementId=${item.id}`} style={actionLinkStyle}>Create Claim</Link>
+          <Link to={`/claims?statementId=${item.id}`} style={actionLinkStyle}>Open Claims for Statement</Link>
+        </div>
+
+        {claimsQuery.isLoading && <p>Loading claims...</p>}
+        {claimsQuery.isError && <p style={{ color: "crimson" }}>Failed to load claims: {(claimsQuery.error as Error).message}</p>}
+        {claimsQuery.isSuccess && claimsQuery.data.items.length === 0 && <p>No claims linked to this statement yet.</p>}
+        {claimsQuery.isSuccess && claimsQuery.data.items.length > 0 && (
+          <ul>
+            {claimsQuery.data.items.map((claim) => (
+              <li key={claim.id}>
+                <Link to={`/claims/${claim.id}`}>{claim.topic}</Link> - {claim.type} - {claim.status}
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
     </div>
   );

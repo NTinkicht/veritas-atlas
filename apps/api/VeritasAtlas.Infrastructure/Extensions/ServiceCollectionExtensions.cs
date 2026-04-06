@@ -26,6 +26,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IStatementService, StatementService>();
         services.AddScoped<StatementService>();
         services.AddScoped<IClaimService, ClaimService>();
+        services.AddScoped<ClaimSliceService>();
         services.AddScoped<IContradictionService, ContradictionService>();
         services.AddScoped<ICaseService, CaseService>();
         services.AddScoped<IConfidenceService, ConfidenceService>();
@@ -36,4 +37,5 @@ public static class ServiceCollectionExtensions
         return services;
     }
 }
+
 

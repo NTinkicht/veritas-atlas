@@ -36,21 +36,14 @@ function Write-Utf8File {
 }
 
 $solutionPath = Join-Path $RootDir "VeritasAtlas.slnx"
-$apiRoot = Join-Path $RootDir "apps\api"
 $webRoot = Join-Path $RootDir "apps\web\veritas-atlas-web"
 
-$claimsContractsPath = Join-Path $apiRoot "VeritasAtlas.Api\Contracts\ClaimsContracts.cs"
-$claimsControllerPath = Join-Path $apiRoot "VeritasAtlas.Api\Controllers\ClaimsController.cs"
-$claimSliceServicePath = Join-Path $apiRoot "VeritasAtlas.Infrastructure\Services\ClaimSliceService.cs"
-$diPath = Join-Path $apiRoot "VeritasAtlas.Infrastructure\Extensions\ServiceCollectionExtensions.cs"
-
-$claimsApiPath = Join-Path $webRoot "src\api\claims.ts"
-$useClaimsPath = Join-Path $webRoot "src\hooks\useClaims.ts"
-$useClaimDetailPath = Join-Path $webRoot "src\hooks\useClaimDetail.ts"
-$useCreateClaimPath = Join-Path $webRoot "src\hooks\useCreateClaim.ts"
 $claimsPagePath = Join-Path $webRoot "src\pages\ClaimsPage.tsx"
 $claimDetailPagePath = Join-Path $webRoot "src\pages\ClaimDetailPage.tsx"
 $claimsWorkspacePagePath = Join-Path $webRoot "src\pages\ClaimsWorkspacePage.tsx"
+$statementDetailPagePath = Join-Path $webRoot "src\pages\StatementDetailPage.tsx"
+$caseDetailPagePath = Join-Path $webRoot "src\pages\CaseDetailPage.tsx"
+$contradictionsWorkspacePagePath = Join-Path $webRoot "src\pages\ContradictionsWorkspacePage.tsx"
 $mainTsxPath = Join-Path $webRoot "src\main.tsx"
 
 Push-Location $RootDir
@@ -64,10 +57,10 @@ if ($LASTEXITCODE -ne 0) {
     throw "git add failed."
 }
 
-$commitMessage = "checkpoint before phase 6.12 - $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')"
+$commitMessage = "checkpoint before phase 6.14 - $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')"
 git commit -m $commitMessage 2>$null
 if ($LASTEXITCODE -ne 0) {
-    Write-Host "No new commit created. Continuing with phase 6.12." -ForegroundColor Yellow
+    Write-Host "No new commit created. Continuing with phase 6.14." -ForegroundColor Yellow
 }
 else {
     Write-Host "Created git commit: $commitMessage" -ForegroundColor Green
@@ -75,388 +68,44 @@ else {
 
 Pop-Location
 
-$claimsContractsContent = @'
-namespace VeritasAtlas.Api.Contracts.Claims;
-
-public sealed record CreateClaimRequest(
-    Guid StatementId,
-    string Topic,
-    string NormalizedText,
-    string? Type,
-    Guid? PersonId,
-    Guid? CaseId,
-    bool IsMaterial);
-
-public sealed record CreateClaimResponse(
-    Guid Id,
-    Guid StatementId,
-    Guid? PersonId,
-    Guid? CaseId,
-    string Type,
-    string Status,
-    string Topic,
-    string NormalizedText,
-    bool IsMaterial,
-    DateTime CreatedAtUtc,
-    DateTime UpdatedAtUtc);
-
-public sealed record GetClaimsItemResponse(
-    Guid Id,
-    Guid StatementId,
-    Guid? PersonId,
-    Guid? CaseId,
-    string Type,
-    string Status,
-    string Topic,
-    string NormalizedText,
-    bool IsMaterial,
-    DateTime CreatedAtUtc,
-    DateTime UpdatedAtUtc);
-
-public sealed record GetClaimResponse(
-    Guid Id,
-    Guid StatementId,
-    Guid? PersonId,
-    Guid? CaseId,
-    string Type,
-    string Status,
-    string Topic,
-    string NormalizedText,
-    bool IsMaterial,
-    DateTime CreatedAtUtc,
-    DateTime UpdatedAtUtc);
-
-public sealed record GetClaimsResponse(
-    IReadOnlyCollection<GetClaimsItemResponse> Items,
-    int Page,
-    int PageSize,
-    int TotalCount,
-    int TotalPages);
-'@
-
-$claimSliceServiceContent = @'
-using Microsoft.EntityFrameworkCore;
-using VeritasAtlas.Domain.Entities;
-using VeritasAtlas.Domain.Enums;
-using VeritasAtlas.Infrastructure.Persistence;
-
-namespace VeritasAtlas.Infrastructure.Services;
-
-public sealed class ClaimSliceService
-{
-    private readonly VeritasAtlasDbContext _dbContext;
-
-    public ClaimSliceService(VeritasAtlasDbContext dbContext)
-    {
-        _dbContext = dbContext;
-    }
-
-    public async Task<Claim> CreateClaimAsync(
-        Guid statementId,
-        string topic,
-        string normalizedText,
-        string? type,
-        Guid? personId,
-        Guid? caseId,
-        bool isMaterial,
-        CancellationToken cancellationToken = default)
-    {
-        var statement = await _dbContext.Statements
-            .AsNoTracking()
-            .FirstOrDefaultAsync(x => x.Id == statementId, cancellationToken);
-
-        if (statement is null)
-        {
-            throw new InvalidOperationException($"Statement '{statementId}' was not found.");
-        }
-
-        ClaimType parsedType = ClaimType.Factual;
-        if (!string.IsNullOrWhiteSpace(type) && Enum.TryParse<ClaimType>(type, true, out var explicitType))
-        {
-            parsedType = explicitType;
-        }
-
-        var entity = new Claim
-        {
-            StatementId = statementId,
-            PersonId = personId,
-            CaseId = caseId,
-            Type = parsedType,
-            Status = ClaimStatus.Draft,
-            Topic = topic.Trim(),
-            NormalizedText = normalizedText.Trim(),
-            IsMaterial = isMaterial
-        };
-
-        _dbContext.Claims.Add(entity);
-        await _dbContext.SaveChangesAsync(cancellationToken);
-
-        return entity;
-    }
-
-    public async Task<(int Total, List<Claim> Items)> GetClaimsAsync(
-        int page,
-        int pageSize,
-        Guid? statementId = null,
-        CancellationToken cancellationToken = default)
-    {
-        page = page < 1 ? 1 : page;
-        pageSize = pageSize < 1 ? 20 : pageSize;
-
-        IQueryable<Claim> query = _dbContext.Claims.AsNoTracking();
-
-        if (statementId.HasValue)
-        {
-            query = query.Where(x => x.StatementId == statementId.Value);
-        }
-
-        query = query.OrderByDescending(x => x.CreatedAtUtc);
-
-        var total = await query.CountAsync(cancellationToken);
-        var items = await query
-            .Skip((page - 1) * pageSize)
-            .Take(pageSize)
-            .ToListAsync(cancellationToken);
-
-        return (total, items);
-    }
-
-    public async Task<Claim?> GetClaimByIdAsync(
-        Guid id,
-        CancellationToken cancellationToken = default)
-    {
-        return await _dbContext.Claims
-            .AsNoTracking()
-            .FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
-    }
-}
-'@
-
-$claimsControllerContent = @'
-using Microsoft.AspNetCore.Mvc;
-using VeritasAtlas.Api.Contracts.Claims;
-using VeritasAtlas.Infrastructure.Services;
-
-namespace VeritasAtlas.Api.Controllers;
-
-[ApiController]
-[Route("api/v1/claims")]
-public sealed class ClaimsController : ControllerBase
-{
-    private readonly ClaimSliceService _claimSliceService;
-
-    public ClaimsController(ClaimSliceService claimSliceService)
-    {
-        _claimSliceService = claimSliceService;
-    }
-
-    [HttpPost]
-    public async Task<ActionResult<CreateClaimResponse>> CreateClaim(
-        [FromBody] CreateClaimRequest request,
-        CancellationToken cancellationToken = default)
-    {
-        var entity = await _claimSliceService.CreateClaimAsync(
-            request.StatementId,
-            request.Topic,
-            request.NormalizedText,
-            request.Type,
-            request.PersonId,
-            request.CaseId,
-            request.IsMaterial,
-            cancellationToken);
-
-        var response = new CreateClaimResponse(
-            entity.Id,
-            entity.StatementId,
-            entity.PersonId,
-            entity.CaseId,
-            entity.Type.ToString(),
-            entity.Status.ToString(),
-            entity.Topic,
-            entity.NormalizedText,
-            entity.IsMaterial,
-            entity.CreatedAtUtc,
-            entity.UpdatedAtUtc);
-
-        return Ok(response);
-    }
-
-    [HttpGet]
-    public async Task<ActionResult<GetClaimsResponse>> GetClaims(
-        [FromQuery] int page = 1,
-        [FromQuery] int pageSize = 20,
-        [FromQuery] Guid? statementId = null,
-        CancellationToken cancellationToken = default)
-    {
-        var (total, items) = await _claimSliceService.GetClaimsAsync(page, pageSize, statementId, cancellationToken);
-
-        var mapped = items.Select(entity => new GetClaimsItemResponse(
-            entity.Id,
-            entity.StatementId,
-            entity.PersonId,
-            entity.CaseId,
-            entity.Type.ToString(),
-            entity.Status.ToString(),
-            entity.Topic,
-            entity.NormalizedText,
-            entity.IsMaterial,
-            entity.CreatedAtUtc,
-            entity.UpdatedAtUtc
-        )).ToArray();
-
-        return Ok(new GetClaimsResponse(
-            mapped,
-            page,
-            pageSize,
-            total,
-            total == 0 ? 0 : (int)Math.Ceiling(total / (double)pageSize)
-        ));
-    }
-
-    [HttpGet("{id:guid}")]
-    public async Task<ActionResult<GetClaimResponse>> GetClaim(
-        [FromRoute] Guid id,
-        CancellationToken cancellationToken = default)
-    {
-        var entity = await _claimSliceService.GetClaimByIdAsync(id, cancellationToken);
-
-        if (entity is null)
-        {
-            return NotFound();
-        }
-
-        return Ok(new GetClaimResponse(
-            entity.Id,
-            entity.StatementId,
-            entity.PersonId,
-            entity.CaseId,
-            entity.Type.ToString(),
-            entity.Status.ToString(),
-            entity.Topic,
-            entity.NormalizedText,
-            entity.IsMaterial,
-            entity.CreatedAtUtc,
-            entity.UpdatedAtUtc
-        ));
-    }
-}
-'@
-
-$diOriginal = Get-Content $diPath -Raw
-if ($diOriginal -notmatch 'AddScoped<ClaimSliceService>\(\);') {
-    $diUpdated = $diOriginal -replace 'services\.AddScoped<IClaimService,\s*ClaimService>\(\);', "services.AddScoped<IClaimService, ClaimService>();`r`n        services.AddScoped<ClaimSliceService>();"
-} else {
-    $diUpdated = $diOriginal
-}
-
-$claimsApiContent = @'
-import { apiGet, apiPost } from "./client";
-
-export type ClaimItem = {
-  id: string;
-  statementId: string;
-  personId: string | null;
-  caseId: string | null;
-  type: string;
-  status: string;
-  topic: string;
-  normalizedText: string;
-  isMaterial: boolean;
-  createdAtUtc: string;
-  updatedAtUtc: string;
-};
-
-export type ClaimDetail = ClaimItem;
-
-export type ClaimsResponse = {
-  items: ClaimItem[];
-  page: number;
-  pageSize: number;
-  totalCount: number;
-  totalPages: number;
-};
-
-export type CreateClaimRequest = {
-  statementId: string;
-  topic: string;
-  normalizedText: string;
-  type?: string;
-  personId?: string;
-  caseId?: string;
-  isMaterial: boolean;
-};
-
-export async function getClaims(statementId?: string): Promise<ClaimsResponse> {
-  const params = new URLSearchParams({
-    page: "1",
-    pageSize: "50",
-  });
-
-  if (statementId) {
-    params.set("statementId", statementId);
-  }
-
-  return apiGet<ClaimsResponse>(`/api/v1/claims?${params.toString()}`);
-}
-
-export async function getClaimById(id: string): Promise<ClaimDetail> {
-  return apiGet<ClaimDetail>(`/api/v1/claims/${id}`);
-}
-
-export async function createClaim(request: CreateClaimRequest) {
-  return apiPost<ClaimItem>("/api/v1/claims", request);
-}
-'@
-
-$useClaimsContent = @'
-import { useQuery } from "@tanstack/react-query";
-import { getClaims } from "../api/claims";
-
-export function useClaims(statementId?: string) {
-  return useQuery({
-    queryKey: ["claims", statementId ?? ""],
-    queryFn: () => getClaims(statementId),
-  });
-}
-'@
-
-$useClaimDetailContent = @'
-import { useQuery } from "@tanstack/react-query";
-import { getClaimById } from "../api/claims";
-
-export function useClaimDetail(id?: string) {
-  return useQuery({
-    queryKey: ["claim-detail", id],
-    queryFn: () => getClaimById(id!),
-    enabled: !!id,
-  });
-}
-'@
-
-$useCreateClaimContent = @'
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { createClaim, type CreateClaimRequest } from "../api/claims";
-
-export function useCreateClaim() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: (request: CreateClaimRequest) => createClaim(request),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["claims"] });
-    },
-  });
-}
-'@
-
 $claimsPageContent = @'
 import { Link, useSearchParams } from "react-router-dom";
+import { useMemo } from "react";
 import { useClaims } from "../hooks/useClaims";
 
 export function ClaimsPage() {
   const [params] = useSearchParams();
   const statementId = params.get("statementId") ?? undefined;
+  const topicFilter = params.get("topic") ?? "";
+  const typeFilter = params.get("type") ?? "All";
+  const materialFilter = params.get("material") ?? "All";
+
   const query = useClaims(statementId);
+  const items = query.data?.items ?? [];
+
+  const filteredItems = useMemo(() => {
+    return items.filter((item) => {
+      const matchesTopic =
+        topicFilter.length === 0 ||
+        item.topic.toLowerCase().includes(topicFilter.toLowerCase()) ||
+        item.normalizedText.toLowerCase().includes(topicFilter.toLowerCase());
+
+      const matchesType =
+        typeFilter === "All" || item.type === typeFilter;
+
+      const matchesMaterial =
+        materialFilter === "All" ||
+        (materialFilter === "Material" && item.isMaterial) ||
+        (materialFilter === "NonMaterial" && !item.isMaterial);
+
+      return matchesTopic && matchesType && matchesMaterial;
+    });
+  }, [items, topicFilter, typeFilter, materialFilter]);
+
+  const types = useMemo(
+    () => ["All", ...Array.from(new Set(items.map((x) => x.type))).sort()],
+    [items]
+  );
 
   return (
     <div style={{ fontFamily: "Arial, sans-serif", padding: "24px" }}>
@@ -468,14 +117,34 @@ export function ClaimsPage() {
           <Link to="/statements">Statements</Link>
           <Link to="/claims">Claims</Link>
           <Link to="/claims/workspace">Claims Workspace</Link>
+          <Link to="/contradictions/workspace">Contradictions Workspace</Link>
         </nav>
       </header>
+
+      <div style={{ marginBottom: "16px", display: "flex", gap: "12px", flexWrap: "wrap" }}>
+        <Link to={statementId ? `/claims/workspace?statementId=${statementId}` : "/claims/workspace"} style={actionLinkStyle}>Open Claims Workspace</Link>
+        <Link to="/contradictions/workspace" style={actionLinkStyle}>Open Contradictions Workspace</Link>
+      </div>
 
       {statementId && (
         <div style={hintCardStyle}>
           <strong>Statement scope:</strong> {statementId}
         </div>
       )}
+
+      <section style={filterPanelStyle}>
+        <input value={topicFilter} readOnly style={inputStyle} placeholder="Use URL ?topic=... for deep link filtering" />
+        <select value={typeFilter} disabled style={selectStyle}>
+          {types.map((value) => (
+            <option key={value} value={value}>{value}</option>
+          ))}
+        </select>
+        <select value={materialFilter} disabled style={selectStyle}>
+          <option value="All">All</option>
+          <option value="Material">Material</option>
+          <option value="NonMaterial">Non-material</option>
+        </select>
+      </section>
 
       {query.isLoading && <p>Loading claims...</p>}
 
@@ -487,9 +156,9 @@ export function ClaimsPage() {
 
       {query.isSuccess && (
         <>
-          <p>Showing {query.data.items.length} of {query.data.totalCount} claims</p>
+          <p>Showing {filteredItems.length} of {query.data.totalCount} claims</p>
 
-          {query.data.items.length === 0 ? (
+          {filteredItems.length === 0 ? (
             <div style={emptyStateStyle}>
               <p style={{ margin: 0 }}>No claims found.</p>
             </div>
@@ -503,18 +172,24 @@ export function ClaimsPage() {
                     <th style={thStyle}>Status</th>
                     <th style={thStyle}>Material</th>
                     <th style={thStyle}>Statement</th>
-                    <th style={thStyle}>Created</th>
+                    <th style={thStyle}>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {query.data.items.map((item) => (
+                  {filteredItems.map((item) => (
                     <tr key={item.id}>
                       <td style={tdStyle}><Link to={`/claims/${item.id}`}>{item.topic}</Link></td>
                       <td style={tdStyle}>{item.type}</td>
                       <td style={tdStyle}>{item.status}</td>
                       <td style={tdStyle}>{item.isMaterial ? "Yes" : "No"}</td>
                       <td style={tdStyle}><Link to={`/statements/${item.statementId}`}>{item.statementId}</Link></td>
-                      <td style={tdStyle}>{new Date(item.createdAtUtc).toLocaleString()}</td>
+                      <td style={tdStyle}>
+                        <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                          <Link to={`/claims/${item.id}`}>Detail</Link>
+                          <Link to={`/claims/workspace?statementId=${item.statementId}`}>Workspace</Link>
+                          <Link to={`/contradictions/workspace?claimId=${item.id}&statementId=${item.statementId}`}>Contradictions</Link>
+                        </div>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -559,6 +234,43 @@ const hintCardStyle: React.CSSProperties = {
   borderRadius: "12px",
   background: "#f8fbff",
 };
+
+const filterPanelStyle: React.CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "minmax(260px, 1fr) 180px 180px",
+  gap: "12px",
+  marginBottom: "16px",
+};
+
+const inputStyle: React.CSSProperties = {
+  width: "100%",
+  boxSizing: "border-box",
+  padding: "10px 12px",
+  borderRadius: "8px",
+  border: "1px solid #ccc",
+  font: "inherit",
+  background: "#fafafa",
+};
+
+const selectStyle: React.CSSProperties = {
+  width: "100%",
+  boxSizing: "border-box",
+  padding: "10px 12px",
+  borderRadius: "8px",
+  border: "1px solid #ccc",
+  font: "inherit",
+  background: "#fafafa",
+};
+
+const actionLinkStyle: React.CSSProperties = {
+  padding: "10px 16px",
+  borderRadius: "8px",
+  border: "1px solid #1976d2",
+  textDecoration: "none",
+  color: "inherit",
+  display: "inline-flex",
+  alignItems: "center",
+};
 '@
 
 $claimDetailPageContent = @'
@@ -588,6 +300,8 @@ export function ClaimDetailPage() {
       <nav style={{ display: "flex", gap: "16px", marginBottom: "20px", flexWrap: "wrap" }}>
         <Link to="/claims">Back to Claims</Link>
         <Link to={`/statements/${item.statementId}`}>Statement</Link>
+        {item.caseId && <Link to={`/cases/${item.caseId}`}>Case</Link>}
+        <Link to={`/contradictions/workspace?claimId=${item.id}&statementId=${item.statementId}`}>Contradictions Workspace</Link>
       </nav>
 
       <h1 style={{ marginTop: 0 }}>Claim</h1>
@@ -603,6 +317,12 @@ export function ClaimDetailPage() {
         <Row label="Person Id" value={item.personId ?? "N/A"} />
         <Row label="Case Id" value={item.caseId ?? "N/A"} />
         <Row label="Created" value={new Date(item.createdAtUtc).toLocaleString()} />
+      </div>
+
+      <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
+        <Link to={`/statements/${item.statementId}`} style={actionLinkStyle}>Open Statement</Link>
+        <Link to={`/claims?statementId=${item.statementId}`} style={actionLinkStyle}>More Claims for Statement</Link>
+        <Link to={`/contradictions/workspace?claimId=${item.id}&statementId=${item.statementId}`} style={actionLinkStyle}>Open Contradictions Workspace</Link>
       </div>
     </div>
   );
@@ -623,11 +343,19 @@ const cardStyle: React.CSSProperties = {
   padding: "16px",
   marginBottom: "16px",
 };
+
+const actionLinkStyle: React.CSSProperties = {
+  padding: "10px 16px",
+  borderRadius: "8px",
+  border: "1px solid #1976d2",
+  textDecoration: "none",
+  color: "inherit",
+};
 '@
 
 $claimsWorkspacePageContent = @'
 import { Link, useSearchParams } from "react-router-dom";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useStatementDetail } from "../hooks/useStatementDetail";
 import { useClaims } from "../hooks/useClaims";
 import { useCreateClaim } from "../hooks/useCreateClaim";
@@ -645,6 +373,13 @@ export function ClaimsWorkspacePage() {
   const [type, setType] = useState("Factual");
   const [isMaterial, setIsMaterial] = useState(true);
 
+  useEffect(() => {
+    if (statementQuery.isSuccess && statementQuery.data) {
+      setNormalizedText((current) => current || statementQuery.data.text);
+      setTopic((current) => current || statementQuery.data.topic || "general");
+    }
+  }, [statementQuery.isSuccess, statementQuery.data]);
+
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
 
@@ -655,9 +390,6 @@ export function ClaimsWorkspacePage() {
       type,
       isMaterial,
     });
-
-    setTopic("");
-    setNormalizedText("");
   };
 
   return (
@@ -669,6 +401,7 @@ export function ClaimsWorkspacePage() {
           <Link to="/">Home</Link>
           <Link to="/statements">Statements</Link>
           <Link to="/claims">Claims</Link>
+          <Link to="/contradictions/workspace">Contradictions Workspace</Link>
           {statementId && <Link to={`/statements/${statementId}`}>Statement</Link>}
         </nav>
       </header>
@@ -684,6 +417,13 @@ export function ClaimsWorkspacePage() {
           <Row label="Topic" value={statementQuery.data.topic ?? "N/A"} />
           <Row label="Polarity" value={statementQuery.data.polarity} />
           <Row label="Status" value={statementQuery.data.status} />
+          <div style={{ display: "flex", gap: "12px", flexWrap: "wrap", marginTop: "12px" }}>
+            {statementQuery.data.evidenceId && (
+              <Link to={`/evidence/${statementQuery.data.evidenceId}`} style={actionLinkStyle}>Open Evidence</Link>
+            )}
+            <Link to={`/claims?statementId=${statementQuery.data.id}`} style={actionLinkStyle}>Open Claims for Statement</Link>
+            <Link to={`/contradictions/workspace?statementId=${statementQuery.data.id}`} style={actionLinkStyle}>Prepare Contradiction Review</Link>
+          </div>
         </div>
       )}
 
@@ -724,6 +464,24 @@ export function ClaimsWorkspacePage() {
               <Link to={statementId ? `/claims?statementId=${statementId}` : "/claims"} style={linkButtonStyle}>Open Claims</Link>
             </div>
           </form>
+
+          {createClaimMutation.isError && (
+            <p style={{ color: "crimson", marginTop: "16px" }}>
+              Failed to create claim: {(createClaimMutation.error as Error).message}
+            </p>
+          )}
+
+          {createClaimMutation.isSuccess && (
+            <div style={successCardStyle}>
+              <p style={{ marginTop: 0 }}><strong>Claim created successfully.</strong></p>
+              <p style={{ marginBottom: "8px" }}>New claim id: {createClaimMutation.data.id}</p>
+              <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
+                <Link to={`/claims/${createClaimMutation.data.id}`}>Open Claim Detail</Link>
+                <Link to={`/claims?statementId=${createClaimMutation.data.statementId}`}>Open Claim List</Link>
+                <Link to={`/contradictions/workspace?claimId=${createClaimMutation.data.id}&statementId=${createClaimMutation.data.statementId}`}>Open Contradictions Workspace</Link>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -795,6 +553,216 @@ const linkButtonStyle: React.CSSProperties = {
   display: "inline-flex",
   alignItems: "center",
 };
+
+const actionLinkStyle: React.CSSProperties = {
+  padding: "10px 16px",
+  borderRadius: "8px",
+  border: "1px solid #1976d2",
+  textDecoration: "none",
+  color: "inherit",
+};
+
+const successCardStyle: React.CSSProperties = {
+  marginTop: "20px",
+  padding: "16px",
+  border: "1px solid #d7e8d7",
+  borderRadius: "12px",
+  background: "#f8fff8",
+};
+'@
+
+$statementDetailPageContent = @'
+import { Link, useParams } from "react-router-dom";
+import { useStatementDetail } from "../hooks/useStatementDetail";
+import { useClaims } from "../hooks/useClaims";
+
+export function StatementDetailPage() {
+  const { id } = useParams();
+  const query = useStatementDetail(id);
+  const claimsQuery = useClaims(id);
+
+  if (query.isLoading) {
+    return <div style={{ fontFamily: "Arial, sans-serif", padding: "24px" }}>Loading statement...</div>;
+  }
+
+  if (query.isError) {
+    return <div style={{ fontFamily: "Arial, sans-serif", padding: "24px", color: "crimson" }}>Failed to load statement: {(query.error as Error).message}</div>;
+  }
+
+  if (!query.data) {
+    return <div style={{ fontFamily: "Arial, sans-serif", padding: "24px" }}>Statement not found.</div>;
+  }
+
+  const item = query.data;
+
+  return (
+    <div style={{ fontFamily: "Arial, sans-serif", padding: "24px" }}>
+      <nav style={{ display: "flex", gap: "16px", marginBottom: "20px", flexWrap: "wrap" }}>
+        <Link to="/statements">Back to Statements</Link>
+        {item.evidenceId && <Link to={`/evidence/${item.evidenceId}`}>Evidence</Link>}
+        <Link to={`/claims/workspace?statementId=${item.id}`}>Claims Workspace</Link>
+        <Link to={`/contradictions/workspace?statementId=${item.id}`}>Contradictions Workspace</Link>
+      </nav>
+
+      <h1 style={{ marginTop: 0 }}>Statement</h1>
+
+      <div style={cardStyle}>
+        <Row label="Id" value={item.id} />
+        <Row label="Text" value={item.text} />
+        <Row label="Topic" value={item.topic ?? "N/A"} />
+        <Row label="Predicate" value={item.predicate ?? "N/A"} />
+        <Row label="Object" value={item.object ?? "N/A"} />
+        <Row label="Polarity" value={item.polarity} />
+        <Row label="Status" value={item.status} />
+        <Row label="Evidence Id" value={item.evidenceId ?? "N/A"} />
+        <Row label="Person Id" value={item.personId ?? "N/A"} />
+        <Row label="Created" value={new Date(item.createdAt).toLocaleString()} />
+      </div>
+
+      <div style={cardStyle}>
+        <h3 style={{ marginTop: 0 }}>Claims</h3>
+        <div style={{ display: "flex", gap: "12px", flexWrap: "wrap", marginBottom: "12px" }}>
+          <Link to={`/claims/workspace?statementId=${item.id}`} style={actionLinkStyle}>Create Claim</Link>
+          <Link to={`/claims?statementId=${item.id}`} style={actionLinkStyle}>Open Claims for Statement</Link>
+          <Link to={`/contradictions/workspace?statementId=${item.id}`} style={actionLinkStyle}>Prepare Contradiction Review</Link>
+        </div>
+
+        {claimsQuery.isLoading && <p>Loading claims...</p>}
+        {claimsQuery.isError && <p style={{ color: "crimson" }}>Failed to load claims: {(claimsQuery.error as Error).message}</p>}
+        {claimsQuery.isSuccess && claimsQuery.data.items.length === 0 && <p>No claims linked to this statement yet.</p>}
+        {claimsQuery.isSuccess && claimsQuery.data.items.length > 0 && (
+          <ul>
+            {claimsQuery.data.items.map((claim) => (
+              <li key={claim.id}>
+                <Link to={`/claims/${claim.id}`}>{claim.topic}</Link> - {claim.type} - {claim.status}
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function Row({ label, value }: { label: string; value: string }) {
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "180px 1fr", gap: "12px", padding: "6px 0" }}>
+      <strong>{label}</strong>
+      <span>{value}</span>
+    </div>
+  );
+}
+
+const cardStyle: React.CSSProperties = {
+  border: "1px solid #ddd",
+  borderRadius: "12px",
+  padding: "16px",
+  marginBottom: "16px",
+};
+
+const actionLinkStyle: React.CSSProperties = {
+  padding: "10px 16px",
+  borderRadius: "8px",
+  border: "1px solid #1976d2",
+  textDecoration: "none",
+  color: "inherit",
+};
+'@
+
+$contradictionsWorkspacePageContent = @'
+import { Link, useSearchParams } from "react-router-dom";
+import { useClaimDetail } from "../hooks/useClaimDetail";
+import { useStatementDetail } from "../hooks/useStatementDetail";
+
+export function ContradictionsWorkspacePage() {
+  const [params] = useSearchParams();
+  const claimId = params.get("claimId") ?? "";
+  const statementId = params.get("statementId") ?? "";
+
+  const claimQuery = useClaimDetail(claimId || undefined);
+  const statementQuery = useStatementDetail(statementId || undefined);
+
+  return (
+    <div style={{ fontFamily: "Arial, sans-serif", padding: "24px", maxWidth: "980px" }}>
+      <header style={{ marginBottom: "24px" }}>
+        <h1 style={{ margin: 0 }}>Contradictions Workspace</h1>
+        <p style={{ color: "#555" }}>Operational preparation space for the contradiction slice.</p>
+        <nav style={{ display: "flex", gap: "16px", marginTop: "12px", flexWrap: "wrap" }}>
+          <Link to="/">Home</Link>
+          <Link to="/claims">Claims</Link>
+          <Link to="/statements">Statements</Link>
+          {claimId && <Link to={`/claims/${claimId}`}>Claim</Link>}
+          {statementId && <Link to={`/statements/${statementId}`}>Statement</Link>}
+        </nav>
+      </header>
+
+      <div style={cardStyle}>
+        <Row label="Claim Id" value={claimId || "N/A"} />
+        <Row label="Statement Id" value={statementId || "N/A"} />
+        <Row label="Workspace Status" value="Ready for contradiction implementation" />
+      </div>
+
+      {claimId && claimQuery.isSuccess && claimQuery.data && (
+        <div style={cardStyle}>
+          <h3 style={{ marginTop: 0 }}>Claim Context</h3>
+          <Row label="Topic" value={claimQuery.data.topic} />
+          <Row label="Type" value={claimQuery.data.type} />
+          <Row label="Status" value={claimQuery.data.status} />
+          <Row label="Normalized Text" value={claimQuery.data.normalizedText} />
+        </div>
+      )}
+
+      {statementId && statementQuery.isSuccess && statementQuery.data && (
+        <div style={cardStyle}>
+          <h3 style={{ marginTop: 0 }}>Statement Context</h3>
+          <Row label="Text" value={statementQuery.data.text} />
+          <Row label="Topic" value={statementQuery.data.topic ?? "N/A"} />
+          <Row label="Polarity" value={statementQuery.data.polarity} />
+          <Row label="Status" value={statementQuery.data.status} />
+        </div>
+      )}
+
+      <div style={cardStyle}>
+        <h3 style={{ marginTop: 0 }}>Planned contradiction actions</h3>
+        <ul style={{ marginBottom: 0 }}>
+          <li>Compare one claim against alternate claims and statements</li>
+          <li>Classify contradiction type and severity</li>
+          <li>Link contradiction results to case review workflow</li>
+        </ul>
+      </div>
+
+      <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
+        {claimId && <Link to={`/claims/${claimId}`} style={actionLinkStyle}>Back to Claim</Link>}
+        {statementId && <Link to={`/claims/workspace?statementId=${statementId}`} style={actionLinkStyle}>Open Claims Workspace</Link>}
+        <Link to="/claims" style={actionLinkStyle}>Open Claims</Link>
+      </div>
+    </div>
+  );
+}
+
+function Row({ label, value }: { label: string; value: string }) {
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "180px 1fr", gap: "12px", padding: "6px 0" }}>
+      <strong>{label}</strong>
+      <span>{value}</span>
+    </div>
+  );
+}
+
+const cardStyle: React.CSSProperties = {
+  border: "1px solid #ddd",
+  borderRadius: "12px",
+  padding: "16px",
+  marginBottom: "16px",
+};
+
+const actionLinkStyle: React.CSSProperties = {
+  padding: "10px 16px",
+  borderRadius: "8px",
+  border: "1px solid #1976d2",
+  textDecoration: "none",
+  color: "inherit",
+};
 '@
 
 $mainTsxContent = @'
@@ -832,6 +800,7 @@ import { StatementDetailPage } from "./pages/StatementDetailPage";
 import { ClaimsPage } from "./pages/ClaimsPage";
 import { ClaimDetailPage } from "./pages/ClaimDetailPage";
 import { ClaimsWorkspacePage } from "./pages/ClaimsWorkspacePage";
+import { ContradictionsWorkspacePage } from "./pages/ContradictionsWorkspacePage";
 import { CaseDetailPage } from "./pages/CaseDetailPage";
 import { ReviewsPage } from "./pages/ReviewsPage";
 import { DashboardPage } from "./pages/DashboardPage";
@@ -861,6 +830,7 @@ function Layout({ children }: { children: React.ReactNode }) {
           <Link to="/statements">Statements</Link>
           <Link to="/claims">Claims</Link>
           <Link to="/claims/workspace">Claims Workspace</Link>
+          <Link to="/contradictions/workspace">Contradictions Workspace</Link>
           <Link to="/sources/new">New Source</Link>
           <Link to="/documents/new">New Document</Link>
           <Link to="/evidence/new">New Evidence</Link>
@@ -876,8 +846,34 @@ function HomePage() {
   return (
     <Layout>
       <h2>Home</h2>
-      <p>Claim vertical slice is now available.</p>
+      <p>Claim operational UX pack is now available.</p>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "16px", marginTop: "20px" }}>
+        <QuickCard title="Statements" text="Inspect extracted statements and linked claims." to="/statements" />
+        <QuickCard title="Claims" text="Browse, filter, and inspect claims." to="/claims" />
+        <QuickCard title="Claims Workspace" text="Create claims from statement context." to="/claims/workspace" />
+        <QuickCard title="Contradictions Workspace" text="Prepare contradiction review from statements and claims." to="/contradictions/workspace" />
+      </div>
     </Layout>
+  );
+}
+
+function QuickCard({ title, text, to }: { title: string; text: string; to: string }) {
+  return (
+    <Link
+      to={to}
+      style={{
+        border: "1px solid #ddd",
+        borderRadius: "14px",
+        padding: "16px",
+        textDecoration: "none",
+        color: "inherit",
+        display: "block",
+      }}
+    >
+      <strong style={{ display: "block", marginBottom: "8px" }}>{title}</strong>
+      <span>{text}</span>
+    </Link>
   );
 }
 
@@ -952,6 +948,7 @@ const router = createBrowserRouter([
   { path: "/claims", element: <ClaimsPage /> },
   { path: "/claims/:id", element: <ClaimDetailPage /> },
   { path: "/claims/workspace", element: <ClaimsWorkspacePage /> },
+  { path: "/contradictions/workspace", element: <ContradictionsWorkspacePage /> },
 ]);
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
@@ -963,24 +960,36 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
 );
 '@
 
+$timestamp = Get-Date -Format "yyyyMMdd-HHmmss"
+$diagDir = Join-Path $RootDir "_diagnostics\phase-6-14-$timestamp"
+Ensure-Directory $diagDir
+$reportPath = Join-Path $diagDir "phase-6-14-report.txt"
+
+Set-Content -Path $reportPath -Value "Phase 6.14 claim to contradiction operational pack`r`nGenerated: $(Get-Date -Format s)`r`nRoot: $RootDir" -Encoding UTF8
+
 Write-Host ""
-Write-Host "Applying Phase 6.12..." -ForegroundColor Cyan
+Write-Host "Applying Phase 6.14..." -ForegroundColor Cyan
 
-Write-Utf8File -Path $claimsContractsPath -Content $claimsContractsContent
-Write-Utf8File -Path $claimSliceServicePath -Content $claimSliceServiceContent
-Write-Utf8File -Path $claimsControllerPath -Content $claimsControllerContent
-Write-Utf8File -Path $diPath -Content $diUpdated
-
-Write-Utf8File -Path $claimsApiPath -Content $claimsApiContent
-Write-Utf8File -Path $useClaimsPath -Content $useClaimsContent
-Write-Utf8File -Path $useClaimDetailPath -Content $useClaimDetailContent
-Write-Utf8File -Path $useCreateClaimPath -Content $useCreateClaimContent
 Write-Utf8File -Path $claimsPagePath -Content $claimsPageContent
 Write-Utf8File -Path $claimDetailPagePath -Content $claimDetailPageContent
 Write-Utf8File -Path $claimsWorkspacePagePath -Content $claimsWorkspacePageContent
+Write-Utf8File -Path $statementDetailPagePath -Content $statementDetailPageContent
+Write-Utf8File -Path $contradictionsWorkspacePagePath -Content $contradictionsWorkspacePageContent
+Write-Utf8File -Path $caseDetailPagePath -Content $caseDetailUpdated
 Write-Utf8File -Path $mainTsxPath -Content $mainTsxContent
 
+Add-Section -OutputPath $reportPath -Title "Updated files" -Content @"
+$claimsPagePath
+$claimDetailPagePath
+$claimsWorkspacePagePath
+$statementDetailPagePath
+$contradictionsWorkspacePagePath
+$caseDetailPagePath
+$mainTsxPath
+"@
+
 Push-Location $RootDir
+
 Write-Host ""
 Write-Host "Building backend..." -ForegroundColor Cyan
 dotnet build $solutionPath
@@ -1001,4 +1010,5 @@ if ($LASTEXITCODE -ne 0) {
 Pop-Location
 
 Write-Host ""
-Write-Host "Phase 6.12 completed successfully." -ForegroundColor Green
+Write-Host "Phase 6.14 completed successfully." -ForegroundColor Green
+Write-Host "Report: $reportPath" -ForegroundColor Cyan

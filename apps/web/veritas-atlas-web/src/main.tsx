@@ -29,6 +29,8 @@ import { EvidencePage } from "./pages/EvidencePage";
 import { EvidenceDetailPage } from "./pages/EvidenceDetailPage";
 import { StatementsPage } from "./pages/StatementsPage";
 import { StatementDetailPage } from "./pages/StatementDetailPage";
+import { ClaimsPage } from "./pages/ClaimsPage";
+import { ClaimDetailPage } from "./pages/ClaimDetailPage";
 import { ClaimsWorkspacePage } from "./pages/ClaimsWorkspacePage";
 import { CaseDetailPage } from "./pages/CaseDetailPage";
 import { ReviewsPage } from "./pages/ReviewsPage";
@@ -57,6 +59,7 @@ function Layout({ children }: { children: React.ReactNode }) {
           <Link to="/documents">Documents</Link>
           <Link to="/evidence">Evidence</Link>
           <Link to="/statements">Statements</Link>
+          <Link to="/claims">Claims</Link>
           <Link to="/claims/workspace">Claims Workspace</Link>
           <Link to="/sources/new">New Source</Link>
           <Link to="/documents/new">New Document</Link>
@@ -73,14 +76,13 @@ function HomePage() {
   return (
     <Layout>
       <h2>Home</h2>
-      <p>Statement filtering and claim workspace placeholder are now available.</p>
+      <p>Claim operational UX pack is now available.</p>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "16px", marginTop: "20px" }}>
-        <QuickCard title="Sources" text="Browse and manage source records." to="/sources" />
-        <QuickCard title="Documents" text="Open document inventory and linked records." to="/documents" />
-        <QuickCard title="Evidence" text="Inspect evidence and create linked statements." to="/evidence" />
-        <QuickCard title="Statements" text="Filter and review extracted statements." to="/statements" />
-        <QuickCard title="Claims Workspace" text="Prepare the next claim slice." to="/claims/workspace" />
+        <QuickCard title="Statements" text="Inspect extracted statements and linked claims." to="/statements" />
+        <QuickCard title="Claims" text="Browse, filter, and inspect claims." to="/claims" />
+        <QuickCard title="Claims Workspace" text="Create claims from statement context." to="/claims/workspace" />
+        <QuickCard title="Evidence" text="Jump from evidence to statements and claims." to="/evidence" />
       </div>
     </Layout>
   );
@@ -173,6 +175,8 @@ const router = createBrowserRouter([
   { path: "/statements", element: <StatementsPage /> },
   { path: "/statements/new", element: <CreateStatementPage /> },
   { path: "/statements/:id", element: <StatementDetailPage /> },
+  { path: "/claims", element: <ClaimsPage /> },
+  { path: "/claims/:id", element: <ClaimDetailPage /> },
   { path: "/claims/workspace", element: <ClaimsWorkspacePage /> },
 ]);
 

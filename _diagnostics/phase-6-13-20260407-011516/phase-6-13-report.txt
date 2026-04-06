@@ -1,0 +1,3 @@
+﻿Phase 6.13 claim operational UX pack
+Generated: 2026-04-07T01:15:16
+Root: C:\Projects\veritas-atlas
