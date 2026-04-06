@@ -119,30 +119,30 @@ function Ensure-RouteBlock {
 }
 
 Write-Host "Checkpointing current code with git..." -ForegroundColor Cyan
-Git-Checkpoint -Message ("checkpoint before phase 6.32 - " + (Get-Date -Format "yyyy-MM-dd HH:mm:ss"))
+Git-Checkpoint -Message ("checkpoint before phase 6.33 - " + (Get-Date -Format "yyyy-MM-dd HH:mm:ss"))
 
-Write-Host "Applying Phase 6.32 - Executive Readout, Portfolio View, and Final Ops Surfaces pack..." -ForegroundColor Cyan
+Write-Host "Applying Phase 6.33 - Final control surfaces, readiness map, and operator cockpit..." -ForegroundColor Cyan
 
 $web = Join-Path $RootDir "apps\web\veritas-atlas-web\src"
 
-Write-File (Join-Path $web "components\ExecutiveReadoutPanel.tsx") @'
-type ExecutiveReadoutItem = {
+Write-File (Join-Path $web "components\SystemReadinessMapPanel.tsx") @'
+type ReadinessNode = {
   label: string;
-  value: string;
+  status: string;
 };
 
-export function ExecutiveReadoutPanel({
-  items,
+export function SystemReadinessMapPanel({
+  nodes,
 }: {
-  items: ExecutiveReadoutItem[];
+  nodes: ReadinessNode[];
 }) {
   return (
     <div style={panelStyle}>
-      <h3 style={{ marginTop: 0 }}>Executive Readout</h3>
+      <h3 style={{ marginTop: 0 }}>System Readiness Map</h3>
       <ul style={{ marginBottom: 0 }}>
-        {items.map((item) => (
-          <li key={item.label}>
-            <strong>{item.label}</strong>: {item.value}
+        {nodes.map((node) => (
+          <li key={node.label}>
+            {node.label} - {node.status}
           </li>
         ))}
       </ul>
@@ -157,27 +157,19 @@ const panelStyle: React.CSSProperties = {
 };
 '@
 
-Write-File (Join-Path $web "components\PortfolioRollupPanel.tsx") @'
-type PortfolioMetric = {
-  label: string;
-  value: number;
-};
+Write-File (Join-Path $web "components\OperatorCockpitPanel.tsx") @'
+import { Link } from "react-router-dom";
 
-export function PortfolioRollupPanel({
-  metrics,
-}: {
-  metrics: PortfolioMetric[];
-}) {
+export function OperatorCockpitPanel() {
   return (
     <div style={panelStyle}>
-      <h3 style={{ marginTop: 0 }}>Portfolio Rollup</h3>
-      <div style={gridStyle}>
-        {metrics.map((metric) => (
-          <div key={metric.label} style={cardStyle}>
-            <span style={{ color: "#666" }}>{metric.label}</span>
-            <strong style={{ fontSize: 28 }}>{metric.value}</strong>
-          </div>
-        ))}
+      <h3 style={{ marginTop: 0 }}>Operator Cockpit</h3>
+      <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+        <Link to="/case-explorer">Case Explorer</Link>
+        <Link to="/truth-review-studio">Truth Review Studio</Link>
+        <Link to="/publication-pipeline">Publication Pipeline</Link>
+        <Link to="/decision-intelligence">Decision Intelligence</Link>
+        <Link to="/release-readiness-hub">Release Readiness Hub</Link>
       </div>
     </div>
   );
@@ -188,40 +180,26 @@ const panelStyle: React.CSSProperties = {
   borderRadius: 14,
   padding: 16,
 };
-
-const gridStyle: React.CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
-  gap: 12,
-};
-
-const cardStyle: React.CSSProperties = {
-  border: "1px solid #eee",
-  borderRadius: 12,
-  padding: 12,
-  display: "grid",
-  gap: 8,
-};
 '@
 
-Write-File (Join-Path $web "components\OpsFinalizationPanel.tsx") @'
-type FinalizationItem = {
+Write-File (Join-Path $web "components\FinalControlSummaryPanel.tsx") @'
+type FinalControlMetric = {
   label: string;
-  status: string;
+  value: string;
 };
 
-export function OpsFinalizationPanel({
-  items,
+export function FinalControlSummaryPanel({
+  metrics,
 }: {
-  items: FinalizationItem[];
+  metrics: FinalControlMetric[];
 }) {
   return (
     <div style={panelStyle}>
-      <h3 style={{ marginTop: 0 }}>Ops Finalization</h3>
+      <h3 style={{ marginTop: 0 }}>Final Control Summary</h3>
       <ul style={{ marginBottom: 0 }}>
-        {items.map((item) => (
-          <li key={item.label}>
-            {item.label} - {item.status}
+        {metrics.map((metric) => (
+          <li key={metric.label}>
+            <strong>{metric.label}</strong>: {metric.value}
           </li>
         ))}
       </ul>
@@ -236,112 +214,93 @@ const panelStyle: React.CSSProperties = {
 };
 '@
 
-Write-File (Join-Path $web "pages\ExecutiveReadoutWorkspacePage.tsx") @'
+Write-File (Join-Path $web "pages\SystemReadinessMapPage.tsx") @'
 import { Link } from "react-router-dom";
-import { useClaims } from "../hooks/useClaims";
-import { useContradictions } from "../hooks/useContradictions";
-import { ExecutiveReadoutPanel } from "../components/ExecutiveReadoutPanel";
+import { SystemReadinessMapPanel } from "../components/SystemReadinessMapPanel";
 
-export function ExecutiveReadoutWorkspacePage() {
-  const claimsQuery = useClaims();
-  const contradictionsQuery = useContradictions();
-
-  const items = [
-    { label: "Claims visible", value: String(claimsQuery.data?.items.length ?? 0) },
-    { label: "Contradictions visible", value: String(contradictionsQuery.data?.items.length ?? 0) },
-    { label: "Delivery state", value: "Operational prototype" },
-    { label: "Readiness mode", value: "Expansion + stabilization" },
+export function SystemReadinessMapPage() {
+  const nodes = [
+    { label: "Core entity workflows", status: "Ready" },
+    { label: "Case explorer", status: "Ready" },
+    { label: "Contradiction workflow", status: "Ready" },
+    { label: "Review surfaces", status: "Ready" },
+    { label: "Publication governance", status: "Partial" },
+    { label: "Deep business logic", status: "Pending" },
   ];
 
   return (
     <div style={{ fontFamily: "Arial, sans-serif", padding: 24 }}>
       <header style={{ marginBottom: 24 }}>
-        <h1 style={{ margin: 0 }}>Executive Readout Workspace</h1>
+        <h1 style={{ margin: 0 }}>System Readiness Map</h1>
         <p style={{ color: "#555" }}>
-          High-level rollup across the current Veritas Atlas operational system.
+          Final readiness map across the major Veritas Atlas operational surfaces.
         </p>
         <nav style={{ display: "flex", gap: 16, marginTop: 12, flexWrap: "wrap" }}>
           <Link to="/">Home</Link>
-          <Link to="/executive-readout-workspace">Executive Readout</Link>
+          <Link to="/system-readiness-map">System Readiness Map</Link>
           <Link to="/release-readiness-hub">Release Readiness Hub</Link>
-          <Link to="/ops-coordination-center">Ops Coordination</Link>
-        </nav>
-      </header>
-
-      <ExecutiveReadoutPanel items={items} />
-    </div>
-  );
-}
-'@
-
-Write-File (Join-Path $web "pages\OperationalPortfolioPage.tsx") @'
-import { Link } from "react-router-dom";
-import { useCases } from "../hooks/useCases";
-import { useClaims } from "../hooks/useClaims";
-import { useContradictions } from "../hooks/useContradictions";
-import { PortfolioRollupPanel } from "../components/PortfolioRollupPanel";
-
-export function OperationalPortfolioPage() {
-  const casesQuery = useCases();
-  const claimsQuery = useClaims();
-  const contradictionsQuery = useContradictions();
-
-  const metrics = [
-    { label: "Cases", value: casesQuery.data?.items.length ?? 0 },
-    { label: "Claims", value: claimsQuery.data?.items.length ?? 0 },
-    { label: "Contradictions", value: contradictionsQuery.data?.items.length ?? 0 },
-    { label: "Open Review Work", value: contradictionsQuery.data?.items.filter(x => x.status !== "Resolved").length ?? 0 },
-  ];
-
-  return (
-    <div style={{ fontFamily: "Arial, sans-serif", padding: 24 }}>
-      <header style={{ marginBottom: 24 }}>
-        <h1 style={{ margin: 0 }}>Operational Portfolio</h1>
-        <p style={{ color: "#555" }}>
-          Rollup across the major operational entities in the platform.
-        </p>
-        <nav style={{ display: "flex", gap: 16, marginTop: 12, flexWrap: "wrap" }}>
-          <Link to="/operational-portfolio">Operational Portfolio</Link>
-          <Link to="/case-explorer">Case Explorer</Link>
-          <Link to="/knowledge-graph-hub">Knowledge Graph Hub</Link>
-        </nav>
-      </header>
-
-      <PortfolioRollupPanel metrics={metrics} />
-    </div>
-  );
-}
-'@
-
-Write-File (Join-Path $web "pages\OpsFinalizationWorkspacePage.tsx") @'
-import { Link } from "react-router-dom";
-import { OpsFinalizationPanel } from "../components/OpsFinalizationPanel";
-
-export function OpsFinalizationWorkspacePage() {
-  const items = [
-    { label: "Core entity pages", status: "Ready" },
-    { label: "Case explorer surfaces", status: "Ready" },
-    { label: "Contradiction workflow surfaces", status: "Ready" },
-    { label: "Review and publication shells", status: "Ready" },
-    { label: "Decision and readiness layers", status: "Ready" },
-    { label: "Final business-depth pass", status: "Pending" },
-  ];
-
-  return (
-    <div style={{ fontFamily: "Arial, sans-serif", padding: 24 }}>
-      <header style={{ marginBottom: 24 }}>
-        <h1 style={{ margin: 0 }}>Ops Finalization Workspace</h1>
-        <p style={{ color: "#555" }}>
-          Final surface for consolidating operational completion before deeper backend and business logic passes.
-        </p>
-        <nav style={{ display: "flex", gap: 16, marginTop: 12, flexWrap: "wrap" }}>
           <Link to="/ops-finalization-workspace">Ops Finalization</Link>
-          <Link to="/delivery-closeout">Delivery Closeout</Link>
-          <Link to="/release-readiness-hub">Release Readiness Hub</Link>
         </nav>
       </header>
 
-      <OpsFinalizationPanel items={items} />
+      <SystemReadinessMapPanel nodes={nodes} />
+    </div>
+  );
+}
+'@
+
+Write-File (Join-Path $web "pages\OperatorCockpitPage.tsx") @'
+import { Link } from "react-router-dom";
+import { OperatorCockpitPanel } from "../components/OperatorCockpitPanel";
+
+export function OperatorCockpitPage() {
+  return (
+    <div style={{ fontFamily: "Arial, sans-serif", padding: 24 }}>
+      <header style={{ marginBottom: 24 }}>
+        <h1 style={{ margin: 0 }}>Operator Cockpit</h1>
+        <p style={{ color: "#555" }}>
+          Central operator surface for jumping across all major execution workspaces.
+        </p>
+        <nav style={{ display: "flex", gap: 16, marginTop: 12, flexWrap: "wrap" }}>
+          <Link to="/operator-cockpit">Operator Cockpit</Link>
+          <Link to="/ops-coordination-center">Ops Coordination</Link>
+          <Link to="/delivery-closeout">Delivery Closeout</Link>
+        </nav>
+      </header>
+
+      <OperatorCockpitPanel />
+    </div>
+  );
+}
+'@
+
+Write-File (Join-Path $web "pages\FinalControlCenterPage.tsx") @'
+import { Link } from "react-router-dom";
+import { FinalControlSummaryPanel } from "../components/FinalControlSummaryPanel";
+
+export function FinalControlCenterPage() {
+  const metrics = [
+    { label: "Operational breadth", value: "High" },
+    { label: "Core workflows", value: "Implemented" },
+    { label: "Governance and publication depth", value: "Partial" },
+    { label: "Next focus", value: "Deeper backend + business logic" },
+  ];
+
+  return (
+    <div style={{ fontFamily: "Arial, sans-serif", padding: 24 }}>
+      <header style={{ marginBottom: 24 }}>
+        <h1 style={{ margin: 0 }}>Final Control Center</h1>
+        <p style={{ color: "#555" }}>
+          Final high-level control surface summarizing the current Veritas Atlas state.
+        </p>
+        <nav style={{ display: "flex", gap: 16, marginTop: 12, flexWrap: "wrap" }}>
+          <Link to="/final-control-center">Final Control Center</Link>
+          <Link to="/executive-readout-workspace">Executive Readout</Link>
+          <Link to="/system-readiness-map">System Readiness Map</Link>
+        </nav>
+      </header>
+
+      <FinalControlSummaryPanel metrics={metrics} />
     </div>
   );
 }
@@ -350,21 +309,21 @@ export function OpsFinalizationWorkspacePage() {
 $main = Join-Path $web "main.tsx"
 $content = Get-Content $main -Raw
 
-$content = Ensure-ImportLine -Content $content -Anchor 'import { DashboardPage } from "./pages/DashboardPage";' -ImportLine 'import { ExecutiveReadoutWorkspacePage } from "./pages/ExecutiveReadoutWorkspacePage";'
-$content = Ensure-ImportLine -Content $content -Anchor 'import { ExecutiveReadoutWorkspacePage } from "./pages/ExecutiveReadoutWorkspacePage";' -ImportLine 'import { OperationalPortfolioPage } from "./pages/OperationalPortfolioPage";'
-$content = Ensure-ImportLine -Content $content -Anchor 'import { OperationalPortfolioPage } from "./pages/OperationalPortfolioPage";' -ImportLine 'import { OpsFinalizationWorkspacePage } from "./pages/OpsFinalizationWorkspacePage";'
+$content = Ensure-ImportLine -Content $content -Anchor 'import { DashboardPage } from "./pages/DashboardPage";' -ImportLine 'import { SystemReadinessMapPage } from "./pages/SystemReadinessMapPage";'
+$content = Ensure-ImportLine -Content $content -Anchor 'import { SystemReadinessMapPage } from "./pages/SystemReadinessMapPage";' -ImportLine 'import { OperatorCockpitPage } from "./pages/OperatorCockpitPage";'
+$content = Ensure-ImportLine -Content $content -Anchor 'import { OperatorCockpitPage } from "./pages/OperatorCockpitPage";' -ImportLine 'import { FinalControlCenterPage } from "./pages/FinalControlCenterPage";'
 
-$content = Ensure-NavBlock -Content $content -Anchor '<Link to="/release-readiness-hub">Release Readiness Hub</Link>' -NavBlock '<Link to="/executive-readout-workspace">Executive Readout</Link>
-          <Link to="/operational-portfolio">Operational Portfolio</Link>
-          <Link to="/ops-finalization-workspace">Ops Finalization</Link>' -PresencePattern 'to="/executive-readout-workspace"'
+$content = Ensure-NavBlock -Content $content -Anchor '<Link to="/release-readiness-hub">Release Readiness Hub</Link>' -NavBlock '<Link to="/system-readiness-map">System Readiness Map</Link>
+          <Link to="/operator-cockpit">Operator Cockpit</Link>
+          <Link to="/final-control-center">Final Control Center</Link>' -PresencePattern 'to="/system-readiness-map"'
 
-$content = Ensure-RouteBlock -Content $content -AnchorRoute '{ path: "/release-readiness-hub", element: <ReleaseReadinessHubPage /> },' -RouteBlock '{ path: "/executive-readout-workspace", element: <ExecutiveReadoutWorkspacePage /> },
-  { path: "/operational-portfolio", element: <OperationalPortfolioPage /> },
-  { path: "/ops-finalization-workspace", element: <OpsFinalizationWorkspacePage /> },' -PresencePattern 'path: "/executive-readout-workspace"'
+$content = Ensure-RouteBlock -Content $content -AnchorRoute '{ path: "/release-readiness-hub", element: <ReleaseReadinessHubPage /> },' -RouteBlock '{ path: "/system-readiness-map", element: <SystemReadinessMapPage /> },
+  { path: "/operator-cockpit", element: <OperatorCockpitPage /> },
+  { path: "/final-control-center", element: <FinalControlCenterPage /> },' -PresencePattern 'path: "/system-readiness-map"'
 
 Write-File $main $content
 
 Write-Host "Building..." -ForegroundColor Cyan
 Build-All -RootDir $RootDir
 
-Write-Host "Phase 6.32 DONE" -ForegroundColor Green
+Write-Host "Phase 6.33 DONE" -ForegroundColor Green

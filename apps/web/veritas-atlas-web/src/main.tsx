@@ -45,6 +45,9 @@ import { PublicationDeskPage } from "./pages/PublicationDeskPage";
 import { CaseDetailPage } from "./pages/CaseDetailPage";
 import { ReviewsPage } from "./pages/ReviewsPage";
 import { DashboardPage } from "./pages/DashboardPage";
+import { ExecutiveReadoutWorkspacePage } from "./pages/ExecutiveReadoutWorkspacePage";
+import { OperationalPortfolioPage } from "./pages/OperationalPortfolioPage";
+import { OpsFinalizationWorkspacePage } from "./pages/OpsFinalizationWorkspacePage";
 import { ReleaseReadinessHubPage } from "./pages/ReleaseReadinessHubPage";
 import { DeliveryCloseoutWorkspacePage } from "./pages/DeliveryCloseoutWorkspacePage";
 import { OpsCoordinationCenterPage } from "./pages/OpsCoordinationCenterPage";
@@ -92,6 +95,9 @@ function Layout({ children }: { children: React.ReactNode }) {
           <Link to="/decision-intelligence">Decision Intelligence</Link>
 <Link to="/knowledge-graph-hub">Knowledge Graph Hub</Link>
 <Link to="/release-readiness-hub">Release Readiness Hub</Link>
+<Link to="/executive-readout-workspace">Executive Readout</Link>
+          <Link to="/operational-portfolio">Operational Portfolio</Link>
+          <Link to="/ops-finalization-workspace">Ops Finalization</Link>
           <Link to="/delivery-closeout">Delivery Closeout</Link>
           <Link to="/ops-coordination-center">Ops Coordination</Link>
           <Link to="/publication-governance">Publication Governance</Link>
@@ -242,6 +248,9 @@ const router = createBrowserRouter([
   { path: "/decision-intelligence", element: <DecisionIntelligencePage /> },
 { path: "/knowledge-graph-hub", element: <KnowledgeGraphHubPage /> },
 { path: "/release-readiness-hub", element: <ReleaseReadinessHubPage /> },
+{ path: "/executive-readout-workspace", element: <ExecutiveReadoutWorkspacePage /> },
+  { path: "/operational-portfolio", element: <OperationalPortfolioPage /> },
+  { path: "/ops-finalization-workspace", element: <OpsFinalizationWorkspacePage /> },
   { path: "/delivery-closeout", element: <DeliveryCloseoutWorkspacePage /> },
   { path: "/ops-coordination-center", element: <OpsCoordinationCenterPage /> },
   { path: "/publication-governance", element: <PublicationGovernanceWorkspacePage /> },
