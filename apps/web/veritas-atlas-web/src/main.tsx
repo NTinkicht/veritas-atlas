@@ -32,6 +32,7 @@ import { StatementDetailPage } from "./pages/StatementDetailPage";
 import { ClaimsPage } from "./pages/ClaimsPage";
 import { ClaimDetailPage } from "./pages/ClaimDetailPage";
 import { ClaimsWorkspacePage } from "./pages/ClaimsWorkspacePage";
+import { ContradictionsWorkspacePage } from "./pages/ContradictionsWorkspacePage";
 import { CaseDetailPage } from "./pages/CaseDetailPage";
 import { ReviewsPage } from "./pages/ReviewsPage";
 import { DashboardPage } from "./pages/DashboardPage";
@@ -61,6 +62,7 @@ function Layout({ children }: { children: React.ReactNode }) {
           <Link to="/statements">Statements</Link>
           <Link to="/claims">Claims</Link>
           <Link to="/claims/workspace">Claims Workspace</Link>
+          <Link to="/contradictions/workspace">Contradictions Workspace</Link>
           <Link to="/sources/new">New Source</Link>
           <Link to="/documents/new">New Document</Link>
           <Link to="/evidence/new">New Evidence</Link>
@@ -76,13 +78,13 @@ function HomePage() {
   return (
     <Layout>
       <h2>Home</h2>
-      <p>Claim operational UX pack is now available.</p>
+      <p>Claim-to-contradiction operational pack is now available.</p>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "16px", marginTop: "20px" }}>
         <QuickCard title="Statements" text="Inspect extracted statements and linked claims." to="/statements" />
         <QuickCard title="Claims" text="Browse, filter, and inspect claims." to="/claims" />
         <QuickCard title="Claims Workspace" text="Create claims from statement context." to="/claims/workspace" />
-        <QuickCard title="Evidence" text="Jump from evidence to statements and claims." to="/evidence" />
+        <QuickCard title="Contradictions Workspace" text="Prepare contradiction review from statements and claims." to="/contradictions/workspace" />
       </div>
     </Layout>
   );
@@ -178,6 +180,7 @@ const router = createBrowserRouter([
   { path: "/claims", element: <ClaimsPage /> },
   { path: "/claims/:id", element: <ClaimDetailPage /> },
   { path: "/claims/workspace", element: <ClaimsWorkspacePage /> },
+  { path: "/contradictions/workspace", element: <ContradictionsWorkspacePage /> },
 ]);
 
 ReactDOM.createRoot(document.getElementById("root")!).render(

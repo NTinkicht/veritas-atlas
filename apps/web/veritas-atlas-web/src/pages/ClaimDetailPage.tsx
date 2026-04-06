@@ -25,6 +25,7 @@ export function ClaimDetailPage() {
         <Link to="/claims">Back to Claims</Link>
         <Link to={`/statements/${item.statementId}`}>Statement</Link>
         {item.caseId && <Link to={`/cases/${item.caseId}`}>Case</Link>}
+        <Link to={`/contradictions/workspace?claimId=${item.id}&statementId=${item.statementId}`}>Contradictions Workspace</Link>
       </nav>
 
       <h1 style={{ marginTop: 0 }}>Claim</h1>
@@ -45,6 +46,7 @@ export function ClaimDetailPage() {
       <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
         <Link to={`/statements/${item.statementId}`} style={actionLinkStyle}>Open Statement</Link>
         <Link to={`/claims?statementId=${item.statementId}`} style={actionLinkStyle}>More Claims for Statement</Link>
+        <Link to={`/contradictions/workspace?claimId=${item.id}&statementId=${item.statementId}`} style={actionLinkStyle}>Open Contradictions Workspace</Link>
       </div>
     </div>
   );

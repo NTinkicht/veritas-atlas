@@ -45,6 +45,7 @@ export function ClaimsWorkspacePage() {
           <Link to="/">Home</Link>
           <Link to="/statements">Statements</Link>
           <Link to="/claims">Claims</Link>
+          <Link to="/contradictions/workspace">Contradictions Workspace</Link>
           {statementId && <Link to={`/statements/${statementId}`}>Statement</Link>}
         </nav>
       </header>
@@ -65,6 +66,7 @@ export function ClaimsWorkspacePage() {
               <Link to={`/evidence/${statementQuery.data.evidenceId}`} style={actionLinkStyle}>Open Evidence</Link>
             )}
             <Link to={`/claims?statementId=${statementQuery.data.id}`} style={actionLinkStyle}>Open Claims for Statement</Link>
+            <Link to={`/contradictions/workspace?statementId=${statementQuery.data.id}`} style={actionLinkStyle}>Prepare Contradiction Review</Link>
           </div>
         </div>
       )}
@@ -120,6 +122,7 @@ export function ClaimsWorkspacePage() {
               <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
                 <Link to={`/claims/${createClaimMutation.data.id}`}>Open Claim Detail</Link>
                 <Link to={`/claims?statementId=${createClaimMutation.data.statementId}`}>Open Claim List</Link>
+                <Link to={`/contradictions/workspace?claimId=${createClaimMutation.data.id}&statementId=${createClaimMutation.data.statementId}`}>Open Contradictions Workspace</Link>
               </div>
             </div>
           )}

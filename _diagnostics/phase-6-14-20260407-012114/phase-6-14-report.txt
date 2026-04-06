@@ -1,0 +1,3 @@
+﻿Phase 6.14 claim to contradiction operational pack
+Generated: 2026-04-07T01:21:14
+Root: C:\Projects\veritas-atlas

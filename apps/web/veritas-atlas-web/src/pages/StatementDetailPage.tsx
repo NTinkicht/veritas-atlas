@@ -27,6 +27,7 @@ export function StatementDetailPage() {
         <Link to="/statements">Back to Statements</Link>
         {item.evidenceId && <Link to={`/evidence/${item.evidenceId}`}>Evidence</Link>}
         <Link to={`/claims/workspace?statementId=${item.id}`}>Claims Workspace</Link>
+        <Link to={`/contradictions/workspace?statementId=${item.id}`}>Contradictions Workspace</Link>
       </nav>
 
       <h1 style={{ marginTop: 0 }}>Statement</h1>
@@ -49,6 +50,7 @@ export function StatementDetailPage() {
         <div style={{ display: "flex", gap: "12px", flexWrap: "wrap", marginBottom: "12px" }}>
           <Link to={`/claims/workspace?statementId=${item.id}`} style={actionLinkStyle}>Create Claim</Link>
           <Link to={`/claims?statementId=${item.id}`} style={actionLinkStyle}>Open Claims for Statement</Link>
+          <Link to={`/contradictions/workspace?statementId=${item.id}`} style={actionLinkStyle}>Prepare Contradiction Review</Link>
         </div>
 
         {claimsQuery.isLoading && <p>Loading claims...</p>}

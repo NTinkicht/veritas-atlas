@@ -46,8 +46,14 @@ export function ClaimsPage() {
           <Link to="/statements">Statements</Link>
           <Link to="/claims">Claims</Link>
           <Link to="/claims/workspace">Claims Workspace</Link>
+          <Link to="/contradictions/workspace">Contradictions Workspace</Link>
         </nav>
       </header>
+
+      <div style={{ marginBottom: "16px", display: "flex", gap: "12px", flexWrap: "wrap" }}>
+        <Link to={statementId ? `/claims/workspace?statementId=${statementId}` : "/claims/workspace"} style={actionLinkStyle}>Open Claims Workspace</Link>
+        <Link to="/contradictions/workspace" style={actionLinkStyle}>Open Contradictions Workspace</Link>
+      </div>
 
       {statementId && (
         <div style={hintCardStyle}>
@@ -95,7 +101,7 @@ export function ClaimsPage() {
                     <th style={thStyle}>Status</th>
                     <th style={thStyle}>Material</th>
                     <th style={thStyle}>Statement</th>
-                    <th style={thStyle}>Created</th>
+                    <th style={thStyle}>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -106,7 +112,13 @@ export function ClaimsPage() {
                       <td style={tdStyle}>{item.status}</td>
                       <td style={tdStyle}>{item.isMaterial ? "Yes" : "No"}</td>
                       <td style={tdStyle}><Link to={`/statements/${item.statementId}`}>{item.statementId}</Link></td>
-                      <td style={tdStyle}>{new Date(item.createdAtUtc).toLocaleString()}</td>
+                      <td style={tdStyle}>
+                        <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                          <Link to={`/claims/${item.id}`}>Detail</Link>
+                          <Link to={`/claims/workspace?statementId=${item.statementId}`}>Workspace</Link>
+                          <Link to={`/contradictions/workspace?claimId=${item.id}&statementId=${item.statementId}`}>Contradictions</Link>
+                        </div>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -179,3 +191,12 @@ const selectStyle: React.CSSProperties = {
   background: "#fafafa",
 };
 
+const actionLinkStyle: React.CSSProperties = {
+  padding: "10px 16px",
+  borderRadius: "8px",
+  border: "1px solid #1976d2",
+  textDecoration: "none",
+  color: "inherit",
+  display: "inline-flex",
+  alignItems: "center",
+};
