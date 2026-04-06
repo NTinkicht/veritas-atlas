@@ -60,186 +60,337 @@ function Git-Checkpoint {
 }
 
 function Build-Backend {
-    Push-Location (Join-Path $RootDir "apps/api")
-    try {
-        dotnet build
-        if ($LASTEXITCODE -ne 0) {
-            throw "Backend build failed."
+    param([Parameter(Mandatory = $true)][string]$RootDir)
+
+    $solutionPath = Join-Path $RootDir "VeritasAtlas.slnx"
+    $apiDir = Join-Path $RootDir "apps\api"
+
+    if (Test-Path $solutionPath) {
+        Push-Location $RootDir
+        try {
+            dotnet build $solutionPath
+            if ($LASTEXITCODE -ne 0) { throw "Backend build failed." }
         }
+        finally { Pop-Location }
+        return
     }
-    finally {
-        Pop-Location
+
+    if (Test-Path $apiDir) {
+        Push-Location $apiDir
+        try {
+            dotnet build
+            if ($LASTEXITCODE -ne 0) { throw "Backend build failed." }
+        }
+        finally { Pop-Location }
+        return
     }
+
+    throw "Could not find solution or api directory."
 }
 
 function Build-Frontend {
-    Push-Location (Join-Path $RootDir "apps/web/veritas-atlas-web")
+    param([Parameter(Mandatory = $true)][string]$RootDir)
+
+    $frontendDir = Join-Path $RootDir "apps\web\veritas-atlas-web"
+    if (-not (Test-Path $frontendDir)) {
+        throw "Frontend directory not found: $frontendDir"
+    }
+
+    Push-Location $frontendDir
     try {
         npm run build
-        if ($LASTEXITCODE -ne 0) {
-            throw "Frontend build failed."
+        if ($LASTEXITCODE -ne 0) { throw "Frontend build failed." }
+    }
+    finally { Pop-Location }
+}
+
+function Ensure-ImportLine {
+    param(
+        [Parameter(Mandatory = $true)][string]$Content,
+        [Parameter(Mandatory = $true)][string]$Anchor,
+        [Parameter(Mandatory = $true)][string]$ImportLine
+    )
+
+    if ($Content -match [regex]::Escape($ImportLine)) {
+        return $Content
+    }
+
+    return $Content -replace [regex]::Escape($Anchor), ($Anchor + [Environment]::NewLine + $ImportLine)
+}
+
+function Ensure-NavLinks {
+    param([Parameter(Mandatory = $true)][string]$Content)
+
+    if ($Content -notmatch 'to="/review-queue"') {
+        $Content = $Content -replace '<Link to="/reviews">Reviews</Link>', '<Link to="/reviews">Reviews</Link>
+          <Link to="/review-queue">Review Queue</Link>
+          <Link to="/review-workspace">Review Workspace</Link>
+          <Link to="/publication-desk">Publication Desk</Link>'
+    }
+
+    return $Content
+}
+
+function Ensure-Routes {
+    param([Parameter(Mandatory = $true)][string]$Content)
+
+    $patterns = @(
+        'path: "/review-queue"',
+        'path: "/review-workspace"',
+        'path: "/publication-desk"'
+    )
+
+    $allExist = $true
+    foreach ($pattern in $patterns) {
+        if ($Content -notmatch $pattern) {
+            $allExist = $false
         }
     }
-    finally {
-        Pop-Location
+
+    if (-not $allExist) {
+        $Content = $Content -replace '\{ path: "/reviews", element: <ReviewsPage /> \},', '{ path: "/reviews", element: <ReviewsPage /> },
+  { path: "/review-queue", element: <ReviewQueuePage /> },
+  { path: "/review-workspace", element: <ReviewWorkspacePage /> },
+  { path: "/publication-desk", element: <PublicationDeskPage /> },'
     }
+
+    return $Content
 }
 
 Write-Host "Checkpointing current code with git..."
-Git-Checkpoint -Message ("checkpoint before phase 6.16 - " + (Get-Date -Format "yyyy-MM-dd HH:mm:ss"))
+Git-Checkpoint -Message ("checkpoint before phase 6.17 - " + (Get-Date -Format "yyyy-MM-dd HH:mm:ss"))
 
-Write-Host "Applying Phase 6.16 - Large Scope - Operations Intelligence Layer..."
+Write-Host "Applying Phase 6.17 - Large Scope - Review and Publication Operations Pack..."
 
-$webRoot = Join-Path $RootDir "apps/web/veritas-atlas-web/src"
+$webRoot = Join-Path $RootDir "apps\web\veritas-atlas-web\src"
 
-$operationsIntelligencePath = Join-Path $webRoot "pages/OperationsIntelligencePage.tsx"
-$investigationNavigatorPath = Join-Path $webRoot "pages/InvestigationNavigatorPage.tsx"
-$agentActivityPanelPath = Join-Path $webRoot "components/AgentActivityPanel.tsx"
-$systemTimelinePanelPath = Join-Path $webRoot "components/SystemTimelinePanel.tsx"
+$reviewQueuePath = Join-Path $webRoot "pages\ReviewQueuePage.tsx"
+$reviewWorkspacePath = Join-Path $webRoot "pages\ReviewWorkspacePage.tsx"
+$publicationDeskPath = Join-Path $webRoot "pages\PublicationDeskPage.tsx"
 $mainPath = Join-Path $webRoot "main.tsx"
 
-Write-Utf8File -Path $operationsIntelligencePath -Content @'
-import React from "react";
+Write-Utf8File -Path $reviewQueuePath -Content @'
 import { Link } from "react-router-dom";
-import { AgentActivityPanel } from "../components/AgentActivityPanel";
-import { SystemTimelinePanel } from "../components/SystemTimelinePanel";
+import { useClaims } from "../hooks/useClaims";
 
-export function OperationsIntelligencePage() {
+export function ReviewQueuePage() {
+  const claimsQuery = useClaims();
+
+  const queueItems = (claimsQuery.data?.items ?? []).slice(0, 12);
+
   return (
-    <div style={{ padding: 24 }}>
-      <h1>Operations Intelligence</h1>
-      <p>System-wide monitoring of cases, claims, contradictions, and agent activity.</p>
+    <div style={{ padding: 24, fontFamily: "Arial, sans-serif" }}>
+      <h1>Review Queue</h1>
+      <p>Operational queue for human review across claims and contradiction preparation.</p>
 
       <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 20 }}>
-        <Link to="/dashboard">Dashboard</Link>
-        <Link to="/operations">Operations Hub</Link>
-        <Link to="/navigator">Navigator</Link>
+        <Link to="/reviews">Reviews</Link>
+        <Link to="/review-workspace">Review Workspace</Link>
+        <Link to="/publication-desk">Publication Desk</Link>
         <Link to="/claims">Claims</Link>
-        <Link to="/contradictions/workspace">Contradictions Workspace</Link>
       </div>
 
-      <section style={{ marginBottom: 24 }}>
-        <h2>Live Metrics</h2>
-        <ul>
-          <li>Total Cases (placeholder)</li>
-          <li>Active Investigations (placeholder)</li>
-          <li>Pending Reviews (placeholder)</li>
-          <li>Agent Runs Today (placeholder)</li>
+      <section style={panelStyle}>
+        <h2 style={{ marginTop: 0 }}>Queue summary</h2>
+        <div style={summaryGridStyle}>
+          <SummaryCard title="Claims available" value={claimsQuery.data?.items.length ?? 0} />
+          <SummaryCard title="Ready for review" value={queueItems.length} />
+          <SummaryCard title="Escalation candidates" value={Math.min(queueItems.length, 3)} />
+        </div>
+      </section>
+
+      <section style={panelStyle}>
+        <h2 style={{ marginTop: 0 }}>Current queue</h2>
+        {claimsQuery.isLoading && <p>Loading queue...</p>}
+        {claimsQuery.isError && <p style={{ color: "crimson" }}>Failed to load queue.</p>}
+        {claimsQuery.isSuccess && queueItems.length === 0 && <p>No review items yet.</p>}
+        {claimsQuery.isSuccess && queueItems.length > 0 && (
+          <ul style={{ marginBottom: 0 }}>
+            {queueItems.map((item) => (
+              <li key={item.id}>
+                <Link to={`/claims/${item.id}`}>{item.topic}</Link> - {item.type} - {item.status}
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+    </div>
+  );
+}
+
+function SummaryCard({ title, value }: { title: string; value: number }) {
+  return (
+    <div style={summaryCardStyle}>
+      <span style={{ color: "#666" }}>{title}</span>
+      <strong style={{ fontSize: 28 }}>{value}</strong>
+    </div>
+  );
+}
+
+const panelStyle: React.CSSProperties = {
+  border: "1px solid #ddd",
+  borderRadius: 14,
+  padding: 16,
+  marginBottom: 20,
+};
+
+const summaryGridStyle: React.CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+  gap: 16,
+};
+
+const summaryCardStyle: React.CSSProperties = {
+  border: "1px solid #eee",
+  borderRadius: 12,
+  padding: 16,
+  display: "grid",
+  gap: 8,
+};
+'@
+
+Write-Utf8File -Path $reviewWorkspacePath -Content @'
+import { Link, useSearchParams } from "react-router-dom";
+import { useClaimDetail } from "../hooks/useClaimDetail";
+
+export function ReviewWorkspacePage() {
+  const [params] = useSearchParams();
+  const claimId = params.get("claimId") ?? "";
+  const claimQuery = useClaimDetail(claimId || undefined);
+
+  return (
+    <div style={{ padding: 24, fontFamily: "Arial, sans-serif", maxWidth: 980 }}>
+      <h1>Review Workspace</h1>
+      <p>Focused review surface for claim validation, escalation, and publication readiness.</p>
+
+      <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 20 }}>
+        <Link to="/review-queue">Review Queue</Link>
+        <Link to="/publication-desk">Publication Desk</Link>
+        {claimId && <Link to={`/claims/${claimId}`}>Claim</Link>}
+      </div>
+
+      <div style={panelStyle}>
+        <Row label="Claim Id" value={claimId || "N/A"} />
+        <Row label="Workspace Status" value="Ready for structured human review" />
+      </div>
+
+      {claimId && claimQuery.isLoading && <p>Loading claim context...</p>}
+      {claimId && claimQuery.isError && <p style={{ color: "crimson" }}>Failed to load claim context.</p>}
+
+      {claimId && claimQuery.isSuccess && claimQuery.data && (
+        <>
+          <div style={panelStyle}>
+            <h2 style={{ marginTop: 0 }}>Claim Context</h2>
+            <Row label="Topic" value={claimQuery.data.topic} />
+            <Row label="Type" value={claimQuery.data.type} />
+            <Row label="Status" value={claimQuery.data.status} />
+            <Row label="Material" value={claimQuery.data.isMaterial ? "Yes" : "No"} />
+            <Row label="Normalized Text" value={claimQuery.data.normalizedText} />
+          </div>
+
+          <div style={panelStyle}>
+            <h2 style={{ marginTop: 0 }}>Review actions</h2>
+            <ul style={{ marginBottom: 0 }}>
+              <li>Validate claim formulation</li>
+              <li>Check evidence alignment</li>
+              <li>Escalate to contradiction comparison</li>
+              <li>Mark ready for publication flow</li>
+            </ul>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function Row({ label, value }: { label: string; value: string }) {
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "180px 1fr", gap: 12, padding: "6px 0" }}>
+      <strong>{label}</strong>
+      <span>{value}</span>
+    </div>
+  );
+}
+
+const panelStyle: React.CSSProperties = {
+  border: "1px solid #ddd",
+  borderRadius: 14,
+  padding: 16,
+  marginBottom: 20,
+};
+'@
+
+Write-Utf8File -Path $publicationDeskPath -Content @'
+import { Link } from "react-router-dom";
+import { useClaims } from "../hooks/useClaims";
+
+export function PublicationDeskPage() {
+  const claimsQuery = useClaims();
+  const publicationCandidates = (claimsQuery.data?.items ?? []).slice(0, 8);
+
+  return (
+    <div style={{ padding: 24, fontFamily: "Arial, sans-serif" }}>
+      <h1>Publication Desk</h1>
+      <p>Operational surface for publication-ready outputs and final publication checks.</p>
+
+      <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 20 }}>
+        <Link to="/review-queue">Review Queue</Link>
+        <Link to="/review-workspace">Review Workspace</Link>
+        <Link to="/claims">Claims</Link>
+      </div>
+
+      <section style={panelStyle}>
+        <h2 style={{ marginTop: 0 }}>Publication readiness</h2>
+        <ul style={{ marginBottom: 0 }}>
+          <li>Claim quality and wording review</li>
+          <li>Evidence alignment check</li>
+          <li>Contradiction notes attached</li>
+          <li>Publication routing placeholder</li>
         </ul>
       </section>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-        <AgentActivityPanel />
-        <SystemTimelinePanel />
-      </div>
-
-      <section style={{ marginTop: 24 }}>
-        <h2>Activity Streams</h2>
-        <p>Recent claims, contradictions, and system events will appear here.</p>
+      <section style={panelStyle}>
+        <h2 style={{ marginTop: 0 }}>Candidate items</h2>
+        {claimsQuery.isLoading && <p>Loading publication candidates...</p>}
+        {claimsQuery.isError && <p style={{ color: "crimson" }}>Failed to load publication candidates.</p>}
+        {claimsQuery.isSuccess && publicationCandidates.length === 0 && <p>No publication candidates yet.</p>}
+        {claimsQuery.isSuccess && publicationCandidates.length > 0 && (
+          <ul style={{ marginBottom: 0 }}>
+            {publicationCandidates.map((item) => (
+              <li key={item.id}>
+                <Link to={`/claims/${item.id}`}>{item.topic}</Link> - {item.type} - {item.status}
+              </li>
+            ))}
+          </ul>
+        )}
       </section>
     </div>
   );
 }
-'@
 
-Write-Utf8File -Path $investigationNavigatorPath -Content @'
-import React from "react";
-import { Link } from "react-router-dom";
-
-export function InvestigationNavigatorPage() {
-  return (
-    <div style={{ padding: 24 }}>
-      <h1>Investigation Navigator</h1>
-      <p>Unified navigation across Cases, Claims, Statements, and Contradictions.</p>
-
-      <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 20 }}>
-        <Link to="/operations-intelligence">Operations Intelligence</Link>
-        <Link to="/operations">Operations Hub</Link>
-        <Link to="/statements">Statements</Link>
-        <Link to="/claims">Claims</Link>
-        <Link to="/contradictions/workspace">Contradictions Workspace</Link>
-      </div>
-
-      <section style={{ marginBottom: 24 }}>
-        <h2>Quick Access</h2>
-        <ul>
-          <li>Latest Claims</li>
-          <li>Latest Statements</li>
-          <li>Recent Contradictions</li>
-        </ul>
-      </section>
-
-      <section>
-        <h2>Cross-Linking</h2>
-        <p>Jump between related entities to follow the investigation graph.</p>
-      </section>
-    </div>
-  );
-}
-'@
-
-Write-Utf8File -Path $agentActivityPanelPath -Content @'
-import React from "react";
-
-export function AgentActivityPanel() {
-  return (
-    <div style={{ border: "1px solid #ccc", padding: 12, borderRadius: 8 }}>
-      <h3>Agent Activity</h3>
-      <ul>
-        <li>Extraction Agent - idle</li>
-        <li>Contradiction Agent - running</li>
-        <li>Confidence Agent - idle</li>
-      </ul>
-    </div>
-  );
-}
-'@
-
-Write-Utf8File -Path $systemTimelinePanelPath -Content @'
-import React from "react";
-
-export function SystemTimelinePanel() {
-  return (
-    <div style={{ border: "1px solid #ccc", padding: 12, borderRadius: 8 }}>
-      <h3>System Timeline</h3>
-      <p>Chronological events across the system.</p>
-    </div>
-  );
-}
+const panelStyle: React.CSSProperties = {
+  border: "1px solid #ddd",
+  borderRadius: 14,
+  padding: 16,
+  marginBottom: 20,
+};
 '@
 
 $mainContent = Get-Content $mainPath -Raw
 
-if ($mainContent -notmatch 'OperationsIntelligencePage') {
-    $mainContent = $mainContent -replace 'import \{ DashboardPage \} from "\./pages/DashboardPage";', @'
-import { DashboardPage } from "./pages/DashboardPage";
-import { OperationsIntelligencePage } from "./pages/OperationsIntelligencePage";
-import { InvestigationNavigatorPage } from "./pages/InvestigationNavigatorPage";
-'@
-}
+$mainContent = Ensure-ImportLine -Content $mainContent -Anchor 'import { ReviewsPage } from "./pages/ReviewsPage";' -ImportLine 'import { ReviewQueuePage } from "./pages/ReviewQueuePage";'
+$mainContent = Ensure-ImportLine -Content $mainContent -Anchor 'import { ReviewQueuePage } from "./pages/ReviewQueuePage";' -ImportLine 'import { ReviewWorkspacePage } from "./pages/ReviewWorkspacePage";'
+$mainContent = Ensure-ImportLine -Content $mainContent -Anchor 'import { ReviewWorkspacePage } from "./pages/ReviewWorkspacePage";' -ImportLine 'import { PublicationDeskPage } from "./pages/PublicationDeskPage";'
 
-if ($mainContent -notmatch 'path: "/operations-intelligence"') {
-    $mainContent = $mainContent -replace '\{ path: "/dashboard", element: <DashboardPage /> \},', @'
-{ path: "/dashboard", element: <DashboardPage /> },
-  { path: "/operations-intelligence", element: <OperationsIntelligencePage /> },
-  { path: "/investigation-navigator", element: <InvestigationNavigatorPage /> },
-'@
-}
-
-if ($mainContent -notmatch 'to="/operations-intelligence"') {
-    $mainContent = $mainContent -replace '<Link to="/dashboard">Dashboard</Link>', @'
-<Link to="/dashboard">Dashboard</Link>
-          <Link to="/operations-intelligence">Operations Intelligence</Link>
-          <Link to="/investigation-navigator">Investigation Navigator</Link>
-'@
-}
+$mainContent = Ensure-NavLinks -Content $mainContent
+$mainContent = Ensure-Routes -Content $mainContent
 
 Write-Utf8File -Path $mainPath -Content $mainContent
 
 Write-Host "Building backend..."
-Build-Backend
+Build-Backend -RootDir $RootDir
 
 Write-Host "Building frontend..."
-Build-Frontend
+Build-Frontend -RootDir $RootDir
 
-Write-Host "Phase 6.16 applied successfully."
+Write-Host "Phase 6.17 applied successfully."

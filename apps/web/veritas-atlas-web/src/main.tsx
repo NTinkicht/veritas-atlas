@@ -1,4 +1,4 @@
-﻿import React from "react";
+import React from "react";
 import ReactDOM from "react-dom/client";
 import {
   createBrowserRouter,
@@ -38,6 +38,7 @@ import { InvestigationNavigatorPage } from "./pages/InvestigationNavigatorPage";
 import { CaseDetailPage } from "./pages/CaseDetailPage";
 import { ReviewsPage } from "./pages/ReviewsPage";
 import { DashboardPage } from "./pages/DashboardPage";
+import { OperationsIntelligencePage } from "./pages/OperationsIntelligencePage";
 import "./index.css";
 
 const queryClient = new QueryClient();
@@ -51,6 +52,8 @@ function Layout({ children }: { children: React.ReactNode }) {
         <nav style={{ display: "flex", gap: "16px", marginTop: "12px", flexWrap: "wrap" }}>
           <Link to="/">Home</Link>
           <Link to="/dashboard">Dashboard</Link>
+          <Link to="/operations-intelligence">Operations Intelligence</Link>
+          <Link to="/investigation-navigator">Investigation Navigator</Link>
           <Link to="/health">Health</Link>
           <Link to="/operations">Operations Hub</Link>
           <Link to="/navigator">Navigator</Link>
@@ -160,6 +163,8 @@ function HealthPage() {
 const router = createBrowserRouter([
   { path: "/", element: <HomePage /> },
   { path: "/dashboard", element: <DashboardPage /> },
+  { path: "/operations-intelligence", element: <OperationsIntelligencePage /> },
+  { path: "/investigation-navigator", element: <InvestigationNavigatorPage /> },
   { path: "/health", element: <HealthPage /> },
   { path: "/operations", element: <OperationsHubPage /> },
   { path: "/navigator", element: <InvestigationNavigatorPage /> },
