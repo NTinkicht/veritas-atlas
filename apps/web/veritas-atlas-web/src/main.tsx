@@ -33,6 +33,8 @@ import { ClaimsPage } from "./pages/ClaimsPage";
 import { ClaimDetailPage } from "./pages/ClaimDetailPage";
 import { ClaimsWorkspacePage } from "./pages/ClaimsWorkspacePage";
 import { ContradictionsWorkspacePage } from "./pages/ContradictionsWorkspacePage";
+import { OperationsHubPage } from "./pages/OperationsHubPage";
+import { InvestigationNavigatorPage } from "./pages/InvestigationNavigatorPage";
 import { CaseDetailPage } from "./pages/CaseDetailPage";
 import { ReviewsPage } from "./pages/ReviewsPage";
 import { DashboardPage } from "./pages/DashboardPage";
@@ -50,6 +52,8 @@ function Layout({ children }: { children: React.ReactNode }) {
           <Link to="/">Home</Link>
           <Link to="/dashboard">Dashboard</Link>
           <Link to="/health">Health</Link>
+          <Link to="/operations">Operations Hub</Link>
+          <Link to="/navigator">Navigator</Link>
           <Link to="/persons">Persons</Link>
           <Link to="/persons/new">New Person</Link>
           <Link to="/cases">Cases</Link>
@@ -78,11 +82,11 @@ function HomePage() {
   return (
     <Layout>
       <h2>Home</h2>
-      <p>Claim-to-contradiction operational pack is now available.</p>
+      <p>Operational navigation pack is now available.</p>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "16px", marginTop: "20px" }}>
-        <QuickCard title="Statements" text="Inspect extracted statements and linked claims." to="/statements" />
-        <QuickCard title="Claims" text="Browse, filter, and inspect claims." to="/claims" />
+        <QuickCard title="Operations Hub" text="Monitor ingestion, statements, claims, and next actions." to="/operations" />
+        <QuickCard title="Navigator" text="Cross-search statements and claims using deep-link query patterns." to="/navigator" />
         <QuickCard title="Claims Workspace" text="Create claims from statement context." to="/claims/workspace" />
         <QuickCard title="Contradictions Workspace" text="Prepare contradiction review from statements and claims." to="/contradictions/workspace" />
       </div>
@@ -157,6 +161,8 @@ const router = createBrowserRouter([
   { path: "/", element: <HomePage /> },
   { path: "/dashboard", element: <DashboardPage /> },
   { path: "/health", element: <HealthPage /> },
+  { path: "/operations", element: <OperationsHubPage /> },
+  { path: "/navigator", element: <InvestigationNavigatorPage /> },
   { path: "/persons", element: <PersonsPage /> },
   { path: "/persons/new", element: <CreatePersonPage /> },
   { path: "/persons/:id", element: <PersonDetailPage /> },
