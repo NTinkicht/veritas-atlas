@@ -1,0 +1,124 @@
+﻿Statements controller restore smoke test
+Generated: 2026-04-06T23:59:23
+Root: C:\Projects\veritas-atlas
+
+========================================================================================================================
+StatementsController.cs
+========================================================================================================================
+using Microsoft.AspNetCore.Mvc;
+using VeritasAtlas.Api.Contracts.Statements;
+using VeritasAtlas.Application.Contracts.Statements;
+using VeritasAtlas.Application.Interfaces;
+using VeritasAtlas.Infrastructure.Services;
+
+namespace VeritasAtlas.Api.Controllers;
+
+[ApiController]
+[Route("api/v1/statements")]
+public class StatementsController : ControllerBase
+{
+    private readonly IStatementService _statementService;
+    private readonly StatementService _statementQueryService;
+
+    public StatementsController(
+        IStatementService statementService,
+        StatementService statementQueryService)
+    {
+        _statementService = statementService;
+        _statementQueryService = statementQueryService;
+    }
+
+    [HttpPost]
+    public async Task<ActionResult<CreateStatementResponse>> CreateStatement(
+        [FromBody] CreateStatementRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var entity = await _statementService.ExtractStatementAsync(
+            request.EvidenceId,
+            request.Text,
+            request.CreatedBy,
+            cancellationToken);
+
+        var response = new CreateStatementResponse(
+            entity.Id,
+            entity.EvidenceId,
+            entity.DocumentId,
+            entity.Text.ToString(),
+            entity.Polarity.ToString(),
+            entity.Status.ToString(),
+            entity.Topic,
+            entity.CreatedAtUtc,
+            entity.UpdatedAtUtc);
+
+        return Ok(response);
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> GetStatements([FromQuery] StatementListRequest request)
+    {
+        var (total, items) = await _statementQueryService.GetStatementsAsync(request.Page, request.PageSize);
+
+        return Ok(new
+        {
+            Total = total,
+            Page = request.Page,
+            PageSize = request.PageSize,
+            Items = items
+        });
+    }
+
+    [HttpGet("{id:guid}")]
+    public async Task<IActionResult> GetStatement(Guid id)
+    {
+        var result = await _statementQueryService.GetStatementByIdAsync(id);
+
+        if (result == null)
+        {
+            return NotFound();
+        }
+
+        return Ok(result);
+    }
+}
+
+========================================================================================================================
+POST /api/v1/sources
+========================================================================================================================
+{
+    "id":  "e7f69816-b4dd-4a11-be56-ca8d728f0de9",
+    "name":  "Statement Restore Source",
+    "type":  "Article",
+    "reference":  {
+                      "externalId":  null,
+                      "url":  "https://example.com/statement-restore",
+                      "domain":  "example.com",
+                      "languageCode":  null
+                  },
+    "status":  "Draft",
+    "createdAtUtc":  "2026-04-06T19:59:33.7310794Z",
+    "updatedAtUtc":  "2026-04-06T19:59:33.7311283Z"
+}
+
+========================================================================================================================
+POST /api/v1/documents
+========================================================================================================================
+{
+    "id":  "fbf7cd1f-5eb3-4d89-bcc9-2b4814bbfe19",
+    "sourceId":  "e7f69816-b4dd-4a11-be56-ca8d728f0de9",
+    "title":  "Statement Restore Document",
+    "status":  "Draft",
+    "createdAtUtc":  "2026-04-06T19:59:35.2140411Z",
+    "updatedAtUtc":  "2026-04-06T19:59:35.2140415Z"
+}
+
+========================================================================================================================
+POST /api/v1/evidence
+========================================================================================================================
+{
+    "id":  "67b089ec-dc2f-45ef-a5db-6a33561417bb",
+    "documentId":  "fbf7cd1f-5eb3-4d89-bcc9-2b4814bbfe19",
+    "quote":  "This is a quoted evidence snippet for the statement restore smoke test.",
+    "status":  "Pending",
+    "createdAtUtc":  "2026-04-06T19:59:35.8498561Z",
+    "updatedAtUtc":  "2026-04-06T19:59:35.8498562Z"
+}
