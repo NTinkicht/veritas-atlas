@@ -45,6 +45,10 @@ import { PublicationDeskPage } from "./pages/PublicationDeskPage";
 import { CaseDetailPage } from "./pages/CaseDetailPage";
 import { ReviewsPage } from "./pages/ReviewsPage";
 import { DashboardPage } from "./pages/DashboardPage";
+import { ReviewDecisionBoardPage } from "./pages/ReviewDecisionBoardPage";
+import { PublicationPipelinePage } from "./pages/PublicationPipelinePage";
+import { EvidenceTracePage } from "./pages/EvidenceTracePage";
+import { NarrativeBuilderPage } from "./pages/NarrativeBuilderPage";
 import { TruthReviewStudioPage } from "./pages/TruthReviewStudioPage";
 import { ContradictionResolutionWorkspacePage } from "./pages/ContradictionResolutionWorkspacePage";
 import { CaseScoreboardPage } from "./pages/CaseScoreboardPage";
@@ -74,6 +78,10 @@ function Layout({ children }: { children: React.ReactNode }) {
           <Link to="/cases">Cases</Link>
 <Link to="/case-explorer">Case Explorer</Link>
 <Link to="/truth-review-studio">Truth Review Studio</Link>
+<Link to="/review-decision-board">Review Decision Board</Link>
+          <Link to="/publication-pipeline">Publication Pipeline</Link>
+          <Link to="/evidence-trace">Evidence Trace</Link>
+          <Link to="/narrative-builder">Narrative Builder</Link>
           <Link to="/case-scoreboard">Case Scoreboard</Link>
           <Link to="/reviews">Reviews</Link>
           <Link to="/review-queue">Review Queue</Link>
@@ -212,6 +220,10 @@ const router = createBrowserRouter([
   { path: "/cases", element: <CasesPage /> },
 { path: "/case-explorer", element: <CaseExplorerPage /> },
 { path: "/truth-review-studio", element: <TruthReviewStudioPage /> },
+{ path: "/review-decision-board", element: <ReviewDecisionBoardPage /> },
+  { path: "/publication-pipeline", element: <PublicationPipelinePage /> },
+  { path: "/evidence-trace", element: <EvidenceTracePage /> },
+  { path: "/narrative-builder", element: <NarrativeBuilderPage /> },
   { path: "/contradiction-resolution/:id", element: <ContradictionResolutionWorkspacePage /> },
   { path: "/case-scoreboard", element: <CaseScoreboardPage /> },
   { path: "/case-explorer/:id", element: <CaseWorkbenchPage /> },
