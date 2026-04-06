@@ -25,12 +25,10 @@ function Write-Utf8File {
 $solutionPath = Join-Path $RootDir "VeritasAtlas.slnx"
 $webRoot = Join-Path $RootDir "apps\web\veritas-atlas-web"
 
-$controllerPath = Join-Path $RootDir "apps\api\VeritasAtlas.Api\Controllers\StatementsController.cs"
 $statementsApiPath = Join-Path $webRoot "src\api\statements.ts"
-$useStatementsPath = Join-Path $webRoot "src\hooks\useStatements.ts"
-$useStatementDetailPath = Join-Path $webRoot "src\hooks\useStatementDetail.ts"
-$statementsPagePath = Join-Path $webRoot "src\pages\StatementsPage.tsx"
+$createStatementPagePath = Join-Path $webRoot "src\pages\CreateStatementPage.tsx"
 $statementDetailPagePath = Join-Path $webRoot "src\pages\StatementDetailPage.tsx"
+$statementsPagePath = Join-Path $webRoot "src\pages\StatementsPage.tsx"
 $evidenceDetailPagePath = Join-Path $webRoot "src\pages\EvidenceDetailPage.tsx"
 $mainTsxPath = Join-Path $webRoot "src\main.tsx"
 
@@ -45,94 +43,16 @@ if ($LASTEXITCODE -ne 0) {
     throw "git add failed."
 }
 
-$commitMessage = "checkpoint before phase 6.8 - $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')"
+$commitMessage = "checkpoint before phase 6.9 - $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')"
 git commit -m $commitMessage 2>$null
 if ($LASTEXITCODE -ne 0) {
-    Write-Host "No new commit created. Continuing with phase 6.8." -ForegroundColor Yellow
+    Write-Host "No new commit created. Continuing with phase 6.9." -ForegroundColor Yellow
 }
 else {
     Write-Host "Created git commit: $commitMessage" -ForegroundColor Green
 }
 
 Pop-Location
-
-$controllerContent = @'
-using Microsoft.AspNetCore.Mvc;
-using VeritasAtlas.Api.Contracts.Statements;
-using VeritasAtlas.Application.Contracts.Statements;
-using VeritasAtlas.Application.Interfaces;
-using VeritasAtlas.Infrastructure.Services;
-
-namespace VeritasAtlas.Api.Controllers;
-
-[ApiController]
-[Route("api/v1/statements")]
-public class StatementsController : ControllerBase
-{
-    private readonly IStatementService _statementService;
-    private readonly StatementService _statementQueryService;
-
-    public StatementsController(
-        IStatementService statementService,
-        StatementService statementQueryService)
-    {
-        _statementService = statementService;
-        _statementQueryService = statementQueryService;
-    }
-
-    [HttpPost]
-    public async Task<ActionResult<CreateStatementResponse>> CreateStatement(
-        [FromBody] CreateStatementRequest request,
-        CancellationToken cancellationToken = default)
-    {
-        var entity = await _statementService.ExtractStatementAsync(
-            request.EvidenceId,
-            request.Text,
-            request.CreatedBy,
-            cancellationToken);
-
-        var response = new CreateStatementResponse(
-            entity.Id,
-            entity.EvidenceId,
-            entity.DocumentId,
-            entity.Text.Raw,
-            entity.Polarity.ToString(),
-            entity.Status.ToString(),
-            entity.Topic,
-            entity.CreatedAtUtc,
-            entity.UpdatedAtUtc);
-
-        return Ok(response);
-    }
-
-    [HttpGet]
-    public async Task<IActionResult> GetStatements([FromQuery] StatementListRequest request)
-    {
-        var (total, items) = await _statementQueryService.GetStatementsAsync(request.Page, request.PageSize);
-
-        return Ok(new
-        {
-            Total = total,
-            Page = request.Page,
-            PageSize = request.PageSize,
-            Items = items
-        });
-    }
-
-    [HttpGet("{id:guid}")]
-    public async Task<IActionResult> GetStatement(Guid id)
-    {
-        var result = await _statementQueryService.GetStatementByIdAsync(id);
-
-        if (result == null)
-        {
-            return NotFound();
-        }
-
-        return Ok(result);
-    }
-}
-'@
 
 $statementsApiContent = @'
 import { apiGet } from "./client";
@@ -145,6 +65,7 @@ export type StatementItem = {
   object: string | null;
   polarity: string;
   status: string;
+  evidenceId?: string | null;
   createdAt: string;
 };
 
@@ -177,124 +98,145 @@ export async function getStatementById(id: string): Promise<StatementDetail> {
 }
 '@
 
-$useStatementsContent = @'
-import { useQuery } from "@tanstack/react-query";
-import { getStatements } from "../api/statements";
+$createStatementPageContent = @'
+import { useState } from "react";
+import { Link, useSearchParams } from "react-router-dom";
+import { useCreateStatement } from "../hooks/useCreateStatement";
 
-export function useStatements() {
-  return useQuery({
-    queryKey: ["statements"],
-    queryFn: getStatements,
-  });
-}
-'@
+export function CreateStatementPage() {
+  const [params] = useSearchParams();
+  const initialEvidenceId = params.get("evidenceId") ?? "";
 
-$useStatementDetailContent = @'
-import { useQuery } from "@tanstack/react-query";
-import { getStatementById } from "../api/statements";
+  const [evidenceId, setEvidenceId] = useState(initialEvidenceId);
+  const [text, setText] = useState("");
+  const [createdBy, setCreatedBy] = useState("");
 
-export function useStatementDetail(id?: string) {
-  return useQuery({
-    queryKey: ["statement-detail", id],
-    queryFn: () => getStatementById(id!),
-    enabled: !!id,
-  });
-}
-'@
+  const mutation = useCreateStatement();
 
-$statementsPageContent = @'
-import { Link } from "react-router-dom";
-import { useStatements } from "../hooks/useStatements";
+  const submit = async (event: React.FormEvent) => {
+    event.preventDefault();
 
-export function StatementsPage() {
-  const query = useStatements();
+    await mutation.mutateAsync({
+      evidenceId,
+      text,
+      createdBy: createdBy || undefined,
+    });
+
+    setText("");
+  };
 
   return (
-    <div style={{ fontFamily: "Arial, sans-serif", padding: "24px" }}>
+    <div style={{ fontFamily: "Arial, sans-serif", padding: "24px", maxWidth: "760px" }}>
       <header style={{ marginBottom: "24px" }}>
-        <h1 style={{ margin: 0 }}>Statements</h1>
-        <p style={{ color: "#555" }}>Live statement catalog from Veritas Atlas API</p>
+        <h1 style={{ margin: 0 }}>Create Statement</h1>
+        <p style={{ color: "#555" }}>Extract a statement from an evidence item.</p>
         <nav style={{ display: "flex", gap: "16px", marginTop: "12px", flexWrap: "wrap" }}>
           <Link to="/">Home</Link>
-          <Link to="/dashboard">Dashboard</Link>
-          <Link to="/sources">Sources</Link>
-          <Link to="/documents">Documents</Link>
           <Link to="/evidence">Evidence</Link>
           <Link to="/statements">Statements</Link>
         </nav>
       </header>
 
-      {query.isLoading && <p>Loading statements...</p>}
+      <form onSubmit={submit} style={{ display: "grid", gap: "16px" }}>
+        <label style={labelStyle}>
+          <span>Evidence Id</span>
+          <input
+            value={evidenceId}
+            onChange={(e) => setEvidenceId(e.target.value)}
+            style={inputStyle}
+            placeholder="Enter evidence id"
+            required
+          />
+        </label>
 
-      {query.isError && (
-        <p style={{ color: "crimson" }}>
-          Failed to load statements: {(query.error as Error).message}
+        <label style={labelStyle}>
+          <span>Statement Text</span>
+          <textarea
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            style={{ ...inputStyle, minHeight: "140px", resize: "vertical" }}
+            placeholder="Enter extracted statement text"
+            required
+          />
+        </label>
+
+        <label style={labelStyle}>
+          <span>Created By</span>
+          <input
+            value={createdBy}
+            onChange={(e) => setCreatedBy(e.target.value)}
+            style={inputStyle}
+            placeholder="Optional creator"
+          />
+        </label>
+
+        <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
+          <button type="submit" style={buttonStyle} disabled={mutation.isPending}>
+            {mutation.isPending ? "Creating..." : "Create Statement"}
+          </button>
+          <Link to="/statements" style={linkButtonStyle}>Open Statements</Link>
+        </div>
+      </form>
+
+      {mutation.isError && (
+        <p style={{ color: "crimson", marginTop: "16px" }}>
+          Failed to create statement: {(mutation.error as Error).message}
         </p>
       )}
 
-      {query.isSuccess && (
-        <>
-          <p>Showing {query.data.items.length} of {query.data.total} statements</p>
-
-          {query.data.items.length === 0 ? (
-            <div style={emptyStateStyle}>
-              <p style={{ margin: 0 }}>No statements found.</p>
-            </div>
-          ) : (
-            <div style={{ overflowX: "auto" }}>
-              <table style={tableStyle}>
-                <thead>
-                  <tr>
-                    <th style={thStyle}>Text</th>
-                    <th style={thStyle}>Topic</th>
-                    <th style={thStyle}>Polarity</th>
-                    <th style={thStyle}>Status</th>
-                    <th style={thStyle}>Created</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {query.data.items.map((item) => (
-                    <tr key={item.id}>
-                      <td style={tdStyle}><Link to={`/statements/${item.id}`}>{item.text}</Link></td>
-                      <td style={tdStyle}>{item.topic ?? "N/A"}</td>
-                      <td style={tdStyle}>{item.polarity}</td>
-                      <td style={tdStyle}>{item.status}</td>
-                      <td style={tdStyle}>{new Date(item.createdAt).toLocaleString()}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </>
+      {mutation.isSuccess && (
+        <div style={successCardStyle}>
+          <p style={{ marginTop: 0 }}><strong>Statement created successfully.</strong></p>
+          <p style={{ marginBottom: "8px" }}>New statement id: {mutation.data.id}</p>
+          <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
+            <Link to={`/statements/${mutation.data.id}`}>Open Statement Detail</Link>
+            {mutation.data.evidenceId && <Link to={`/evidence/${mutation.data.evidenceId}`}>Back to Evidence</Link>}
+          </div>
+        </div>
       )}
     </div>
   );
 }
 
-const tableStyle: React.CSSProperties = {
+const labelStyle: React.CSSProperties = {
+  display: "grid",
+  gap: "8px",
+};
+
+const inputStyle: React.CSSProperties = {
   width: "100%",
-  borderCollapse: "collapse",
-  marginTop: "16px",
+  boxSizing: "border-box",
+  padding: "10px 12px",
+  borderRadius: "8px",
+  border: "1px solid #ccc",
+  font: "inherit",
 };
 
-const thStyle: React.CSSProperties = {
-  textAlign: "left",
-  borderBottom: "1px solid #ccc",
-  padding: "10px",
+const buttonStyle: React.CSSProperties = {
+  padding: "10px 16px",
+  borderRadius: "8px",
+  border: "1px solid #1976d2",
+  background: "#1976d2",
+  color: "white",
+  cursor: "pointer",
 };
 
-const tdStyle: React.CSSProperties = {
-  borderBottom: "1px solid #eee",
-  padding: "10px",
-  verticalAlign: "top",
+const linkButtonStyle: React.CSSProperties = {
+  padding: "10px 16px",
+  borderRadius: "8px",
+  border: "1px solid #1976d2",
+  textDecoration: "none",
+  color: "inherit",
+  display: "inline-flex",
+  alignItems: "center",
 };
 
-const emptyStateStyle: React.CSSProperties = {
-  border: "1px solid #eee",
+const successCardStyle: React.CSSProperties = {
+  marginTop: "20px",
+  padding: "16px",
+  border: "1px solid #d7e8d7",
   borderRadius: "12px",
-  padding: "20px",
-  color: "#666",
+  background: "#f8fff8",
 };
 '@
 
@@ -341,6 +283,11 @@ export function StatementDetailPage() {
         <Row label="Person Id" value={item.personId ?? "N/A"} />
         <Row label="Created" value={new Date(item.createdAt).toLocaleString()} />
       </div>
+
+      <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
+        {item.evidenceId && <Link to={`/evidence/${item.evidenceId}`} style={actionLinkStyle}>Open Evidence</Link>}
+        <Link to="/statements" style={actionLinkStyle}>Back to Statements</Link>
+      </div>
     </div>
   );
 }
@@ -359,6 +306,126 @@ const cardStyle: React.CSSProperties = {
   borderRadius: "12px",
   padding: "16px",
   marginBottom: "16px",
+};
+
+const actionLinkStyle: React.CSSProperties = {
+  padding: "10px 16px",
+  borderRadius: "8px",
+  border: "1px solid #1976d2",
+  textDecoration: "none",
+  color: "inherit",
+};
+'@
+
+$statementsPageContent = @'
+import { Link } from "react-router-dom";
+import { useStatements } from "../hooks/useStatements";
+
+export function StatementsPage() {
+  const query = useStatements();
+
+  return (
+    <div style={{ fontFamily: "Arial, sans-serif", padding: "24px" }}>
+      <header style={{ marginBottom: "24px" }}>
+        <h1 style={{ margin: 0 }}>Statements</h1>
+        <p style={{ color: "#555" }}>Live statement catalog from Veritas Atlas API</p>
+        <nav style={{ display: "flex", gap: "16px", marginTop: "12px", flexWrap: "wrap" }}>
+          <Link to="/">Home</Link>
+          <Link to="/dashboard">Dashboard</Link>
+          <Link to="/sources">Sources</Link>
+          <Link to="/documents">Documents</Link>
+          <Link to="/evidence">Evidence</Link>
+          <Link to="/statements">Statements</Link>
+        </nav>
+      </header>
+
+      <div style={{ marginBottom: "16px", display: "flex", gap: "12px", flexWrap: "wrap" }}>
+        <Link to="/statements/new" style={actionLinkStyle}>Create New Statement</Link>
+      </div>
+
+      {query.isLoading && <p>Loading statements...</p>}
+
+      {query.isError && (
+        <p style={{ color: "crimson" }}>
+          Failed to load statements: {(query.error as Error).message}
+        </p>
+      )}
+
+      {query.isSuccess && (
+        <>
+          <p>Showing {query.data.items.length} of {query.data.total} statements</p>
+
+          {query.data.items.length === 0 ? (
+            <div style={emptyStateStyle}>
+              <p style={{ margin: 0 }}>No statements found.</p>
+            </div>
+          ) : (
+            <div style={{ overflowX: "auto" }}>
+              <table style={tableStyle}>
+                <thead>
+                  <tr>
+                    <th style={thStyle}>Text</th>
+                    <th style={thStyle}>Topic</th>
+                    <th style={thStyle}>Polarity</th>
+                    <th style={thStyle}>Status</th>
+                    <th style={thStyle}>Evidence</th>
+                    <th style={thStyle}>Created</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {query.data.items.map((item) => (
+                    <tr key={item.id}>
+                      <td style={tdStyle}><Link to={`/statements/${item.id}`}>{item.text}</Link></td>
+                      <td style={tdStyle}>{item.topic ?? "N/A"}</td>
+                      <td style={tdStyle}>{item.polarity}</td>
+                      <td style={tdStyle}>{item.status}</td>
+                      <td style={tdStyle}>{item.evidenceId ? <Link to={`/evidence/${item.evidenceId}`}>{item.evidenceId}</Link> : "N/A"}</td>
+                      <td style={tdStyle}>{new Date(item.createdAt).toLocaleString()}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+const tableStyle: React.CSSProperties = {
+  width: "100%",
+  borderCollapse: "collapse",
+  marginTop: "16px",
+};
+
+const thStyle: React.CSSProperties = {
+  textAlign: "left",
+  borderBottom: "1px solid #ccc",
+  padding: "10px",
+};
+
+const tdStyle: React.CSSProperties = {
+  borderBottom: "1px solid #eee",
+  padding: "10px",
+  verticalAlign: "top",
+};
+
+const actionLinkStyle: React.CSSProperties = {
+  padding: "10px 16px",
+  borderRadius: "8px",
+  border: "1px solid #1976d2",
+  textDecoration: "none",
+  color: "inherit",
+  display: "inline-flex",
+  alignItems: "center",
+};
+
+const emptyStateStyle: React.CSSProperties = {
+  border: "1px solid #eee",
+  borderRadius: "12px",
+  padding: "20px",
+  color: "#666",
 };
 '@
 
@@ -385,7 +452,7 @@ export function EvidenceDetailPage() {
   }
 
   const item = query.data;
-  const relatedStatements = statementsQuery.data?.items.filter((x) => x.id && x.text) ?? [];
+  const relatedStatements = (statementsQuery.data?.items ?? []).filter((x) => x.evidenceId === item.id);
 
   return (
     <div style={{ fontFamily: "Arial, sans-serif", padding: "24px" }}>
@@ -418,8 +485,13 @@ export function EvidenceDetailPage() {
 
       <div style={cardStyle}>
         <h3 style={{ marginTop: 0 }}>Statements</h3>
+        <div style={{ display: "flex", gap: "12px", flexWrap: "wrap", marginBottom: "12px" }}>
+          <Link to={`/statements/new?evidenceId=${item.id}`} style={actionLinkStyle}>Create Statement for this Evidence</Link>
+          <Link to="/statements" style={actionLinkStyle}>Open Statements</Link>
+        </div>
+
         {statementsQuery.isLoading && <p>Loading statements...</p>}
-        {statementsQuery.isSuccess && relatedStatements.length === 0 && <p>No statement links shown yet.</p>}
+        {statementsQuery.isSuccess && relatedStatements.length === 0 && <p>No statements are linked to this evidence yet.</p>}
         {statementsQuery.isSuccess && relatedStatements.length > 0 && (
           <ul>
             {relatedStatements.map((statement) => (
@@ -448,6 +520,14 @@ const cardStyle: React.CSSProperties = {
   borderRadius: "12px",
   padding: "16px",
   marginBottom: "16px",
+};
+
+const actionLinkStyle: React.CSSProperties = {
+  padding: "10px 16px",
+  borderRadius: "8px",
+  border: "1px solid #1976d2",
+  textDecoration: "none",
+  color: "inherit",
 };
 '@
 
@@ -525,7 +605,7 @@ function HomePage() {
   return (
     <Layout>
       <h2>Home</h2>
-      <p>Statements list and detail pages are now available.</p>
+      <p>Statement UX linking is now available.</p>
     </Layout>
   );
 }
@@ -610,14 +690,12 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
 '@
 
 Write-Host ""
-Write-Host "Applying Phase 6.8..." -ForegroundColor Cyan
+Write-Host "Applying Phase 6.9..." -ForegroundColor Cyan
 
-Write-Utf8File -Path $controllerPath -Content $controllerContent
 Write-Utf8File -Path $statementsApiPath -Content $statementsApiContent
-Write-Utf8File -Path $useStatementsPath -Content $useStatementsContent
-Write-Utf8File -Path $useStatementDetailPath -Content $useStatementDetailContent
-Write-Utf8File -Path $statementsPagePath -Content $statementsPageContent
+Write-Utf8File -Path $createStatementPagePath -Content $createStatementPageContent
 Write-Utf8File -Path $statementDetailPagePath -Content $statementDetailPageContent
+Write-Utf8File -Path $statementsPagePath -Content $statementsPageContent
 Write-Utf8File -Path $evidenceDetailPagePath -Content $evidenceDetailPageContent
 Write-Utf8File -Path $mainTsxPath -Content $mainTsxContent
 
@@ -642,4 +720,4 @@ if ($LASTEXITCODE -ne 0) {
 Pop-Location
 
 Write-Host ""
-Write-Host "Phase 6.8 completed successfully." -ForegroundColor Green
+Write-Host "Phase 6.9 completed successfully." -ForegroundColor Green

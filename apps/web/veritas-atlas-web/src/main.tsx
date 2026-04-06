@@ -27,6 +27,8 @@ import { DocumentsPage } from "./pages/DocumentsPage";
 import { DocumentDetailPage } from "./pages/DocumentDetailPage";
 import { EvidencePage } from "./pages/EvidencePage";
 import { EvidenceDetailPage } from "./pages/EvidenceDetailPage";
+import { StatementsPage } from "./pages/StatementsPage";
+import { StatementDetailPage } from "./pages/StatementDetailPage";
 import { CaseDetailPage } from "./pages/CaseDetailPage";
 import { ReviewsPage } from "./pages/ReviewsPage";
 import { DashboardPage } from "./pages/DashboardPage";
@@ -53,6 +55,7 @@ function Layout({ children }: { children: React.ReactNode }) {
           <Link to="/sources">Sources</Link>
           <Link to="/documents">Documents</Link>
           <Link to="/evidence">Evidence</Link>
+          <Link to="/statements">Statements</Link>
           <Link to="/sources/new">New Source</Link>
           <Link to="/documents/new">New Document</Link>
           <Link to="/evidence/new">New Evidence</Link>
@@ -68,7 +71,7 @@ function HomePage() {
   return (
     <Layout>
       <h2>Home</h2>
-      <p>Detail pages and cross-links are now available for sources, documents, and evidence.</p>
+      <p>Statements list and detail pages are now available.</p>
     </Layout>
   );
 }
@@ -138,7 +141,9 @@ const router = createBrowserRouter([
   { path: "/evidence", element: <EvidencePage /> },
   { path: "/evidence/new", element: <CreateEvidencePage /> },
   { path: "/evidence/:id", element: <EvidenceDetailPage /> },
+  { path: "/statements", element: <StatementsPage /> },
   { path: "/statements/new", element: <CreateStatementPage /> },
+  { path: "/statements/:id", element: <StatementDetailPage /> },
 ]);
 
 ReactDOM.createRoot(document.getElementById("root")!).render(

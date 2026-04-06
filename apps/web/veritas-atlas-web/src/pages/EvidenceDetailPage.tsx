@@ -1,9 +1,11 @@
 ﻿import { Link, useParams } from "react-router-dom";
 import { useEvidenceDetail } from "../hooks/useEvidenceDetail";
+import { useStatements } from "../hooks/useStatements";
 
 export function EvidenceDetailPage() {
   const { id } = useParams();
   const query = useEvidenceDetail(id);
+  const statementsQuery = useStatements();
 
   if (query.isLoading) {
     return <div style={{ fontFamily: "Arial, sans-serif", padding: "24px" }}>Loading evidence...</div>;
@@ -18,12 +20,14 @@ export function EvidenceDetailPage() {
   }
 
   const item = query.data;
+  const relatedStatements = statementsQuery.data?.items.filter((x) => x.id && x.text) ?? [];
 
   return (
     <div style={{ fontFamily: "Arial, sans-serif", padding: "24px" }}>
       <nav style={{ display: "flex", gap: "16px", marginBottom: "20px", flexWrap: "wrap" }}>
         <Link to="/evidence">Back to Evidence</Link>
         {item.documentId && <Link to={`/documents/${item.documentId}`}>Document</Link>}
+        <Link to="/statements">Statements</Link>
       </nav>
 
       <h1 style={{ marginTop: 0 }}>Evidence {item.id}</h1>
@@ -36,10 +40,10 @@ export function EvidenceDetailPage() {
         <Row label="Status" value={item.status} />
         <Row label="LanguageCode" value={item.languageCode ?? "N/A"} />
         <Row label="ContentHash" value={item.contentHash ?? "N/A"} />
-        <Row label="Captured" value={item.capturedAtUtc ? formatDate(item.capturedAtUtc) : "N/A"} />
+        <Row label="Captured" value={item.capturedAtUtc ? new Date(item.capturedAtUtc).toLocaleString() : "N/A"} />
         <Row label="Span" value={item.span ? `${item.span.startOffset} - ${item.span.endOffset}` : "N/A"} />
-        <Row label="Created" value={formatDate(item.createdAtUtc)} />
-        <Row label="Updated" value={formatDate(item.updatedAtUtc)} />
+        <Row label="Created" value={new Date(item.createdAtUtc).toLocaleString()} />
+        <Row label="Updated" value={new Date(item.updatedAtUtc).toLocaleString()} />
       </div>
 
       <div style={cardStyle}>
@@ -47,9 +51,19 @@ export function EvidenceDetailPage() {
         <pre style={{ whiteSpace: "pre-wrap", margin: 0, fontFamily: "inherit" }}>{item.content}</pre>
       </div>
 
-      <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
-        {item.documentId && <Link to={`/documents/${item.documentId}`} style={actionLinkStyle}>Open Document</Link>}
-        <Link to="/statements/new" style={actionLinkStyle}>Create Statement</Link>
+      <div style={cardStyle}>
+        <h3 style={{ marginTop: 0 }}>Statements</h3>
+        {statementsQuery.isLoading && <p>Loading statements...</p>}
+        {statementsQuery.isSuccess && relatedStatements.length === 0 && <p>No statement links shown yet.</p>}
+        {statementsQuery.isSuccess && relatedStatements.length > 0 && (
+          <ul>
+            {relatedStatements.map((statement) => (
+              <li key={statement.id}>
+                <Link to={`/statements/${statement.id}`}>{statement.text}</Link>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
     </div>
   );
@@ -64,21 +78,9 @@ function Row({ label, value }: { label: string; value: string }) {
   );
 }
 
-function formatDate(value: string) {
-  return new Date(value).toLocaleString();
-}
-
 const cardStyle: React.CSSProperties = {
   border: "1px solid #ddd",
   borderRadius: "12px",
   padding: "16px",
   marginBottom: "16px",
-};
-
-const actionLinkStyle: React.CSSProperties = {
-  padding: "10px 16px",
-  borderRadius: "8px",
-  border: "1px solid #1976d2",
-  textDecoration: "none",
-  color: "inherit",
 };

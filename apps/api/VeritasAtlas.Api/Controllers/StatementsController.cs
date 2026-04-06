@@ -36,7 +36,7 @@ public class StatementsController : ControllerBase
             entity.Id,
             entity.EvidenceId,
             entity.DocumentId,
-            entity.Text.ToString(),
+            entity.Text.Raw,
             entity.Polarity.ToString(),
             entity.Status.ToString(),
             entity.Topic,
