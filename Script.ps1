@@ -149,79 +149,80 @@ function Ensure-RouteBlock {
 }
 
 Write-Host "Checkpointing current code with git..."
-Git-Checkpoint -Message ("checkpoint before phase 6.19 - " + (Get-Date -Format "yyyy-MM-dd HH:mm:ss"))
+Git-Checkpoint -Message ("checkpoint before phase 6.20 - " + (Get-Date -Format "yyyy-MM-dd HH:mm:ss"))
 
-Write-Host "Applying Phase 6.19 - Large Scope - Executive Oversight and Delivery Control Pack..."
+Write-Host "Applying Phase 6.20 - Large Scope - Analytics and AI Operations Control Pack..."
 
 $webRoot = Join-Path $RootDir "apps\web\veritas-atlas-web\src"
 
-$executiveOverviewPath = Join-Path $webRoot "pages\ExecutiveOverviewPage.tsx"
-$deliveryControlTowerPath = Join-Path $webRoot "pages\DeliveryControlTowerPage.tsx"
-$workstreamBoardPath = Join-Path $webRoot "pages\WorkstreamBoardPage.tsx"
-$escalationCenterPath = Join-Path $webRoot "pages\EscalationCenterPage.tsx"
-$executiveSummaryPanelPath = Join-Path $webRoot "components\ExecutiveSummaryPanel.tsx"
-$deliveryHealthPanelPath = Join-Path $webRoot "components\DeliveryHealthPanel.tsx"
+$analyticsCenterPath = Join-Path $webRoot "pages\AnalyticsCenterPage.tsx"
+$agentRunsBoardPath = Join-Path $webRoot "pages\AgentRunsBoardPage.tsx"
+$caseFlowMapPath = Join-Path $webRoot "pages\CaseFlowMapPage.tsx"
+$qualityRadarPath = Join-Path $webRoot "pages\QualityRadarPage.tsx"
+$analyticsSummaryPanelPath = Join-Path $webRoot "components\AnalyticsSummaryPanel.tsx"
+$agentUtilizationPanelPath = Join-Path $webRoot "components\AgentUtilizationPanel.tsx"
 $mainPath = Join-Path $webRoot "main.tsx"
 
-Write-Utf8File -Path $executiveSummaryPanelPath -Content @'
-export function ExecutiveSummaryPanel() {
+Write-Utf8File -Path $analyticsSummaryPanelPath -Content @'
+export function AnalyticsSummaryPanel() {
   return (
     <div style={{ border: "1px solid #ddd", borderRadius: 12, padding: 16 }}>
-      <h3 style={{ marginTop: 0 }}>Executive Summary</h3>
+      <h3 style={{ marginTop: 0 }}>Analytics Summary</h3>
       <ul style={{ marginBottom: 0 }}>
-        <li>Total operational surfaces expanded: placeholder</li>
-        <li>Key review bottlenecks: placeholder</li>
-        <li>Top publication risks: placeholder</li>
+        <li>Operational throughput: placeholder</li>
+        <li>Review load trend: placeholder</li>
+        <li>Publication readiness trend: placeholder</li>
       </ul>
     </div>
   );
 }
 '@
 
-Write-Utf8File -Path $deliveryHealthPanelPath -Content @'
-export function DeliveryHealthPanel() {
+Write-Utf8File -Path $agentUtilizationPanelPath -Content @'
+export function AgentUtilizationPanel() {
   return (
     <div style={{ border: "1px solid #ddd", borderRadius: 12, padding: 16 }}>
-      <h3 style={{ marginTop: 0 }}>Delivery Health</h3>
+      <h3 style={{ marginTop: 0 }}>Agent Utilization</h3>
       <ul style={{ marginBottom: 0 }}>
-        <li>Build health: placeholder</li>
-        <li>Workflow continuity: placeholder</li>
-        <li>Escalation pressure: placeholder</li>
+        <li>Extraction workload: placeholder</li>
+        <li>Contradiction workload: placeholder</li>
+        <li>Confidence workload: placeholder</li>
       </ul>
     </div>
   );
 }
 '@
 
-Write-Utf8File -Path $executiveOverviewPath -Content @'
+Write-Utf8File -Path $analyticsCenterPath -Content @'
 import { Link } from "react-router-dom";
-import { ExecutiveSummaryPanel } from "../components/ExecutiveSummaryPanel";
-import { DeliveryHealthPanel } from "../components/DeliveryHealthPanel";
+import { AnalyticsSummaryPanel } from "../components/AnalyticsSummaryPanel";
+import { AgentUtilizationPanel } from "../components/AgentUtilizationPanel";
 
-export function ExecutiveOverviewPage() {
+export function AnalyticsCenterPage() {
   return (
     <div style={{ padding: 24, fontFamily: "Arial, sans-serif" }}>
-      <h1>Executive Overview</h1>
-      <p>High-level operational oversight across governance, review, publication, and delivery execution.</p>
+      <h1>Analytics Center</h1>
+      <p>Central analytics surface for operational throughput, review pressure, and AI workload visibility.</p>
 
       <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 20 }}>
         <Link to="/operations-intelligence">Operations Intelligence</Link>
-        <Link to="/governance-console">Governance Console</Link>
-        <Link to="/delivery-control-tower">Delivery Control Tower</Link>
-        <Link to="/escalation-center">Escalation Center</Link>
+        <Link to="/executive-overview">Executive Overview</Link>
+        <Link to="/agent-runs-board">Agent Runs Board</Link>
+        <Link to="/quality-radar">Quality Radar</Link>
+        <Link to="/case-flow-map">Case Flow Map</Link>
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 24 }}>
-        <ExecutiveSummaryPanel />
-        <DeliveryHealthPanel />
+        <AnalyticsSummaryPanel />
+        <AgentUtilizationPanel />
       </div>
 
       <section style={panelStyle}>
-        <h2 style={{ marginTop: 0 }}>Executive priorities</h2>
+        <h2 style={{ marginTop: 0 }}>Analytics priorities</h2>
         <ul style={{ marginBottom: 0 }}>
-          <li>Reduce blocked publication items</li>
-          <li>Improve review-to-publication flow</li>
-          <li>Track unresolved escalations and operational friction</li>
+          <li>Surface throughput bottlenecks early</li>
+          <li>Track review versus publication readiness balance</li>
+          <li>Monitor AI workload concentration and idle capacity</li>
         </ul>
       </section>
     </div>
@@ -235,70 +236,33 @@ const panelStyle: React.CSSProperties = {
 };
 '@
 
-Write-Utf8File -Path $deliveryControlTowerPath -Content @'
+Write-Utf8File -Path $agentRunsBoardPath -Content @'
 import { Link } from "react-router-dom";
 
-export function DeliveryControlTowerPage() {
-  return (
-    <div style={{ padding: 24, fontFamily: "Arial, sans-serif" }}>
-      <h1>Delivery Control Tower</h1>
-      <p>Central delivery surface for active workstreams, sequencing, and operational follow-through.</p>
-
-      <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 20 }}>
-        <Link to="/executive-overview">Executive Overview</Link>
-        <Link to="/workstream-board">Workstream Board</Link>
-        <Link to="/escalation-center">Escalation Center</Link>
-      </div>
-
-      <section style={panelStyle}>
-        <h2 style={{ marginTop: 0 }}>Control priorities</h2>
-        <ul style={{ marginBottom: 0 }}>
-          <li>Monitor active operational workstreams</li>
-          <li>Keep blockers visible</li>
-          <li>Route issues to escalation center when needed</li>
-        </ul>
-      </section>
-    </div>
-  );
-}
-
-const panelStyle: React.CSSProperties = {
-  border: "1px solid #ddd",
-  borderRadius: 14,
-  padding: 16,
-};
-'@
-
-Write-Utf8File -Path $workstreamBoardPath -Content @'
-import { Link } from "react-router-dom";
-
-export function WorkstreamBoardPage() {
-  const lanes = {
-    Planning: ["Governance refinement", "Review routing"],
-    Active: ["Claim operations", "Contradiction preparation", "Publication readiness"],
-    Blocked: ["Escalation policy placeholder"],
-    Done: ["Ingestion workspace expansion"]
-  };
+export function AgentRunsBoardPage() {
+  const runs = [
+    { name: "Extraction Agent", status: "Idle", detail: "Awaiting new evidence" },
+    { name: "Contradiction Agent", status: "Running", detail: "Comparing active claims" },
+    { name: "Confidence Agent", status: "Idle", detail: "No pending recalculations" },
+    { name: "Review Support Agent", status: "Placeholder", detail: "Future workflow expansion" }
+  ];
 
   return (
     <div style={{ padding: 24, fontFamily: "Arial, sans-serif" }}>
-      <h1>Workstream Board</h1>
-      <p>Visual organization of operational workstreams and current execution state.</p>
+      <h1>Agent Runs Board</h1>
+      <p>Board view for current and upcoming AI operations across the system.</p>
 
       <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 20 }}>
-        <Link to="/delivery-control-tower">Delivery Control Tower</Link>
-        <Link to="/executive-overview">Executive Overview</Link>
+        <Link to="/analytics-center">Analytics Center</Link>
+        <Link to="/operations-intelligence">Operations Intelligence</Link>
       </div>
 
       <div style={gridStyle}>
-        {Object.entries(lanes).map(([lane, items]) => (
-          <div key={lane} style={laneStyle}>
-            <h3 style={{ marginTop: 0 }}>{lane}</h3>
-            <ul style={{ marginBottom: 0 }}>
-              {items.map((item) => (
-                <li key={item}>{item}</li>
-              ))}
-            </ul>
+        {runs.map((run) => (
+          <div key={run.name} style={cardStyle}>
+            <h3 style={{ marginTop: 0 }}>{run.name}</h3>
+            <p><strong>Status:</strong> {run.status}</p>
+            <p style={{ marginBottom: 0 }}>{run.detail}</p>
           </div>
         ))}
       </div>
@@ -308,45 +272,89 @@ export function WorkstreamBoardPage() {
 
 const gridStyle: React.CSSProperties = {
   display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+  gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
   gap: 16,
 };
 
-const laneStyle: React.CSSProperties = {
+const cardStyle: React.CSSProperties = {
   border: "1px solid #ddd",
   borderRadius: 14,
   padding: 16,
-  minHeight: 220,
 };
 '@
 
-Write-Utf8File -Path $escalationCenterPath -Content @'
+Write-Utf8File -Path $caseFlowMapPath -Content @'
 import { Link } from "react-router-dom";
 
-export function EscalationCenterPage() {
-  const escalations = [
-    "Review bottleneck placeholder",
-    "Publication blocker placeholder",
-    "Contradiction severity escalation placeholder",
-    "Operational routing issue placeholder"
+export function CaseFlowMapPage() {
+  const steps = [
+    "Source registration",
+    "Document intake",
+    "Evidence extraction",
+    "Statement creation",
+    "Claim formulation",
+    "Contradiction preparation",
+    "Review routing",
+    "Publication readiness",
   ];
 
   return (
     <div style={{ padding: 24, fontFamily: "Arial, sans-serif" }}>
-      <h1>Escalation Center</h1>
-      <p>Central point for operational blockers, high-risk items, and unresolved workflow issues.</p>
+      <h1>Case Flow Map</h1>
+      <p>Visual sequence of how information moves through the Veritas Atlas operational system.</p>
 
       <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 20 }}>
-        <Link to="/delivery-control-tower">Delivery Control Tower</Link>
-        <Link to="/executive-overview">Executive Overview</Link>
-        <Link to="/governance-console">Governance Console</Link>
+        <Link to="/analytics-center">Analytics Center</Link>
+        <Link to="/operations">Operations Hub</Link>
+        <Link to="/review-queue">Review Queue</Link>
       </div>
 
       <section style={panelStyle}>
-        <h2 style={{ marginTop: 0 }}>Current escalations</h2>
+        <ol style={{ marginBottom: 0, paddingLeft: 20 }}>
+          {steps.map((step) => (
+            <li key={step} style={{ marginBottom: 8 }}>{step}</li>
+          ))}
+        </ol>
+      </section>
+    </div>
+  );
+}
+
+const panelStyle: React.CSSProperties = {
+  border: "1px solid #ddd",
+  borderRadius: 14,
+  padding: 16,
+};
+'@
+
+Write-Utf8File -Path $qualityRadarPath -Content @'
+import { Link } from "react-router-dom";
+
+export function QualityRadarPage() {
+  const dimensions = [
+    "Evidence quality",
+    "Statement clarity",
+    "Claim quality",
+    "Contradiction readiness",
+    "Review traceability",
+    "Publication readiness"
+  ];
+
+  return (
+    <div style={{ padding: 24, fontFamily: "Arial, sans-serif" }}>
+      <h1>Quality Radar</h1>
+      <p>Operational quality dimensions for reviewing system maturity and readiness.</p>
+
+      <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 20 }}>
+        <Link to="/analytics-center">Analytics Center</Link>
+        <Link to="/governance-console">Governance Console</Link>
+        <Link to="/publication-readiness">Publication Readiness</Link>
+      </div>
+
+      <section style={panelStyle}>
         <ul style={{ marginBottom: 0 }}>
-          {escalations.map((item, index) => (
-            <li key={index}>{item}</li>
+          {dimensions.map((dimension) => (
+            <li key={dimension}>{dimension} - placeholder</li>
           ))}
         </ul>
       </section>
@@ -363,20 +371,20 @@ const panelStyle: React.CSSProperties = {
 
 $mainContent = Get-Content $mainPath -Raw
 
-$mainContent = Ensure-ImportLine -Content $mainContent -Anchor 'import { DashboardPage } from "./pages/DashboardPage";' -ImportLine 'import { ExecutiveOverviewPage } from "./pages/ExecutiveOverviewPage";'
-$mainContent = Ensure-ImportLine -Content $mainContent -Anchor 'import { ExecutiveOverviewPage } from "./pages/ExecutiveOverviewPage";' -ImportLine 'import { DeliveryControlTowerPage } from "./pages/DeliveryControlTowerPage";'
-$mainContent = Ensure-ImportLine -Content $mainContent -Anchor 'import { DeliveryControlTowerPage } from "./pages/DeliveryControlTowerPage";' -ImportLine 'import { WorkstreamBoardPage } from "./pages/WorkstreamBoardPage";'
-$mainContent = Ensure-ImportLine -Content $mainContent -Anchor 'import { WorkstreamBoardPage } from "./pages/WorkstreamBoardPage";' -ImportLine 'import { EscalationCenterPage } from "./pages/EscalationCenterPage";'
+$mainContent = Ensure-ImportLine -Content $mainContent -Anchor 'import { DashboardPage } from "./pages/DashboardPage";' -ImportLine 'import { AnalyticsCenterPage } from "./pages/AnalyticsCenterPage";'
+$mainContent = Ensure-ImportLine -Content $mainContent -Anchor 'import { AnalyticsCenterPage } from "./pages/AnalyticsCenterPage";' -ImportLine 'import { AgentRunsBoardPage } from "./pages/AgentRunsBoardPage";'
+$mainContent = Ensure-ImportLine -Content $mainContent -Anchor 'import { AgentRunsBoardPage } from "./pages/AgentRunsBoardPage";' -ImportLine 'import { CaseFlowMapPage } from "./pages/CaseFlowMapPage";'
+$mainContent = Ensure-ImportLine -Content $mainContent -Anchor 'import { CaseFlowMapPage } from "./pages/CaseFlowMapPage";' -ImportLine 'import { QualityRadarPage } from "./pages/QualityRadarPage";'
 
-$mainContent = Ensure-NavBlock -Content $mainContent -Anchor '<Link to="/dashboard">Dashboard</Link>' -NavBlock '<Link to="/executive-overview">Executive Overview</Link>
-          <Link to="/delivery-control-tower">Delivery Control Tower</Link>
-          <Link to="/workstream-board">Workstream Board</Link>
-          <Link to="/escalation-center">Escalation Center</Link>' -PresencePattern 'to="/executive-overview"'
+$mainContent = Ensure-NavBlock -Content $mainContent -Anchor '<Link to="/dashboard">Dashboard</Link>' -NavBlock '<Link to="/analytics-center">Analytics Center</Link>
+          <Link to="/agent-runs-board">Agent Runs Board</Link>
+          <Link to="/case-flow-map">Case Flow Map</Link>
+          <Link to="/quality-radar">Quality Radar</Link>' -PresencePattern 'to="/analytics-center"'
 
-$mainContent = Ensure-RouteBlock -Content $mainContent -AnchorRoute '{ path: "/dashboard", element: <DashboardPage /> },' -RouteBlock '{ path: "/executive-overview", element: <ExecutiveOverviewPage /> },
-  { path: "/delivery-control-tower", element: <DeliveryControlTowerPage /> },
-  { path: "/workstream-board", element: <WorkstreamBoardPage /> },
-  { path: "/escalation-center", element: <EscalationCenterPage /> },' -PresencePattern 'path: "/executive-overview"'
+$mainContent = Ensure-RouteBlock -Content $mainContent -AnchorRoute '{ path: "/dashboard", element: <DashboardPage /> },' -RouteBlock '{ path: "/analytics-center", element: <AnalyticsCenterPage /> },
+  { path: "/agent-runs-board", element: <AgentRunsBoardPage /> },
+  { path: "/case-flow-map", element: <CaseFlowMapPage /> },
+  { path: "/quality-radar", element: <QualityRadarPage /> },' -PresencePattern 'path: "/analytics-center"'
 
 Write-Utf8File -Path $mainPath -Content $mainContent
 
@@ -386,4 +394,4 @@ Build-Backend -RootDir $RootDir
 Write-Host "Building frontend..."
 Build-Frontend -RootDir $RootDir
 
-Write-Host "Phase 6.19 applied successfully."
+Write-Host "Phase 6.20 applied successfully."

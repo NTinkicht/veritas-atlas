@@ -41,6 +41,10 @@ import { ReviewQueuePage } from "./pages/ReviewQueuePage";
 import { ReviewWorkspacePage } from "./pages/ReviewWorkspacePage";
 import { PublicationDeskPage } from "./pages/PublicationDeskPage";
 import { DashboardPage } from "./pages/DashboardPage";
+import { ExecutiveOverviewPage } from "./pages/ExecutiveOverviewPage";
+import { DeliveryControlTowerPage } from "./pages/DeliveryControlTowerPage";
+import { WorkstreamBoardPage } from "./pages/WorkstreamBoardPage";
+import { EscalationCenterPage } from "./pages/EscalationCenterPage";
 import { GovernanceConsolePage } from "./pages/GovernanceConsolePage";
 import { PublicationReadinessBoardPage } from "./pages/PublicationReadinessBoardPage";
 import { DecisionLogPage } from "./pages/DecisionLogPage";
@@ -58,6 +62,10 @@ function Layout({ children }: { children: React.ReactNode }) {
         <nav style={{ display: "flex", gap: "16px", marginTop: "12px", flexWrap: "wrap" }}>
           <Link to="/">Home</Link>
           <Link to="/dashboard">Dashboard</Link>
+<Link to="/executive-overview">Executive Overview</Link>
+          <Link to="/delivery-control-tower">Delivery Control Tower</Link>
+          <Link to="/workstream-board">Workstream Board</Link>
+          <Link to="/escalation-center">Escalation Center</Link>
           <Link to="/operations-intelligence">Operations Intelligence</Link>
           <Link to="/investigation-navigator">Investigation Navigator</Link>
           <Link to="/health">Health</Link>
@@ -175,6 +183,10 @@ function HealthPage() {
 const router = createBrowserRouter([
   { path: "/", element: <HomePage /> },
   { path: "/dashboard", element: <DashboardPage /> },
+{ path: "/executive-overview", element: <ExecutiveOverviewPage /> },
+  { path: "/delivery-control-tower", element: <DeliveryControlTowerPage /> },
+  { path: "/workstream-board", element: <WorkstreamBoardPage /> },
+  { path: "/escalation-center", element: <EscalationCenterPage /> },
 { path: "/governance-console", element: <GovernanceConsolePage /> },
   { path: "/publication-readiness", element: <PublicationReadinessBoardPage /> },
   { path: "/decision-log", element: <DecisionLogPage /> },
