@@ -1,15 +1,7 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
-import {
-  createBrowserRouter,
-  RouterProvider,
-  Link,
-} from "react-router-dom";
-import {
-  QueryClient,
-  QueryClientProvider,
-  useQuery,
-} from "@tanstack/react-query";
+import { createBrowserRouter, RouterProvider, Link } from "react-router-dom";
+import { QueryClient, QueryClientProvider, useQuery } from "@tanstack/react-query";
 import { getDatabaseHealth, getHealth } from "./api/health";
 import { PersonsPage } from "./pages/PersonsPage";
 import { PersonDetailPage } from "./pages/PersonDetailPage";
@@ -35,24 +27,24 @@ import { ClaimsWorkspacePage } from "./pages/ClaimsWorkspacePage";
 import { ContradictionsWorkspacePage } from "./pages/ContradictionsWorkspacePage";
 import { OperationsHubPage } from "./pages/OperationsHubPage";
 import { InvestigationNavigatorPage } from "./pages/InvestigationNavigatorPage";
-import { CaseDetailPage } from "./pages/CaseDetailPage";
-import { ReviewsPage } from "./pages/ReviewsPage";
-import { ReviewQueuePage } from "./pages/ReviewQueuePage";
-import { ReviewWorkspacePage } from "./pages/ReviewWorkspacePage";
-import { PublicationDeskPage } from "./pages/PublicationDeskPage";
-import { DashboardPage } from "./pages/DashboardPage";
-import { AnalyticsCenterPage } from "./pages/AnalyticsCenterPage";
-import { AgentRunsBoardPage } from "./pages/AgentRunsBoardPage";
-import { CaseFlowMapPage } from "./pages/CaseFlowMapPage";
-import { QualityRadarPage } from "./pages/QualityRadarPage";
+import { OperationsIntelligencePage } from "./pages/OperationsIntelligencePage";
+import { GovernanceConsolePage } from "./pages/GovernanceConsolePage";
+import { PublicationReadinessBoardPage } from "./pages/PublicationReadinessBoardPage";
+import { DecisionLogPage } from "./pages/DecisionLogPage";
 import { ExecutiveOverviewPage } from "./pages/ExecutiveOverviewPage";
 import { DeliveryControlTowerPage } from "./pages/DeliveryControlTowerPage";
 import { WorkstreamBoardPage } from "./pages/WorkstreamBoardPage";
 import { EscalationCenterPage } from "./pages/EscalationCenterPage";
-import { GovernanceConsolePage } from "./pages/GovernanceConsolePage";
-import { PublicationReadinessBoardPage } from "./pages/PublicationReadinessBoardPage";
-import { DecisionLogPage } from "./pages/DecisionLogPage";
-import { OperationsIntelligencePage } from "./pages/OperationsIntelligencePage";
+import { AnalyticsCenterPage } from "./pages/AnalyticsCenterPage";
+import { AgentRunsBoardPage } from "./pages/AgentRunsBoardPage";
+import { CaseFlowMapPage } from "./pages/CaseFlowMapPage";
+import { QualityRadarPage } from "./pages/QualityRadarPage";
+import { ReviewQueuePage } from "./pages/ReviewQueuePage";
+import { ReviewWorkspacePage } from "./pages/ReviewWorkspacePage";
+import { PublicationDeskPage } from "./pages/PublicationDeskPage";
+import { CaseDetailPage } from "./pages/CaseDetailPage";
+import { ReviewsPage } from "./pages/ReviewsPage";
+import { DashboardPage } from "./pages/DashboardPage";
 import "./index.css";
 
 const queryClient = new QueryClient();
@@ -66,30 +58,19 @@ function Layout({ children }: { children: React.ReactNode }) {
         <nav style={{ display: "flex", gap: "16px", marginTop: "12px", flexWrap: "wrap" }}>
           <Link to="/">Home</Link>
           <Link to="/dashboard">Dashboard</Link>
-<Link to="/analytics-center">Analytics Center</Link>
-          <Link to="/agent-runs-board">Agent Runs Board</Link>
-          <Link to="/case-flow-map">Case Flow Map</Link>
-          <Link to="/quality-radar">Quality Radar</Link>
-<Link to="/executive-overview">Executive Overview</Link>
-          <Link to="/delivery-control-tower">Delivery Control Tower</Link>
-          <Link to="/workstream-board">Workstream Board</Link>
-          <Link to="/escalation-center">Escalation Center</Link>
           <Link to="/operations-intelligence">Operations Intelligence</Link>
           <Link to="/investigation-navigator">Investigation Navigator</Link>
-          <Link to="/health">Health</Link>
-          <Link to="/operations">Operations Hub</Link>
-          <Link to="/navigator">Navigator</Link>
+          <Link to="/analytics-center">Analytics Center</Link>
+          <Link to="/executive-overview">Executive Overview</Link>
           <Link to="/persons">Persons</Link>
-          <Link to="/persons/new">New Person</Link>
           <Link to="/cases">Cases</Link>
-          <Link to="/cases/new">New Case</Link>
           <Link to="/reviews">Reviews</Link>
-<Link to="/governance-console">Governance Console</Link>
-          <Link to="/publication-readiness">Publication Readiness</Link>
-          <Link to="/decision-log">Decision Log</Link>
           <Link to="/review-queue">Review Queue</Link>
           <Link to="/review-workspace">Review Workspace</Link>
           <Link to="/publication-desk">Publication Desk</Link>
+          <Link to="/governance-console">Governance Console</Link>
+          <Link to="/publication-readiness">Publication Readiness</Link>
+          <Link to="/decision-log">Decision Log</Link>
           <Link to="/ingestion">Ingestion</Link>
           <Link to="/sources">Sources</Link>
           <Link to="/documents">Documents</Link>
@@ -98,10 +79,18 @@ function Layout({ children }: { children: React.ReactNode }) {
           <Link to="/claims">Claims</Link>
           <Link to="/claims/workspace">Claims Workspace</Link>
           <Link to="/contradictions/workspace">Contradictions Workspace</Link>
+          <Link to="/delivery-control-tower">Delivery Control Tower</Link>
+          <Link to="/workstream-board">Workstream Board</Link>
+          <Link to="/escalation-center">Escalation Center</Link>
+          <Link to="/agent-runs-board">Agent Runs Board</Link>
+          <Link to="/case-flow-map">Case Flow Map</Link>
+          <Link to="/quality-radar">Quality Radar</Link>
           <Link to="/sources/new">New Source</Link>
           <Link to="/documents/new">New Document</Link>
           <Link to="/evidence/new">New Evidence</Link>
           <Link to="/statements/new">New Statement</Link>
+          <Link to="/persons/new">New Person</Link>
+          <Link to="/cases/new">New Case</Link>
         </nav>
       </header>
       <main>{children}</main>
@@ -113,13 +102,13 @@ function HomePage() {
   return (
     <Layout>
       <h2>Home</h2>
-      <p>Operational navigation pack is now available.</p>
+      <p>Operational shell stabilized.</p>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "16px", marginTop: "20px" }}>
-        <QuickCard title="Operations Hub" text="Monitor ingestion, statements, claims, and next actions." to="/operations" />
-        <QuickCard title="Navigator" text="Cross-search statements and claims using deep-link query patterns." to="/navigator" />
-        <QuickCard title="Claims Workspace" text="Create claims from statement context." to="/claims/workspace" />
-        <QuickCard title="Contradictions Workspace" text="Prepare contradiction review from statements and claims." to="/contradictions/workspace" />
+        <QuickCard title="Operations Intelligence" text="Cross-system monitoring and AI visibility." to="/operations-intelligence" />
+        <QuickCard title="Analytics Center" text="Throughput, quality, and workload views." to="/analytics-center" />
+        <QuickCard title="Governance Console" text="Review and publication governance surfaces." to="/governance-console" />
+        <QuickCard title="Claims Workspace" text="Create and inspect claims." to="/claims/workspace" />
       </div>
     </Layout>
   );
@@ -191,22 +180,19 @@ function HealthPage() {
 const router = createBrowserRouter([
   { path: "/", element: <HomePage /> },
   { path: "/dashboard", element: <DashboardPage /> },
-{ path: "/analytics-center", element: <AnalyticsCenterPage /> },
-  { path: "/agent-runs-board", element: <AgentRunsBoardPage /> },
-  { path: "/case-flow-map", element: <CaseFlowMapPage /> },
-  { path: "/quality-radar", element: <QualityRadarPage /> },
-{ path: "/executive-overview", element: <ExecutiveOverviewPage /> },
-  { path: "/delivery-control-tower", element: <DeliveryControlTowerPage /> },
-  { path: "/workstream-board", element: <WorkstreamBoardPage /> },
-  { path: "/escalation-center", element: <EscalationCenterPage /> },
-{ path: "/governance-console", element: <GovernanceConsolePage /> },
-  { path: "/publication-readiness", element: <PublicationReadinessBoardPage /> },
-  { path: "/decision-log", element: <DecisionLogPage /> },
-  { path: "/operations-intelligence", element: <OperationsIntelligencePage /> },
-  { path: "/investigation-navigator", element: <InvestigationNavigatorPage /> },
   { path: "/health", element: <HealthPage /> },
   { path: "/operations", element: <OperationsHubPage /> },
   { path: "/navigator", element: <InvestigationNavigatorPage /> },
+  { path: "/operations-intelligence", element: <OperationsIntelligencePage /> },
+  { path: "/investigation-navigator", element: <InvestigationNavigatorPage /> },
+  { path: "/analytics-center", element: <AnalyticsCenterPage /> },
+  { path: "/executive-overview", element: <ExecutiveOverviewPage /> },
+  { path: "/delivery-control-tower", element: <DeliveryControlTowerPage /> },
+  { path: "/workstream-board", element: <WorkstreamBoardPage /> },
+  { path: "/escalation-center", element: <EscalationCenterPage /> },
+  { path: "/agent-runs-board", element: <AgentRunsBoardPage /> },
+  { path: "/case-flow-map", element: <CaseFlowMapPage /> },
+  { path: "/quality-radar", element: <QualityRadarPage /> },
   { path: "/persons", element: <PersonsPage /> },
   { path: "/persons/new", element: <CreatePersonPage /> },
   { path: "/persons/:id", element: <PersonDetailPage /> },
@@ -217,6 +203,9 @@ const router = createBrowserRouter([
   { path: "/review-queue", element: <ReviewQueuePage /> },
   { path: "/review-workspace", element: <ReviewWorkspacePage /> },
   { path: "/publication-desk", element: <PublicationDeskPage /> },
+  { path: "/governance-console", element: <GovernanceConsolePage /> },
+  { path: "/publication-readiness", element: <PublicationReadinessBoardPage /> },
+  { path: "/decision-log", element: <DecisionLogPage /> },
   { path: "/ingestion", element: <IngestionWorkspacePage /> },
   { path: "/sources", element: <SourcesPage /> },
   { path: "/sources/new", element: <CreateSourcePage /> },
