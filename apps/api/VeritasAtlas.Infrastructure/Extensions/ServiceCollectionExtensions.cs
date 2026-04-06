@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using VeritasAtlas.Application.Interfaces;
@@ -26,6 +26,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IStatementService, StatementService>();
         services.AddScoped<StatementService>();
         services.AddScoped<IClaimService, ClaimService>();
+        services.AddScoped<ContradictionSliceService>();
         services.AddScoped<ClaimSliceService>();
         services.AddScoped<IContradictionService, ContradictionService>();
         services.AddScoped<ICaseService, CaseService>();

@@ -45,6 +45,9 @@ import { PublicationDeskPage } from "./pages/PublicationDeskPage";
 import { CaseDetailPage } from "./pages/CaseDetailPage";
 import { ReviewsPage } from "./pages/ReviewsPage";
 import { DashboardPage } from "./pages/DashboardPage";
+import { ContradictionsPage } from "./pages/ContradictionsPage";
+import { ContradictionDetailPage } from "./pages/ContradictionDetailPage";
+import { ResolutionBoardPage } from "./pages/ResolutionBoardPage";
 import "./index.css";
 
 const queryClient = new QueryClient();
@@ -77,6 +80,8 @@ function Layout({ children }: { children: React.ReactNode }) {
           <Link to="/evidence">Evidence</Link>
           <Link to="/statements">Statements</Link>
           <Link to="/claims">Claims</Link>
+<Link to="/contradictions">Contradictions</Link>
+          <Link to="/resolution-board">Resolution Board</Link>
           <Link to="/claims/workspace">Claims Workspace</Link>
           <Link to="/contradictions/workspace">Contradictions Workspace</Link>
           <Link to="/delivery-control-tower">Delivery Control Tower</Link>
@@ -220,6 +225,9 @@ const router = createBrowserRouter([
   { path: "/statements/new", element: <CreateStatementPage /> },
   { path: "/statements/:id", element: <StatementDetailPage /> },
   { path: "/claims", element: <ClaimsPage /> },
+{ path: "/contradictions", element: <ContradictionsPage /> },
+  { path: "/contradictions/:id", element: <ContradictionDetailPage /> },
+  { path: "/resolution-board", element: <ResolutionBoardPage /> },
   { path: "/claims/:id", element: <ClaimDetailPage /> },
   { path: "/claims/workspace", element: <ClaimsWorkspacePage /> },
   { path: "/contradictions/workspace", element: <ContradictionsWorkspacePage /> },

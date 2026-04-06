@@ -1,7 +1,6 @@
-﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc;
 using VeritasAtlas.Api.Contracts.Contradictions;
-using VeritasAtlas.Application.Interfaces;
-using VeritasAtlas.Domain.Enums;
+using VeritasAtlas.Infrastructure.Services;
 
 namespace VeritasAtlas.Api.Controllers;
 
@@ -9,11 +8,11 @@ namespace VeritasAtlas.Api.Controllers;
 [Route("api/v1/contradictions")]
 public sealed class ContradictionsController : ControllerBase
 {
-    private readonly IContradictionService _contradictionService;
+    private readonly ContradictionSliceService _contradictionSliceService;
 
-    public ContradictionsController(IContradictionService contradictionService)
+    public ContradictionsController(ContradictionSliceService contradictionSliceService)
     {
-        _contradictionService = contradictionService;
+        _contradictionSliceService = contradictionSliceService;
     }
 
     [HttpPost]
@@ -21,34 +20,89 @@ public sealed class ContradictionsController : ControllerBase
         [FromBody] CreateContradictionRequest request,
         CancellationToken cancellationToken = default)
     {
-        if (!Enum.TryParse<ContradictionType>(request.Type, true, out var contradictionType))
-        {
-            return BadRequest(new { message = "Invalid contradiction type." });
-        }
-
-        var entity = await _contradictionService.AddContradictionAsync(
-            request.CaseId,
-            request.LeftClaimId,
-            request.RightClaimId,
-            contradictionType,
+        var entity = await _contradictionSliceService.CreateContradictionAsync(
+            request.PrimaryClaimId,
+            request.SecondaryClaimId,
+            request.Topic,
             request.Summary,
-            request.Rationale,
-            request.CreatedBy,
+            request.ContradictionType,
+            request.Severity,
+            request.CaseId,
             cancellationToken);
 
         var response = new CreateContradictionResponse(
             entity.Id,
-            entity.CaseId,
             entity.LeftClaimId,
             entity.RightClaimId,
+            entity.CaseId,
+            request.Topic,
+            entity.Summary,
             entity.Type.ToString(),
             entity.Severity.ToString(),
             entity.Status.ToString(),
-            entity.Summary,
-            entity.Rationale,
             entity.CreatedAtUtc,
             entity.UpdatedAtUtc);
 
         return Ok(response);
+    }
+
+    [HttpGet]
+    public async Task<ActionResult<GetContradictionsResponse>> GetContradictions(
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 20,
+        [FromQuery] Guid? claimId = null,
+        [FromQuery] Guid? caseId = null,
+        CancellationToken cancellationToken = default)
+    {
+        var (total, items) = await _contradictionSliceService.GetContradictionsAsync(page, pageSize, claimId, caseId, cancellationToken);
+
+        var mapped = items.Select(entity => new GetContradictionsItemResponse(
+            entity.Id,
+            entity.LeftClaimId,
+            entity.RightClaimId,
+            entity.CaseId,
+            entity.Summary,
+            entity.Summary,
+            entity.Type.ToString(),
+            entity.Severity.ToString(),
+            entity.Status.ToString(),
+            entity.CreatedAtUtc,
+            entity.UpdatedAtUtc
+        )).ToArray();
+
+        return Ok(new GetContradictionsResponse(
+            mapped,
+            page,
+            pageSize,
+            total,
+            total == 0 ? 0 : (int)Math.Ceiling(total / (double)pageSize)
+        ));
+    }
+
+    [HttpGet("{id:guid}")]
+    public async Task<ActionResult<GetContradictionResponse>> GetContradiction(
+        [FromRoute] Guid id,
+        CancellationToken cancellationToken = default)
+    {
+        var entity = await _contradictionSliceService.GetContradictionByIdAsync(id, cancellationToken);
+
+        if (entity is null)
+        {
+            return NotFound();
+        }
+
+        return Ok(new GetContradictionResponse(
+            entity.Id,
+            entity.LeftClaimId,
+            entity.RightClaimId,
+            entity.CaseId,
+            entity.Summary,
+            entity.Summary,
+            entity.Type.ToString(),
+            entity.Severity.ToString(),
+            entity.Status.ToString(),
+            entity.CreatedAtUtc,
+            entity.UpdatedAtUtc
+        ));
     }
 }
