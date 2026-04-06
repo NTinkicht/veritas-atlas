@@ -118,21 +118,6 @@ function Ensure-ImportLine {
     return $Content -replace [regex]::Escape($Anchor), ($Anchor + [Environment]::NewLine + $ImportLine)
 }
 
-function Ensure-RouteBlock {
-    param(
-        [Parameter(Mandatory = $true)][string]$Content,
-        [Parameter(Mandatory = $true)][string]$AnchorRoute,
-        [Parameter(Mandatory = $true)][string]$RouteBlock,
-        [Parameter(Mandatory = $true)][string]$PresencePattern
-    )
-
-    if ($Content -match $PresencePattern) {
-        return $Content
-    }
-
-    return $Content -replace [regex]::Escape($AnchorRoute), ($AnchorRoute + [Environment]::NewLine + $RouteBlock)
-}
-
 function Ensure-NavBlock {
     param(
         [Parameter(Mandatory = $true)][string]$Content,
@@ -148,80 +133,95 @@ function Ensure-NavBlock {
     return $Content -replace [regex]::Escape($Anchor), ($Anchor + [Environment]::NewLine + $NavBlock)
 }
 
-Write-Host "Checkpointing current code with git..."
-Git-Checkpoint -Message ("checkpoint before phase 6.18 - " + (Get-Date -Format "yyyy-MM-dd HH:mm:ss"))
+function Ensure-RouteBlock {
+    param(
+        [Parameter(Mandatory = $true)][string]$Content,
+        [Parameter(Mandatory = $true)][string]$AnchorRoute,
+        [Parameter(Mandatory = $true)][string]$RouteBlock,
+        [Parameter(Mandatory = $true)][string]$PresencePattern
+    )
 
-Write-Host "Applying Phase 6.18 - Large Scope - Governance and Publication Console Pack..."
+    if ($Content -match $PresencePattern) {
+        return $Content
+    }
+
+    return $Content -replace [regex]::Escape($AnchorRoute), ($AnchorRoute + [Environment]::NewLine + $RouteBlock)
+}
+
+Write-Host "Checkpointing current code with git..."
+Git-Checkpoint -Message ("checkpoint before phase 6.19 - " + (Get-Date -Format "yyyy-MM-dd HH:mm:ss"))
+
+Write-Host "Applying Phase 6.19 - Large Scope - Executive Oversight and Delivery Control Pack..."
 
 $webRoot = Join-Path $RootDir "apps\web\veritas-atlas-web\src"
 
-$governanceConsolePath = Join-Path $webRoot "pages\GovernanceConsolePage.tsx"
-$publicationReadinessBoardPath = Join-Path $webRoot "pages\PublicationReadinessBoardPage.tsx"
-$decisionLogPath = Join-Path $webRoot "pages\DecisionLogPage.tsx"
-$reviewMetricsPanelPath = Join-Path $webRoot "components\ReviewMetricsPanel.tsx"
-$publicationStatusPanelPath = Join-Path $webRoot "components\PublicationStatusPanel.tsx"
+$executiveOverviewPath = Join-Path $webRoot "pages\ExecutiveOverviewPage.tsx"
+$deliveryControlTowerPath = Join-Path $webRoot "pages\DeliveryControlTowerPage.tsx"
+$workstreamBoardPath = Join-Path $webRoot "pages\WorkstreamBoardPage.tsx"
+$escalationCenterPath = Join-Path $webRoot "pages\EscalationCenterPage.tsx"
+$executiveSummaryPanelPath = Join-Path $webRoot "components\ExecutiveSummaryPanel.tsx"
+$deliveryHealthPanelPath = Join-Path $webRoot "components\DeliveryHealthPanel.tsx"
 $mainPath = Join-Path $webRoot "main.tsx"
 
-Write-Utf8File -Path $reviewMetricsPanelPath -Content @'
-export function ReviewMetricsPanel() {
+Write-Utf8File -Path $executiveSummaryPanelPath -Content @'
+export function ExecutiveSummaryPanel() {
   return (
     <div style={{ border: "1px solid #ddd", borderRadius: 12, padding: 16 }}>
-      <h3 style={{ marginTop: 0 }}>Review Metrics</h3>
+      <h3 style={{ marginTop: 0 }}>Executive Summary</h3>
       <ul style={{ marginBottom: 0 }}>
-        <li>Items in review: placeholder</li>
-        <li>Items escalated: placeholder</li>
-        <li>Average review turnaround: placeholder</li>
+        <li>Total operational surfaces expanded: placeholder</li>
+        <li>Key review bottlenecks: placeholder</li>
+        <li>Top publication risks: placeholder</li>
       </ul>
     </div>
   );
 }
 '@
 
-Write-Utf8File -Path $publicationStatusPanelPath -Content @'
-export function PublicationStatusPanel() {
+Write-Utf8File -Path $deliveryHealthPanelPath -Content @'
+export function DeliveryHealthPanel() {
   return (
     <div style={{ border: "1px solid #ddd", borderRadius: 12, padding: 16 }}>
-      <h3 style={{ marginTop: 0 }}>Publication Status</h3>
+      <h3 style={{ marginTop: 0 }}>Delivery Health</h3>
       <ul style={{ marginBottom: 0 }}>
-        <li>Ready to publish: placeholder</li>
-        <li>Blocked by review: placeholder</li>
-        <li>Pending contradiction notes: placeholder</li>
+        <li>Build health: placeholder</li>
+        <li>Workflow continuity: placeholder</li>
+        <li>Escalation pressure: placeholder</li>
       </ul>
     </div>
   );
 }
 '@
 
-Write-Utf8File -Path $governanceConsolePath -Content @'
+Write-Utf8File -Path $executiveOverviewPath -Content @'
 import { Link } from "react-router-dom";
-import { ReviewMetricsPanel } from "../components/ReviewMetricsPanel";
-import { PublicationStatusPanel } from "../components/PublicationStatusPanel";
+import { ExecutiveSummaryPanel } from "../components/ExecutiveSummaryPanel";
+import { DeliveryHealthPanel } from "../components/DeliveryHealthPanel";
 
-export function GovernanceConsolePage() {
+export function ExecutiveOverviewPage() {
   return (
     <div style={{ padding: 24, fontFamily: "Arial, sans-serif" }}>
-      <h1>Governance Console</h1>
-      <p>Operational surface for review governance, escalation tracking, and publication readiness.</p>
+      <h1>Executive Overview</h1>
+      <p>High-level operational oversight across governance, review, publication, and delivery execution.</p>
 
       <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 20 }}>
-        <Link to="/review-queue">Review Queue</Link>
-        <Link to="/review-workspace">Review Workspace</Link>
-        <Link to="/publication-desk">Publication Desk</Link>
-        <Link to="/publication-readiness">Publication Readiness</Link>
-        <Link to="/decision-log">Decision Log</Link>
+        <Link to="/operations-intelligence">Operations Intelligence</Link>
+        <Link to="/governance-console">Governance Console</Link>
+        <Link to="/delivery-control-tower">Delivery Control Tower</Link>
+        <Link to="/escalation-center">Escalation Center</Link>
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 24 }}>
-        <ReviewMetricsPanel />
-        <PublicationStatusPanel />
+        <ExecutiveSummaryPanel />
+        <DeliveryHealthPanel />
       </div>
 
       <section style={panelStyle}>
-        <h2 style={{ marginTop: 0 }}>Governance priorities</h2>
+        <h2 style={{ marginTop: 0 }}>Executive priorities</h2>
         <ul style={{ marginBottom: 0 }}>
-          <li>Keep publication decisions traceable</li>
-          <li>Escalate unresolved contradiction candidates</li>
-          <li>Route review-ready items into publication desk</li>
+          <li>Reduce blocked publication items</li>
+          <li>Improve review-to-publication flow</li>
+          <li>Track unresolved escalations and operational friction</li>
         </ul>
       </section>
     </div>
@@ -235,65 +235,84 @@ const panelStyle: React.CSSProperties = {
 };
 '@
 
-Write-Utf8File -Path $publicationReadinessBoardPath -Content @'
+Write-Utf8File -Path $deliveryControlTowerPath -Content @'
 import { Link } from "react-router-dom";
-import { useClaims } from "../hooks/useClaims";
 
-export function PublicationReadinessBoardPage() {
-  const claimsQuery = useClaims();
-  const items = (claimsQuery.data?.items ?? []).slice(0, 10);
-
+export function DeliveryControlTowerPage() {
   return (
     <div style={{ padding: 24, fontFamily: "Arial, sans-serif" }}>
-      <h1>Publication Readiness Board</h1>
-      <p>Board view for items approaching publication after review and contradiction preparation.</p>
+      <h1>Delivery Control Tower</h1>
+      <p>Central delivery surface for active workstreams, sequencing, and operational follow-through.</p>
 
       <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 20 }}>
-        <Link to="/governance-console">Governance Console</Link>
-        <Link to="/publication-desk">Publication Desk</Link>
-        <Link to="/review-queue">Review Queue</Link>
+        <Link to="/executive-overview">Executive Overview</Link>
+        <Link to="/workstream-board">Workstream Board</Link>
+        <Link to="/escalation-center">Escalation Center</Link>
       </div>
 
-      <section style={gridStyle}>
-        <BoardColumn title="Needs Review" items={items.slice(0, 3)} />
-        <BoardColumn title="Needs Contradiction Check" items={items.slice(3, 6)} />
-        <BoardColumn title="Ready to Publish" items={items.slice(6, 10)} />
+      <section style={panelStyle}>
+        <h2 style={{ marginTop: 0 }}>Control priorities</h2>
+        <ul style={{ marginBottom: 0 }}>
+          <li>Monitor active operational workstreams</li>
+          <li>Keep blockers visible</li>
+          <li>Route issues to escalation center when needed</li>
+        </ul>
       </section>
     </div>
   );
 }
 
-function BoardColumn({
-  title,
-  items,
-}: {
-  title: string;
-  items: Array<{ id: string; topic: string; type: string; status: string }>;
-}) {
+const panelStyle: React.CSSProperties = {
+  border: "1px solid #ddd",
+  borderRadius: 14,
+  padding: 16,
+};
+'@
+
+Write-Utf8File -Path $workstreamBoardPath -Content @'
+import { Link } from "react-router-dom";
+
+export function WorkstreamBoardPage() {
+  const lanes = {
+    Planning: ["Governance refinement", "Review routing"],
+    Active: ["Claim operations", "Contradiction preparation", "Publication readiness"],
+    Blocked: ["Escalation policy placeholder"],
+    Done: ["Ingestion workspace expansion"]
+  };
+
   return (
-    <div style={columnStyle}>
-      <h3 style={{ marginTop: 0 }}>{title}</h3>
-      {items.length === 0 && <p>No items.</p>}
-      {items.length > 0 && (
-        <ul style={{ marginBottom: 0 }}>
-          {items.map((item) => (
-            <li key={item.id}>
-              <Link to={`/claims/${item.id}`}>{item.topic}</Link> - {item.type} - {item.status}
-            </li>
-          ))}
-        </ul>
-      )}
+    <div style={{ padding: 24, fontFamily: "Arial, sans-serif" }}>
+      <h1>Workstream Board</h1>
+      <p>Visual organization of operational workstreams and current execution state.</p>
+
+      <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 20 }}>
+        <Link to="/delivery-control-tower">Delivery Control Tower</Link>
+        <Link to="/executive-overview">Executive Overview</Link>
+      </div>
+
+      <div style={gridStyle}>
+        {Object.entries(lanes).map(([lane, items]) => (
+          <div key={lane} style={laneStyle}>
+            <h3 style={{ marginTop: 0 }}>{lane}</h3>
+            <ul style={{ marginBottom: 0 }}>
+              {items.map((item) => (
+                <li key={item}>{item}</li>
+              ))}
+            </ul>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
 
 const gridStyle: React.CSSProperties = {
   display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
+  gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
   gap: 16,
 };
 
-const columnStyle: React.CSSProperties = {
+const laneStyle: React.CSSProperties = {
   border: "1px solid #ddd",
   borderRadius: 14,
   padding: 16,
@@ -301,32 +320,32 @@ const columnStyle: React.CSSProperties = {
 };
 '@
 
-Write-Utf8File -Path $decisionLogPath -Content @'
+Write-Utf8File -Path $escalationCenterPath -Content @'
 import { Link } from "react-router-dom";
 
-export function DecisionLogPage() {
-  const decisions = [
-    "Review queue policy placeholder",
-    "Publication routing placeholder",
-    "Escalation rule placeholder",
-    "Contradiction severity placeholder",
+export function EscalationCenterPage() {
+  const escalations = [
+    "Review bottleneck placeholder",
+    "Publication blocker placeholder",
+    "Contradiction severity escalation placeholder",
+    "Operational routing issue placeholder"
   ];
 
   return (
     <div style={{ padding: 24, fontFamily: "Arial, sans-serif" }}>
-      <h1>Decision Log</h1>
-      <p>Central place for governance and publication decisions.</p>
+      <h1>Escalation Center</h1>
+      <p>Central point for operational blockers, high-risk items, and unresolved workflow issues.</p>
 
       <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 20 }}>
+        <Link to="/delivery-control-tower">Delivery Control Tower</Link>
+        <Link to="/executive-overview">Executive Overview</Link>
         <Link to="/governance-console">Governance Console</Link>
-        <Link to="/publication-readiness">Publication Readiness</Link>
-        <Link to="/publication-desk">Publication Desk</Link>
       </div>
 
       <section style={panelStyle}>
-        <h2 style={{ marginTop: 0 }}>Current decisions</h2>
+        <h2 style={{ marginTop: 0 }}>Current escalations</h2>
         <ul style={{ marginBottom: 0 }}>
-          {decisions.map((item, index) => (
+          {escalations.map((item, index) => (
             <li key={index}>{item}</li>
           ))}
         </ul>
@@ -344,17 +363,20 @@ const panelStyle: React.CSSProperties = {
 
 $mainContent = Get-Content $mainPath -Raw
 
-$mainContent = Ensure-ImportLine -Content $mainContent -Anchor 'import { DashboardPage } from "./pages/DashboardPage";' -ImportLine 'import { GovernanceConsolePage } from "./pages/GovernanceConsolePage";'
-$mainContent = Ensure-ImportLine -Content $mainContent -Anchor 'import { GovernanceConsolePage } from "./pages/GovernanceConsolePage";' -ImportLine 'import { PublicationReadinessBoardPage } from "./pages/PublicationReadinessBoardPage";'
-$mainContent = Ensure-ImportLine -Content $mainContent -Anchor 'import { PublicationReadinessBoardPage } from "./pages/PublicationReadinessBoardPage";' -ImportLine 'import { DecisionLogPage } from "./pages/DecisionLogPage";'
+$mainContent = Ensure-ImportLine -Content $mainContent -Anchor 'import { DashboardPage } from "./pages/DashboardPage";' -ImportLine 'import { ExecutiveOverviewPage } from "./pages/ExecutiveOverviewPage";'
+$mainContent = Ensure-ImportLine -Content $mainContent -Anchor 'import { ExecutiveOverviewPage } from "./pages/ExecutiveOverviewPage";' -ImportLine 'import { DeliveryControlTowerPage } from "./pages/DeliveryControlTowerPage";'
+$mainContent = Ensure-ImportLine -Content $mainContent -Anchor 'import { DeliveryControlTowerPage } from "./pages/DeliveryControlTowerPage";' -ImportLine 'import { WorkstreamBoardPage } from "./pages/WorkstreamBoardPage";'
+$mainContent = Ensure-ImportLine -Content $mainContent -Anchor 'import { WorkstreamBoardPage } from "./pages/WorkstreamBoardPage";' -ImportLine 'import { EscalationCenterPage } from "./pages/EscalationCenterPage";'
 
-$mainContent = Ensure-NavBlock -Content $mainContent -Anchor '<Link to="/reviews">Reviews</Link>' -NavBlock '<Link to="/governance-console">Governance Console</Link>
-          <Link to="/publication-readiness">Publication Readiness</Link>
-          <Link to="/decision-log">Decision Log</Link>' -PresencePattern 'to="/governance-console"'
+$mainContent = Ensure-NavBlock -Content $mainContent -Anchor '<Link to="/dashboard">Dashboard</Link>' -NavBlock '<Link to="/executive-overview">Executive Overview</Link>
+          <Link to="/delivery-control-tower">Delivery Control Tower</Link>
+          <Link to="/workstream-board">Workstream Board</Link>
+          <Link to="/escalation-center">Escalation Center</Link>' -PresencePattern 'to="/executive-overview"'
 
-$mainContent = Ensure-RouteBlock -Content $mainContent -AnchorRoute '{ path: "/dashboard", element: <DashboardPage /> },' -RouteBlock '{ path: "/governance-console", element: <GovernanceConsolePage /> },
-  { path: "/publication-readiness", element: <PublicationReadinessBoardPage /> },
-  { path: "/decision-log", element: <DecisionLogPage /> },' -PresencePattern 'path: "/governance-console"'
+$mainContent = Ensure-RouteBlock -Content $mainContent -AnchorRoute '{ path: "/dashboard", element: <DashboardPage /> },' -RouteBlock '{ path: "/executive-overview", element: <ExecutiveOverviewPage /> },
+  { path: "/delivery-control-tower", element: <DeliveryControlTowerPage /> },
+  { path: "/workstream-board", element: <WorkstreamBoardPage /> },
+  { path: "/escalation-center", element: <EscalationCenterPage /> },' -PresencePattern 'path: "/executive-overview"'
 
 Write-Utf8File -Path $mainPath -Content $mainContent
 
@@ -364,4 +386,4 @@ Build-Backend -RootDir $RootDir
 Write-Host "Building frontend..."
 Build-Frontend -RootDir $RootDir
 
-Write-Host "Phase 6.18 applied successfully."
+Write-Host "Phase 6.19 applied successfully."

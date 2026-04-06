@@ -41,6 +41,9 @@ import { ReviewQueuePage } from "./pages/ReviewQueuePage";
 import { ReviewWorkspacePage } from "./pages/ReviewWorkspacePage";
 import { PublicationDeskPage } from "./pages/PublicationDeskPage";
 import { DashboardPage } from "./pages/DashboardPage";
+import { GovernanceConsolePage } from "./pages/GovernanceConsolePage";
+import { PublicationReadinessBoardPage } from "./pages/PublicationReadinessBoardPage";
+import { DecisionLogPage } from "./pages/DecisionLogPage";
 import { OperationsIntelligencePage } from "./pages/OperationsIntelligencePage";
 import "./index.css";
 
@@ -65,6 +68,9 @@ function Layout({ children }: { children: React.ReactNode }) {
           <Link to="/cases">Cases</Link>
           <Link to="/cases/new">New Case</Link>
           <Link to="/reviews">Reviews</Link>
+<Link to="/governance-console">Governance Console</Link>
+          <Link to="/publication-readiness">Publication Readiness</Link>
+          <Link to="/decision-log">Decision Log</Link>
           <Link to="/review-queue">Review Queue</Link>
           <Link to="/review-workspace">Review Workspace</Link>
           <Link to="/publication-desk">Publication Desk</Link>
@@ -169,6 +175,9 @@ function HealthPage() {
 const router = createBrowserRouter([
   { path: "/", element: <HomePage /> },
   { path: "/dashboard", element: <DashboardPage /> },
+{ path: "/governance-console", element: <GovernanceConsolePage /> },
+  { path: "/publication-readiness", element: <PublicationReadinessBoardPage /> },
+  { path: "/decision-log", element: <DecisionLogPage /> },
   { path: "/operations-intelligence", element: <OperationsIntelligencePage /> },
   { path: "/investigation-navigator", element: <InvestigationNavigatorPage /> },
   { path: "/health", element: <HealthPage /> },
