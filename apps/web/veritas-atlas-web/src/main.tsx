@@ -74,7 +74,34 @@ function HomePage() {
     <Layout>
       <h2>Home</h2>
       <p>Statement filtering and claim workspace placeholder are now available.</p>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "16px", marginTop: "20px" }}>
+        <QuickCard title="Sources" text="Browse and manage source records." to="/sources" />
+        <QuickCard title="Documents" text="Open document inventory and linked records." to="/documents" />
+        <QuickCard title="Evidence" text="Inspect evidence and create linked statements." to="/evidence" />
+        <QuickCard title="Statements" text="Filter and review extracted statements." to="/statements" />
+        <QuickCard title="Claims Workspace" text="Prepare the next claim slice." to="/claims/workspace" />
+      </div>
     </Layout>
+  );
+}
+
+function QuickCard({ title, text, to }: { title: string; text: string; to: string }) {
+  return (
+    <Link
+      to={to}
+      style={{
+        border: "1px solid #ddd",
+        borderRadius: "14px",
+        padding: "16px",
+        textDecoration: "none",
+        color: "inherit",
+        display: "block",
+      }}
+    >
+      <strong style={{ display: "block", marginBottom: "8px" }}>{title}</strong>
+      <span>{text}</span>
+    </Link>
   );
 }
 

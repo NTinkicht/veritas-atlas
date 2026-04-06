@@ -1,15 +1,15 @@
 ﻿import { Link, useSearchParams } from "react-router-dom";
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { useStatements } from "../hooks/useStatements";
 
 export function StatementsPage() {
-  const [params] = useSearchParams();
-  const forcedEvidenceId = params.get("evidenceId") ?? "";
+  const [params, setParams] = useSearchParams();
 
-  const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("All");
-  const [polarityFilter, setPolarityFilter] = useState("All");
-  const [topicFilter, setTopicFilter] = useState("All");
+  const forcedEvidenceId = params.get("evidenceId") ?? "";
+  const search = params.get("search") ?? "";
+  const statusFilter = params.get("status") ?? "All";
+  const polarityFilter = params.get("polarity") ?? "All";
+  const topicFilter = params.get("topic") ?? "All";
 
   const query = useStatements();
   const items = query.data?.items ?? [];
@@ -56,6 +56,16 @@ export function StatementsPage() {
     [items]
   );
 
+  const updateParam = (key: string, value: string) => {
+    const next = new URLSearchParams(params);
+    if (!value || value === "All") {
+      next.delete(key);
+    } else {
+      next.set(key, value);
+    }
+    setParams(next);
+  };
+
   return (
     <div style={{ fontFamily: "Arial, sans-serif", padding: "24px" }}>
       <header style={{ marginBottom: "24px" }}>
@@ -78,21 +88,21 @@ export function StatementsPage() {
       <section style={filterPanelStyle}>
         <input
           value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          onChange={(e) => updateParam("search", e.target.value)}
           placeholder="Search statement text, topic, predicate, or object"
           style={inputStyle}
         />
-        <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} style={selectStyle}>
+        <select value={statusFilter} onChange={(e) => updateParam("status", e.target.value)} style={selectStyle}>
           {statuses.map((value) => (
             <option key={value} value={value}>{value}</option>
           ))}
         </select>
-        <select value={polarityFilter} onChange={(e) => setPolarityFilter(e.target.value)} style={selectStyle}>
+        <select value={polarityFilter} onChange={(e) => updateParam("polarity", e.target.value)} style={selectStyle}>
           {polarities.map((value) => (
             <option key={value} value={value}>{value}</option>
           ))}
         </select>
-        <select value={topicFilter} onChange={(e) => setTopicFilter(e.target.value)} style={selectStyle}>
+        <select value={topicFilter} onChange={(e) => updateParam("topic", e.target.value)} style={selectStyle}>
           {topics.map((value) => (
             <option key={value} value={value}>{value}</option>
           ))}
