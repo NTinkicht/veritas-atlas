@@ -22,8 +22,11 @@ import { CreateEvidencePage } from "./pages/CreateEvidencePage";
 import { CreateSourcePage } from "./pages/CreateSourcePage";
 import { IngestionWorkspacePage } from "./pages/IngestionWorkspacePage";
 import { SourcesPage } from "./pages/SourcesPage";
+import { SourceDetailPage } from "./pages/SourceDetailPage";
 import { DocumentsPage } from "./pages/DocumentsPage";
+import { DocumentDetailPage } from "./pages/DocumentDetailPage";
 import { EvidencePage } from "./pages/EvidencePage";
+import { EvidenceDetailPage } from "./pages/EvidenceDetailPage";
 import { CaseDetailPage } from "./pages/CaseDetailPage";
 import { ReviewsPage } from "./pages/ReviewsPage";
 import { DashboardPage } from "./pages/DashboardPage";
@@ -65,7 +68,7 @@ function HomePage() {
   return (
     <Layout>
       <h2>Home</h2>
-      <p>Browse pages are now available for sources, documents, and evidence.</p>
+      <p>Detail pages and cross-links are now available for sources, documents, and evidence.</p>
     </Layout>
   );
 }
@@ -127,11 +130,14 @@ const router = createBrowserRouter([
   { path: "/reviews", element: <ReviewsPage /> },
   { path: "/ingestion", element: <IngestionWorkspacePage /> },
   { path: "/sources", element: <SourcesPage /> },
-  { path: "/documents", element: <DocumentsPage /> },
-  { path: "/evidence", element: <EvidencePage /> },
   { path: "/sources/new", element: <CreateSourcePage /> },
+  { path: "/sources/:id", element: <SourceDetailPage /> },
+  { path: "/documents", element: <DocumentsPage /> },
   { path: "/documents/new", element: <CreateDocumentPage /> },
+  { path: "/documents/:id", element: <DocumentDetailPage /> },
+  { path: "/evidence", element: <EvidencePage /> },
   { path: "/evidence/new", element: <CreateEvidencePage /> },
+  { path: "/evidence/:id", element: <EvidenceDetailPage /> },
   { path: "/statements/new", element: <CreateStatementPage /> },
 ]);
 

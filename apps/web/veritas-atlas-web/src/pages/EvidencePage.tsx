@@ -1,14 +1,16 @@
-﻿import { Link } from "react-router-dom";
+﻿import { Link, useSearchParams } from "react-router-dom";
 import { useMemo, useState, type CSSProperties } from "react";
 import { useEvidenceList } from "../hooks/useEvidenceList";
 import type { EvidenceItem } from "../api/evidenceList";
 
 export function EvidencePage() {
+  const [params] = useSearchParams();
+  const forcedDocumentId = params.get("documentId") ?? "";
   const [documentIdFilter, setDocumentIdFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
 
   const evidenceQuery = useEvidenceList({
-    documentId: documentIdFilter || undefined,
+    documentId: forcedDocumentId || documentIdFilter || undefined,
     status: statusFilter,
   });
 
@@ -42,7 +44,7 @@ export function EvidencePage() {
 
       <section style={filterPanelStyle}>
         <input
-          value={documentIdFilter}
+          value={forcedDocumentId || documentIdFilter}
           onChange={(e) => setDocumentIdFilter(e.target.value)}
           placeholder="Filter by document id"
           style={inputStyle}
@@ -86,8 +88,8 @@ export function EvidencePage() {
                 <tbody>
                   {items.map((item: EvidenceItem) => (
                     <tr key={item.id}>
-                      <td style={tdStyle}>{item.id}</td>
-                      <td style={tdStyle}>{item.documentId ?? "N/A"}</td>
+                      <td style={tdStyle}><Link to={`/evidence/${item.id}`}>{item.id}</Link></td>
+                      <td style={tdStyle}>{item.documentId ? <Link to={`/documents/${item.documentId}`}>{item.documentId}</Link> : "N/A"}</td>
                       <td style={tdStyle}>{item.status}</td>
                       <td style={tdStyle}>{formatDate(item.createdAtUtc)}</td>
                     </tr>

@@ -23,6 +23,21 @@ public sealed record GetDocumentsItemResponse(
     DateTime CreatedAtUtc,
     DateTime UpdatedAtUtc);
 
+public sealed record GetDocumentResponse(
+    Guid Id,
+    Guid SourceId,
+    string Title,
+    string Type,
+    string Status,
+    string? LanguageCode,
+    string? ExternalId,
+    string? Url,
+    string? ContentHash,
+    DateTime? PublishedAtUtc,
+    DateTime? RetrievedAtUtc,
+    DateTime CreatedAtUtc,
+    DateTime UpdatedAtUtc);
+
 public sealed record GetDocumentsResponse(
     IReadOnlyCollection<GetDocumentsItemResponse> Items,
     int Page,

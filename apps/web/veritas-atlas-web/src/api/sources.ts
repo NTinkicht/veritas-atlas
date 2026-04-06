@@ -17,6 +17,18 @@ export type SourceItem = {
   updatedAtUtc: string;
 };
 
+export type SourceDetail = {
+  id: string;
+  name: string;
+  description: string | null;
+  type: string;
+  status: string;
+  trustTier: string;
+  reference: SourceReferenceResponse | null;
+  createdAtUtc: string;
+  updatedAtUtc: string;
+};
+
 export type SourcesResponse = {
   items: SourceItem[];
   page: number;
@@ -42,4 +54,8 @@ export async function getSources(query?: SourcesQuery): Promise<SourcesResponse>
   if (query?.status && query.status !== "All") params.set("status", query.status);
 
   return apiGet<SourcesResponse>(`/api/v1/sources?${params.toString()}`);
+}
+
+export async function getSourceById(id: string): Promise<SourceDetail> {
+  return apiGet<SourceDetail>(`/api/v1/sources/${id}`);
 }

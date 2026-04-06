@@ -17,7 +17,7 @@ public sealed class EvidenceController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<ActionResult<GetEvidenceResponse>> GetEvidence(
+    public async Task<ActionResult<GetEvidenceListResponse>> GetEvidence(
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 20,
         [FromQuery] Guid? documentId = null,
@@ -50,12 +50,40 @@ public sealed class EvidenceController : ControllerBase
                 entity.UpdatedAtUtc))
             .ToArray();
 
-        return Ok(new GetEvidenceResponse(
+        return Ok(new GetEvidenceListResponse(
             items,
             result.Page,
             result.PageSize,
             result.TotalCount,
             result.TotalPages));
+    }
+
+    [HttpGet("{id:guid}")]
+    public async Task<ActionResult<GetEvidenceResponse>> GetEvidenceById(
+        [FromRoute] Guid id,
+        CancellationToken cancellationToken = default)
+    {
+        var result = await _evidenceService.GetEvidenceAsync(1, int.MaxValue, null, null, cancellationToken);
+        var entity = result.Items.FirstOrDefault(x => x.Id == id);
+
+        if (entity is null)
+        {
+            return NotFound();
+        }
+
+        return Ok(new GetEvidenceResponse(
+            entity.Id,
+            entity.SourceId,
+            entity.DocumentId,
+            entity.Type.ToString(),
+            entity.Status.ToString(),
+            entity.Content,
+            entity.ContentHash,
+            entity.LanguageCode,
+            entity.Span.HasValue ? new GetEvidenceResponseItemSpan(entity.Span.Value.StartOffset, entity.Span.Value.EndOffset) : null,
+            entity.CapturedAtUtc,
+            entity.CreatedAtUtc,
+            entity.UpdatedAtUtc));
     }
 
     [HttpPost]

@@ -1,15 +1,18 @@
-﻿import { Link } from "react-router-dom";
+﻿import { Link, useSearchParams } from "react-router-dom";
 import { useMemo, useState, type CSSProperties } from "react";
 import { useSources } from "../hooks/useSources";
 import type { SourceItem, SourceReferenceResponse } from "../api/sources";
 
 export function SourcesPage() {
+  const [params] = useSearchParams();
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState("All");
   const [statusFilter, setStatusFilter] = useState("All");
 
+  const forcedSearch = params.get("search") ?? undefined;
+
   const sourcesQuery = useSources({
-    search: search || undefined,
+    search: forcedSearch ?? (search || undefined),
     type: typeFilter,
     status: statusFilter,
   });
@@ -49,7 +52,7 @@ export function SourcesPage() {
 
       <section style={filterPanelStyle}>
         <input
-          value={search}
+          value={forcedSearch ?? search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search name, type, status, domain, url, or external id"
           style={inputStyle}
@@ -99,7 +102,7 @@ export function SourcesPage() {
                 <tbody>
                   {items.map((item: SourceItem) => (
                     <tr key={item.id}>
-                      <td style={tdStyle}>{item.name}</td>
+                      <td style={tdStyle}><Link to={`/sources/${item.id}`}>{item.name}</Link></td>
                       <td style={tdStyle}>{item.type}</td>
                       <td style={tdStyle}>{renderReference(item.reference)}</td>
                       <td style={tdStyle}>{item.status}</td>

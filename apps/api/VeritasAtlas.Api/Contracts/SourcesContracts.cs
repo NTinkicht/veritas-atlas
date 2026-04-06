@@ -30,6 +30,17 @@ public sealed record GetSourcesItemResponse(
     DateTime CreatedAtUtc,
     DateTime UpdatedAtUtc);
 
+public sealed record GetSourceResponse(
+    Guid Id,
+    string Name,
+    string? Description,
+    string Type,
+    string Status,
+    string TrustTier,
+    SourceReferenceResponse? Reference,
+    DateTime CreatedAtUtc,
+    DateTime UpdatedAtUtc);
+
 public sealed record GetSourcesResponse(
     IReadOnlyCollection<GetSourcesItemResponse> Items,
     int Page,

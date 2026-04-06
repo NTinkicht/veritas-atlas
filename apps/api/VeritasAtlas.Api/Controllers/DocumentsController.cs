@@ -59,6 +59,35 @@ public sealed class DocumentsController : ControllerBase
             result.TotalPages));
     }
 
+    [HttpGet("{id:guid}")]
+    public async Task<ActionResult<GetDocumentResponse>> GetDocumentById(
+        [FromRoute] Guid id,
+        CancellationToken cancellationToken = default)
+    {
+        var result = await _documentService.GetDocumentsAsync(1, int.MaxValue, null, null, cancellationToken);
+        var entity = result.Items.FirstOrDefault(x => x.Id == id);
+
+        if (entity is null)
+        {
+            return NotFound();
+        }
+
+        return Ok(new GetDocumentResponse(
+            entity.Id,
+            entity.SourceId,
+            entity.Title,
+            entity.Type.ToString(),
+            entity.Status.ToString(),
+            entity.LanguageCode,
+            entity.ExternalId,
+            entity.Url,
+            entity.ContentHash,
+            entity.PublishedAtUtc,
+            entity.RetrievedAtUtc,
+            entity.CreatedAtUtc,
+            entity.UpdatedAtUtc));
+    }
+
     [HttpPost]
     public async Task<ActionResult<CreateDocumentResponse>> CreateDocument(
         [FromBody] CreateDocumentRequest request,

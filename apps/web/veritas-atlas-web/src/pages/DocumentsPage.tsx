@@ -1,14 +1,16 @@
-﻿import { Link } from "react-router-dom";
+﻿import { Link, useSearchParams } from "react-router-dom";
 import { useMemo, useState, type CSSProperties } from "react";
 import { useDocuments } from "../hooks/useDocuments";
 import type { DocumentItem } from "../api/documents";
 
 export function DocumentsPage() {
+  const [params] = useSearchParams();
+  const forcedSourceId = params.get("sourceId") ?? "";
   const [sourceIdFilter, setSourceIdFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
 
   const documentsQuery = useDocuments({
-    sourceId: sourceIdFilter || undefined,
+    sourceId: forcedSourceId || sourceIdFilter || undefined,
     status: statusFilter,
   });
 
@@ -42,7 +44,7 @@ export function DocumentsPage() {
 
       <section style={filterPanelStyle}>
         <input
-          value={sourceIdFilter}
+          value={forcedSourceId || sourceIdFilter}
           onChange={(e) => setSourceIdFilter(e.target.value)}
           placeholder="Filter by source id"
           style={inputStyle}
@@ -87,8 +89,8 @@ export function DocumentsPage() {
                 <tbody>
                   {items.map((item: DocumentItem) => (
                     <tr key={item.id}>
-                      <td style={tdStyle}>{item.id}</td>
-                      <td style={tdStyle}>{item.sourceId}</td>
+                      <td style={tdStyle}><Link to={`/documents/${item.id}`}>{item.id}</Link></td>
+                      <td style={tdStyle}><Link to={`/sources/${item.sourceId}`}>{item.sourceId}</Link></td>
                       <td style={tdStyle}>{item.title}</td>
                       <td style={tdStyle}>{item.status}</td>
                       <td style={tdStyle}>{formatDate(item.createdAtUtc)}</td>

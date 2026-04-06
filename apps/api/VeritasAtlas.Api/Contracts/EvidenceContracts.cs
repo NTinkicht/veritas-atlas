@@ -23,7 +23,25 @@ public sealed record GetEvidenceItemResponse(
     DateTime CreatedAtUtc,
     DateTime UpdatedAtUtc);
 
+public sealed record GetEvidenceResponseItemSpan(
+    int StartOffset,
+    int EndOffset);
+
 public sealed record GetEvidenceResponse(
+    Guid Id,
+    Guid SourceId,
+    Guid? DocumentId,
+    string Type,
+    string Status,
+    string Content,
+    string? ContentHash,
+    string? LanguageCode,
+    GetEvidenceResponseItemSpan? Span,
+    DateTime? CapturedAtUtc,
+    DateTime CreatedAtUtc,
+    DateTime UpdatedAtUtc);
+
+public sealed record GetEvidenceListResponse(
     IReadOnlyCollection<GetEvidenceItemResponse> Items,
     int Page,
     int PageSize,

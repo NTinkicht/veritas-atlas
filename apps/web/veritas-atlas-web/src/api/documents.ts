@@ -9,6 +9,22 @@ export type DocumentItem = {
   updatedAtUtc: string;
 };
 
+export type DocumentDetail = {
+  id: string;
+  sourceId: string;
+  title: string;
+  type: string;
+  status: string;
+  languageCode: string | null;
+  externalId: string | null;
+  url: string | null;
+  contentHash: string | null;
+  publishedAtUtc: string | null;
+  retrievedAtUtc: string | null;
+  createdAtUtc: string;
+  updatedAtUtc: string;
+};
+
 export type DocumentsResponse = {
   items: DocumentItem[];
   page: number;
@@ -32,4 +48,8 @@ export async function getDocuments(query?: DocumentsQuery): Promise<DocumentsRes
   if (query?.status && query.status !== "All") params.set("status", query.status);
 
   return apiGet<DocumentsResponse>(`/api/v1/documents?${params.toString()}`);
+}
+
+export async function getDocumentById(id: string): Promise<DocumentDetail> {
+  return apiGet<DocumentDetail>(`/api/v1/documents/${id}`);
 }

@@ -1,0 +1,105 @@
+﻿Phase 6.5 detail pages verification
+Generated: 2026-04-06T22:14:00
+Root: C:\Projects\veritas-atlas
+
+========================================================================================================================
+POST /api/v1/sources
+========================================================================================================================
+{
+    "id":  "79a9bfe1-1c09-4869-9928-e2b2670e5d9f",
+    "name":  "Detail Smoke Source",
+    "type":  "Article",
+    "reference":  {
+                      "externalId":  null,
+                      "url":  "https://example.com/detail-test",
+                      "domain":  "example.com",
+                      "languageCode":  null
+                  },
+    "status":  "Draft",
+    "createdAtUtc":  "2026-04-06T18:14:35.3179891Z",
+    "updatedAtUtc":  "2026-04-06T18:14:35.3180554Z"
+}
+
+========================================================================================================================
+POST /api/v1/documents
+========================================================================================================================
+{
+    "id":  "b3433e8e-b514-435c-9d59-c7792107e48c",
+    "sourceId":  "79a9bfe1-1c09-4869-9928-e2b2670e5d9f",
+    "title":  "Detail Smoke Document",
+    "status":  "Draft",
+    "createdAtUtc":  "2026-04-06T18:14:37.0960943Z",
+    "updatedAtUtc":  "2026-04-06T18:14:37.0960946Z"
+}
+
+========================================================================================================================
+POST /api/v1/evidence
+========================================================================================================================
+{
+    "id":  "9d7c98fe-f75a-4937-a8ca-5efc41e4b2de",
+    "documentId":  "b3433e8e-b514-435c-9d59-c7792107e48c",
+    "quote":  "Evidence snippet for detail test.",
+    "status":  "Pending",
+    "createdAtUtc":  "2026-04-06T18:14:37.6508595Z",
+    "updatedAtUtc":  "2026-04-06T18:14:37.6508596Z"
+}
+
+========================================================================================================================
+GET /api/v1/sources/{id}
+========================================================================================================================
+{
+    "id":  "79a9bfe1-1c09-4869-9928-e2b2670e5d9f",
+    "name":  "Detail Smoke Source",
+    "description":  null,
+    "type":  "Article",
+    "status":  "Draft",
+    "trustTier":  "Unknown",
+    "reference":  {
+                      "externalId":  null,
+                      "url":  "https://example.com/detail-test",
+                      "domain":  "example.com",
+                      "languageCode":  null
+                  },
+    "createdAtUtc":  "2026-04-06T18:14:35.317989Z",
+    "updatedAtUtc":  "2026-04-06T18:14:35.318055Z"
+}
+
+========================================================================================================================
+GET /api/v1/documents/{id}
+========================================================================================================================
+{
+    "id":  "b3433e8e-b514-435c-9d59-c7792107e48c",
+    "sourceId":  "79a9bfe1-1c09-4869-9928-e2b2670e5d9f",
+    "title":  "Detail Smoke Document",
+    "type":  "Unknown",
+    "status":  "Draft",
+    "languageCode":  null,
+    "externalId":  "detail-doc-001",
+    "url":  null,
+    "contentHash":  "0DF537C23460AB197D7D8C60B4D196E1DA70FDB9B7DF521B6731DE20157D8878",
+    "publishedAtUtc":  null,
+    "retrievedAtUtc":  "2026-04-06T18:14:37.096637Z",
+    "createdAtUtc":  "2026-04-06T18:14:37.096094Z",
+    "updatedAtUtc":  "2026-04-06T18:14:37.096094Z"
+}
+
+========================================================================================================================
+GET /api/v1/evidence/{id}
+========================================================================================================================
+{
+    "id":  "9d7c98fe-f75a-4937-a8ca-5efc41e4b2de",
+    "sourceId":  "79a9bfe1-1c09-4869-9928-e2b2670e5d9f",
+    "documentId":  "b3433e8e-b514-435c-9d59-c7792107e48c",
+    "type":  "Quote",
+    "status":  "Pending",
+    "content":  "Evidence snippet for detail test.\r\n\r\nEvidence context for detail test.",
+    "contentHash":  "ECCDFB80CC1C3C93DEC50C3A695EA87027725245B175313185B02CB1C3E67027",
+    "languageCode":  null,
+    "span":  {
+                 "startOffset":  0,
+                 "endOffset":  32
+             },
+    "capturedAtUtc":  "2026-04-06T18:14:37.651622Z",
+    "createdAtUtc":  "2026-04-06T18:14:37.650859Z",
+    "updatedAtUtc":  "2026-04-06T18:14:37.650859Z"
+}
