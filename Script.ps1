@@ -1,5 +1,7 @@
 param(
-    [string]$RootDir = "C:\Projects\veritas-atlas"
+    [string]$RootDir = "C:\Projects\veritas-atlas",
+    [string]$ApiProject = "apps\api\VeritasAtlas.Api\VeritasAtlas.Api.csproj",
+    [string]$BaseUrl = "http://localhost:5091"
 )
 
 $ErrorActionPreference = "Stop"
@@ -11,21 +13,54 @@ function Ensure-Directory {
     }
 }
 
-function Write-Utf8File {
+function Add-Section {
     param(
-        [string]$Path,
+        [string]$OutputPath,
+        [string]$Title,
         [string]$Content
     )
-    $parent = Split-Path -Parent $Path
-    Ensure-Directory $parent
-    Set-Content -Path $Path -Value $Content -Encoding UTF8
-    Write-Host "Wrote: $Path" -ForegroundColor Green
+
+    Add-Content -Path $OutputPath -Value ""
+    Add-Content -Path $OutputPath -Value ("=" * 120)
+    Add-Content -Path $OutputPath -Value $Title
+    Add-Content -Path $OutputPath -Value ("=" * 120)
+    Add-Content -Path $OutputPath -Value $Content
+}
+
+function Wait-ForApi {
+    param(
+        [string]$HealthUrl,
+        [int]$MaxAttempts = 40
+    )
+
+    for ($i = 1; $i -le $MaxAttempts; $i++) {
+        try {
+            $null = Invoke-RestMethod -Method Get -Uri $HealthUrl -TimeoutSec 2
+            return $true
+        }
+        catch {
+            Start-Sleep -Milliseconds 750
+        }
+    }
+
+    return $false
+}
+
+$solutionPath = Join-Path $RootDir "VeritasAtlas.slnx"
+$apiProjectPath = Join-Path $RootDir $ApiProject
+
+if (-not (Test-Path $solutionPath)) {
+    throw "Solution file not found: $solutionPath"
+}
+
+if (-not (Test-Path $apiProjectPath)) {
+    throw "API project not found: $apiProjectPath"
 }
 
 Push-Location $RootDir
 
 Write-Host ""
-Write-Host "Checkpointing before StatementService hard repair..." -ForegroundColor Cyan
+Write-Host "Checkpointing current code with git..." -ForegroundColor Cyan
 
 git add -A
 if ($LASTEXITCODE -ne 0) {
@@ -33,147 +68,176 @@ if ($LASTEXITCODE -ne 0) {
     throw "git add failed."
 }
 
-$commitMessage = "checkpoint before statementservice hard repair - $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')"
+$commitMessage = "checkpoint before statement smoke test - $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')"
 git commit -m $commitMessage 2>$null
 if ($LASTEXITCODE -ne 0) {
-    Write-Host "No new commit created. Continuing with repair." -ForegroundColor Yellow
+    Write-Host "No new commit created. Continuing with smoke test." -ForegroundColor Yellow
 }
 else {
     Write-Host "Created git commit: $commitMessage" -ForegroundColor Green
 }
 
-Pop-Location
+$timestamp = Get-Date -Format "yyyyMMdd-HHmmss"
+$diagDir = Join-Path $RootDir "_diagnostics\statement-smoke-$timestamp"
+Ensure-Directory $diagDir
 
-$servicePath = Join-Path $RootDir "apps\api\VeritasAtlas.Infrastructure\Services\StatementService.cs"
-$solutionPath = Join-Path $RootDir "VeritasAtlas.slnx"
+$reportPath = Join-Path $diagDir "statement-smoke-report.txt"
+$stdoutPath = Join-Path $diagDir "api-stdout.log"
+$stderrPath = Join-Path $diagDir "api-stderr.log"
 
-$serviceContent = @'
-using Microsoft.EntityFrameworkCore;
-using VeritasAtlas.Application.Common;
-using VeritasAtlas.Application.Contracts.Statements;
-using VeritasAtlas.Application.Interfaces;
-using VeritasAtlas.Domain.Entities;
-using VeritasAtlas.Domain.Enums;
-using VeritasAtlas.Domain.ValueObjects;
-using VeritasAtlas.Infrastructure.Persistence;
-
-namespace VeritasAtlas.Infrastructure.Services;
-
-public sealed class StatementService : IStatementService
-{
-    private readonly VeritasAtlasDbContext _dbContext;
-
-    public StatementService(VeritasAtlasDbContext dbContext)
-    {
-        _dbContext = dbContext;
-    }
-
-    public async Task<Statement> ExtractStatementAsync(
-        Guid evidenceId,
-        string text,
-        string? createdBy = null,
-        CancellationToken cancellationToken = default)
-    {
-        var evidence = await _dbContext.Evidences
-            .FirstOrDefaultAsync(x => x.Id == evidenceId, cancellationToken);
-
-        if (evidence is null)
-        {
-            throw new NotFoundException($"Evidence '{evidenceId}' was not found.");
-        }
-
-        if (string.IsNullOrWhiteSpace(text))
-        {
-            throw new ValidationException("Statement text is required.");
-        }
-
-        var normalized = text.Trim();
-
-        var entity = new Statement
-        {
-            EvidenceId = evidenceId,
-            DocumentId = evidence.DocumentId,
-            Text = new StatementText(normalized, normalized),
-            Polarity = StatementPolarity.Affirmative,
-            Status = StatementStatus.Extracted,
-            Topic = "general"
-        };
-
-        _dbContext.Statements.Add(entity);
-        await _dbContext.SaveChangesAsync(cancellationToken);
-
-        return entity;
-    }
-
-    public async Task<(int Total, List<StatementListItemResponse> Items)> GetStatementsAsync(
-        int page,
-        int pageSize)
-    {
-        page = page < 1 ? 1 : page;
-        pageSize = pageSize < 1 ? 20 : pageSize;
-
-        var query = _dbContext.Statements.AsNoTracking();
-
-        var total = await query.CountAsync();
-
-        var items = await query
-            .OrderByDescending(x => x.CreatedAtUtc)
-            .Skip((page - 1) * pageSize)
-            .Take(pageSize)
-            .Select(x => new StatementListItemResponse
-            {
-                Id = x.Id,
-                Text = x.Text.Raw,
-                Topic = x.Topic,
-                Predicate = x.Predicate,
-                Object = x.ObjectValue,
-                Polarity = x.Polarity.ToString(),
-                Status = x.Status.ToString(),
-                CreatedAt = x.CreatedAtUtc
-            })
-            .ToListAsync();
-
-        return (total, items);
-    }
-
-    public async Task<StatementDetailResponse?> GetStatementByIdAsync(Guid id)
-    {
-        return await _dbContext.Statements
-            .AsNoTracking()
-            .Where(x => x.Id == id)
-            .Select(x => new StatementDetailResponse
-            {
-                Id = x.Id,
-                Text = x.Text.Raw,
-                Topic = x.Topic,
-                Predicate = x.Predicate,
-                Object = x.ObjectValue,
-                Polarity = x.Polarity.ToString(),
-                Status = x.Status.ToString(),
-                EvidenceId = x.EvidenceId,
-                PersonId = x.PersonId,
-                CreatedAt = x.CreatedAtUtc
-            })
-            .FirstOrDefaultAsync();
-    }
-}
-'@
+Set-Content -Path $reportPath -Value "Statement smoke test`r`nGenerated: $(Get-Date -Format s)`r`nRoot: $RootDir" -Encoding UTF8
 
 Write-Host ""
-Write-Host "Replacing StatementService.cs with a clean version..." -ForegroundColor Cyan
-Write-Utf8File -Path $servicePath -Content $serviceContent
+Write-Host "Building..." -ForegroundColor Cyan
 
-Write-Host ""
-Write-Host "Building after hard repair..." -ForegroundColor Cyan
-
-Push-Location $RootDir
 dotnet build $solutionPath
-$buildExit = $LASTEXITCODE
-Pop-Location
-
-if ($buildExit -ne 0) {
+if ($LASTEXITCODE -ne 0) {
+    Pop-Location
     throw "dotnet build failed."
 }
 
 Write-Host ""
-Write-Host "StatementService hard repair completed successfully." -ForegroundColor Green
+Write-Host "Starting API..." -ForegroundColor Cyan
+
+$apiProcess = Start-Process `
+    -FilePath "dotnet" `
+    -ArgumentList @("run", "--project", $apiProjectPath, "--no-build") `
+    -WorkingDirectory $RootDir `
+    -RedirectStandardOutput $stdoutPath `
+    -RedirectStandardError $stderrPath `
+    -PassThru
+
+try {
+    $healthOk = Wait-ForApi -HealthUrl "$BaseUrl/health"
+    if (-not $healthOk) {
+        throw "API did not become ready."
+    }
+
+    Write-Host "API is reachable." -ForegroundColor Green
+
+    $sourceBody = @{
+        name = "Statement Smoke Source"
+        type = "Article"
+        reference = "https://example.com/statement-smoke"
+        createdBy = "statement-smoke"
+    } | ConvertTo-Json -Depth 5
+
+    $sourceResponse = Invoke-RestMethod `
+        -Method Post `
+        -Uri "$BaseUrl/api/v1/sources" `
+        -ContentType "application/json" `
+        -Body $sourceBody
+
+    Add-Section -OutputPath $reportPath -Title "POST /api/v1/sources" -Content (($sourceResponse | ConvertTo-Json -Depth 10))
+
+    $documentBody = @{
+        sourceId = $sourceResponse.id
+        title = "Statement Smoke Document"
+        content = "This is a document used for statement smoke testing."
+        externalReference = "statement-smoke-doc-001"
+        createdBy = "statement-smoke"
+    } | ConvertTo-Json -Depth 5
+
+    $documentResponse = Invoke-RestMethod `
+        -Method Post `
+        -Uri "$BaseUrl/api/v1/documents" `
+        -ContentType "application/json" `
+        -Body $documentBody
+
+    Add-Section -OutputPath $reportPath -Title "POST /api/v1/documents" -Content (($documentResponse | ConvertTo-Json -Depth 10))
+
+    $evidenceBody = @{
+        documentId = $documentResponse.id
+        quote = "This is a quoted evidence snippet for statement testing."
+        startOffset = 0
+        endOffset = 54
+        context = "Additional evidence context."
+        createdBy = "statement-smoke"
+    } | ConvertTo-Json -Depth 5
+
+    $evidenceResponse = Invoke-RestMethod `
+        -Method Post `
+        -Uri "$BaseUrl/api/v1/evidence" `
+        -ContentType "application/json" `
+        -Body $evidenceBody
+
+    Add-Section -OutputPath $reportPath -Title "POST /api/v1/evidence" -Content (($evidenceResponse | ConvertTo-Json -Depth 10))
+
+    $statementBody = @{
+        evidenceId = $evidenceResponse.id
+        text = "The subject made a statement during the recorded event."
+        createdBy = "statement-smoke"
+    } | ConvertTo-Json -Depth 5
+
+    $statementCreateResponse = Invoke-RestMethod `
+        -Method Post `
+        -Uri "$BaseUrl/api/v1/statements" `
+        -ContentType "application/json" `
+        -Body $statementBody
+
+    Add-Section -OutputPath $reportPath -Title "POST /api/v1/statements" -Content (($statementCreateResponse | ConvertTo-Json -Depth 10))
+
+    $statementListV1Succeeded = $false
+    $statementListApiSucceeded = $false
+    $statementDetailV1Succeeded = $false
+    $statementDetailApiSucceeded = $false
+
+    try {
+        $statementListV1 = Invoke-RestMethod -Method Get -Uri "$BaseUrl/api/v1/statements?page=1&pageSize=10"
+        $statementListV1Succeeded = $true
+        Add-Section -OutputPath $reportPath -Title "GET /api/v1/statements" -Content (($statementListV1 | ConvertTo-Json -Depth 10))
+    }
+    catch {
+        Add-Section -OutputPath $reportPath -Title "GET /api/v1/statements" -Content $_.Exception.ToString()
+    }
+
+    try {
+        $statementListApi = Invoke-RestMethod -Method Get -Uri "$BaseUrl/api/statements?page=1&pageSize=10"
+        $statementListApiSucceeded = $true
+        Add-Section -OutputPath $reportPath -Title "GET /api/statements" -Content (($statementListApi | ConvertTo-Json -Depth 10))
+    }
+    catch {
+        Add-Section -OutputPath $reportPath -Title "GET /api/statements" -Content $_.Exception.ToString()
+    }
+
+    try {
+        $statementDetailV1 = Invoke-RestMethod -Method Get -Uri "$BaseUrl/api/v1/statements/$($statementCreateResponse.id)"
+        $statementDetailV1Succeeded = $true
+        Add-Section -OutputPath $reportPath -Title "GET /api/v1/statements/{id}" -Content (($statementDetailV1 | ConvertTo-Json -Depth 10))
+    }
+    catch {
+        Add-Section -OutputPath $reportPath -Title "GET /api/v1/statements/{id}" -Content $_.Exception.ToString()
+    }
+
+    try {
+        $statementDetailApi = Invoke-RestMethod -Method Get -Uri "$BaseUrl/api/statements/$($statementCreateResponse.id)"
+        $statementDetailApiSucceeded = $true
+        Add-Section -OutputPath $reportPath -Title "GET /api/statements/{id}" -Content (($statementDetailApi | ConvertTo-Json -Depth 10))
+    }
+    catch {
+        Add-Section -OutputPath $reportPath -Title "GET /api/statements/{id}" -Content $_.Exception.ToString()
+    }
+
+    $summary = @(
+        "POST /api/v1/statements succeeded: True",
+        "GET /api/v1/statements succeeded: $statementListV1Succeeded",
+        "GET /api/statements succeeded: $statementListApiSucceeded",
+        "GET /api/v1/statements/{id} succeeded: $statementDetailV1Succeeded",
+        "GET /api/statements/{id} succeeded: $statementDetailApiSucceeded"
+    ) -join [Environment]::NewLine
+
+    Add-Section -OutputPath $reportPath -Title "SUMMARY" -Content $summary
+
+    Write-Host ""
+    Write-Host "Statement smoke test completed." -ForegroundColor Green
+    Write-Host "Report: $reportPath" -ForegroundColor Cyan
+}
+finally {
+    if ($apiProcess -and -not $apiProcess.HasExited) {
+        Write-Host ""
+        Write-Host "Stopping API..." -ForegroundColor Cyan
+        Stop-Process -Id $apiProcess.Id -Force
+    }
+
+    Pop-Location
+}
