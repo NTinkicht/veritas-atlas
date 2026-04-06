@@ -25,6 +25,21 @@ export type SourcesResponse = {
   totalPages: number;
 };
 
-export async function getSources(): Promise<SourcesResponse> {
-  return apiGet<SourcesResponse>("/api/v1/sources?page=1&pageSize=50");
+export type SourcesQuery = {
+  search?: string;
+  type?: string;
+  status?: string;
+};
+
+export async function getSources(query?: SourcesQuery): Promise<SourcesResponse> {
+  const params = new URLSearchParams({
+    page: "1",
+    pageSize: "50",
+  });
+
+  if (query?.search) params.set("search", query.search);
+  if (query?.type && query.type !== "All") params.set("type", query.type);
+  if (query?.status && query.status !== "All") params.set("status", query.status);
+
+  return apiGet<SourcesResponse>(`/api/v1/sources?${params.toString()}`);
 }

@@ -17,6 +17,19 @@ export type DocumentsResponse = {
   totalPages: number;
 };
 
-export async function getDocuments(): Promise<DocumentsResponse> {
-  return apiGet<DocumentsResponse>("/api/v1/documents?page=1&pageSize=50");
+export type DocumentsQuery = {
+  sourceId?: string;
+  status?: string;
+};
+
+export async function getDocuments(query?: DocumentsQuery): Promise<DocumentsResponse> {
+  const params = new URLSearchParams({
+    page: "1",
+    pageSize: "50",
+  });
+
+  if (query?.sourceId) params.set("sourceId", query.sourceId);
+  if (query?.status && query.status !== "All") params.set("status", query.status);
+
+  return apiGet<DocumentsResponse>(`/api/v1/documents?${params.toString()}`);
 }

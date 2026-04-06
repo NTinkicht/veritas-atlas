@@ -1,9 +1,9 @@
 ﻿import { useQuery } from "@tanstack/react-query";
-import { getDocuments } from "../api/documents";
+import { getDocuments, type DocumentsQuery } from "../api/documents";
 
-export function useDocuments() {
+export function useDocuments(query?: DocumentsQuery) {
   return useQuery({
-    queryKey: ["documents"],
-    queryFn: getDocuments,
+    queryKey: ["documents", query ?? {}],
+    queryFn: () => getDocuments(query),
   });
 }

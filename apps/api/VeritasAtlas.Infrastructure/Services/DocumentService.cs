@@ -4,6 +4,7 @@ using System.Text;
 using VeritasAtlas.Application.Interfaces;
 using VeritasAtlas.Application.Models;
 using VeritasAtlas.Domain.Entities;
+using VeritasAtlas.Domain.Enums;
 using VeritasAtlas.Infrastructure.Persistence;
 
 namespace VeritasAtlas.Infrastructure.Services;
@@ -61,14 +62,26 @@ public sealed class DocumentService : IDocumentService
     public async Task<PagedListResult<Document>> GetDocumentsAsync(
         int page,
         int pageSize,
+        Guid? sourceId = null,
+        DocumentStatus? status = null,
         CancellationToken cancellationToken = default)
     {
         page = page < 1 ? 1 : page;
         pageSize = pageSize < 1 ? 20 : pageSize;
 
-        var query = _dbContext.Documents
-            .AsNoTracking()
-            .OrderByDescending(x => x.CreatedAtUtc);
+        IQueryable<Document> query = _dbContext.Documents.AsNoTracking();
+
+        if (sourceId.HasValue)
+        {
+            query = query.Where(x => x.SourceId == sourceId.Value);
+        }
+
+        if (status.HasValue)
+        {
+            query = query.Where(x => x.Status == status.Value);
+        }
+
+        query = query.OrderByDescending(x => x.CreatedAtUtc);
 
         var totalCount = await query.CountAsync(cancellationToken);
         var items = await query

@@ -1,9 +1,9 @@
 ﻿import { useQuery } from "@tanstack/react-query";
-import { getEvidenceList } from "../api/evidenceList";
+import { getEvidenceList, type EvidenceQuery } from "../api/evidenceList";
 
-export function useEvidenceList() {
+export function useEvidenceList(query?: EvidenceQuery) {
   return useQuery({
-    queryKey: ["evidence"],
-    queryFn: getEvidenceList,
+    queryKey: ["evidence", query ?? {}],
+    queryFn: () => getEvidenceList(query),
   });
 }

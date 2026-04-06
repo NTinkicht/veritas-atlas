@@ -1,5 +1,6 @@
 ﻿using VeritasAtlas.Application.Models;
 using VeritasAtlas.Domain.Entities;
+using VeritasAtlas.Domain.Enums;
 
 namespace VeritasAtlas.Application.Interfaces;
 
@@ -16,5 +17,7 @@ public interface IDocumentService
     Task<PagedListResult<Document>> GetDocumentsAsync(
         int page,
         int pageSize,
+        Guid? sourceId = null,
+        DocumentStatus? status = null,
         CancellationToken cancellationToken = default);
 }

@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using VeritasAtlas.Api.Contracts.Documents;
 using VeritasAtlas.Application.Interfaces;
+using VeritasAtlas.Domain.Enums;
 
 namespace VeritasAtlas.Api.Controllers;
 
@@ -19,9 +20,26 @@ public sealed class DocumentsController : ControllerBase
     public async Task<ActionResult<GetDocumentsResponse>> GetDocuments(
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 20,
+        [FromQuery] Guid? sourceId = null,
+        [FromQuery] string? status = null,
         CancellationToken cancellationToken = default)
     {
-        var result = await _documentService.GetDocumentsAsync(page, pageSize, cancellationToken);
+        DocumentStatus? parsedStatus = null;
+        if (!string.IsNullOrWhiteSpace(status))
+        {
+            if (!Enum.TryParse<DocumentStatus>(status, true, out var documentStatus))
+            {
+                return BadRequest(new { message = "Invalid document status filter." });
+            }
+            parsedStatus = documentStatus;
+        }
+
+        var result = await _documentService.GetDocumentsAsync(
+            page,
+            pageSize,
+            sourceId,
+            parsedStatus,
+            cancellationToken);
 
         var items = result.Items
             .Select(entity => new GetDocumentsItemResponse(

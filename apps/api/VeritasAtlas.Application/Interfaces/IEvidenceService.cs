@@ -1,5 +1,6 @@
 ﻿using VeritasAtlas.Application.Models;
 using VeritasAtlas.Domain.Entities;
+using VeritasAtlas.Domain.Enums;
 
 namespace VeritasAtlas.Application.Interfaces;
 
@@ -17,5 +18,7 @@ public interface IEvidenceService
     Task<PagedListResult<Evidence>> GetEvidenceAsync(
         int page,
         int pageSize,
+        Guid? documentId = null,
+        EvidenceStatus? status = null,
         CancellationToken cancellationToken = default);
 }

@@ -21,9 +21,38 @@ public sealed class SourcesController : ControllerBase
     public async Task<ActionResult<GetSourcesResponse>> GetSources(
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 20,
+        [FromQuery] string? search = null,
+        [FromQuery] string? type = null,
+        [FromQuery] string? status = null,
         CancellationToken cancellationToken = default)
     {
-        var result = await _sourceService.GetSourcesAsync(page, pageSize, cancellationToken);
+        SourceType? parsedType = null;
+        if (!string.IsNullOrWhiteSpace(type))
+        {
+            if (!Enum.TryParse<SourceType>(type, true, out var sourceType))
+            {
+                return BadRequest(new { message = "Invalid source type filter." });
+            }
+            parsedType = sourceType;
+        }
+
+        SourceStatus? parsedStatus = null;
+        if (!string.IsNullOrWhiteSpace(status))
+        {
+            if (!Enum.TryParse<SourceStatus>(status, true, out var sourceStatus))
+            {
+                return BadRequest(new { message = "Invalid source status filter." });
+            }
+            parsedStatus = sourceStatus;
+        }
+
+        var result = await _sourceService.GetSourcesAsync(
+            page,
+            pageSize,
+            search,
+            parsedType,
+            parsedStatus,
+            cancellationToken);
 
         var items = result.Items
             .Select(entity => new GetSourcesItemResponse(

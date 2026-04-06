@@ -4,9 +4,13 @@ import { useDocuments } from "../hooks/useDocuments";
 import type { DocumentItem } from "../api/documents";
 
 export function DocumentsPage() {
-  const documentsQuery = useDocuments();
-  const [search, setSearch] = useState("");
+  const [sourceIdFilter, setSourceIdFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
+
+  const documentsQuery = useDocuments({
+    sourceId: sourceIdFilter || undefined,
+    status: statusFilter,
+  });
 
   const items = documentsQuery.data?.items ?? [];
 
@@ -14,23 +18,6 @@ export function DocumentsPage() {
     () => ["All", ...Array.from(new Set(items.map((x) => x.status))).sort()],
     [items]
   );
-
-  const filteredItems = useMemo(() => {
-    const term = search.trim().toLowerCase();
-
-    return items.filter((item) => {
-      const matchesSearch =
-        term.length === 0 ||
-        item.title.toLowerCase().includes(term) ||
-        item.status.toLowerCase().includes(term) ||
-        item.id.toLowerCase().includes(term) ||
-        item.sourceId.toLowerCase().includes(term);
-
-      const matchesStatus = statusFilter === "All" || item.status === statusFilter;
-
-      return matchesSearch && matchesStatus;
-    });
-  }, [items, search, statusFilter]);
 
   return (
     <div style={{ fontFamily: "Arial, sans-serif", padding: "24px" }}>
@@ -55,9 +42,9 @@ export function DocumentsPage() {
 
       <section style={filterPanelStyle}>
         <input
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search id, source id, title, or status"
+          value={sourceIdFilter}
+          onChange={(e) => setSourceIdFilter(e.target.value)}
+          placeholder="Filter by source id"
           style={inputStyle}
         />
         <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} style={selectStyle}>
@@ -78,10 +65,10 @@ export function DocumentsPage() {
       {documentsQuery.isSuccess && (
         <>
           <p>
-            Showing {filteredItems.length} of {documentsQuery.data.totalCount} documents
+            Showing {items.length} of {documentsQuery.data.totalCount} documents
           </p>
 
-          {filteredItems.length === 0 ? (
+          {items.length === 0 ? (
             <div style={emptyStateStyle}>
               <p style={{ margin: 0 }}>No documents match the current filters.</p>
             </div>
@@ -98,7 +85,7 @@ export function DocumentsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredItems.map((item: DocumentItem) => (
+                  {items.map((item: DocumentItem) => (
                     <tr key={item.id}>
                       <td style={tdStyle}>{item.id}</td>
                       <td style={tdStyle}>{item.sourceId}</td>

@@ -1,9 +1,9 @@
 ﻿import { useQuery } from "@tanstack/react-query";
-import { getSources } from "../api/sources";
+import { getSources, type SourcesQuery } from "../api/sources";
 
-export function useSources() {
+export function useSources(query?: SourcesQuery) {
   return useQuery({
-    queryKey: ["sources"],
-    queryFn: getSources,
+    queryKey: ["sources", query ?? {}],
+    queryFn: () => getSources(query),
   });
 }

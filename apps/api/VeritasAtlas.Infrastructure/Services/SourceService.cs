@@ -42,14 +42,41 @@ public sealed class SourceService : ISourceService
     public async Task<PagedListResult<Source>> GetSourcesAsync(
         int page,
         int pageSize,
+        string? search = null,
+        SourceType? type = null,
+        SourceStatus? status = null,
         CancellationToken cancellationToken = default)
     {
         page = page < 1 ? 1 : page;
         pageSize = pageSize < 1 ? 20 : pageSize;
 
-        var query = _dbContext.Sources
-            .AsNoTracking()
-            .OrderByDescending(x => x.CreatedAtUtc);
+        IQueryable<Source> query = _dbContext.Sources.AsNoTracking();
+
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var term = search.Trim().ToLower();
+
+            query = query.Where(x =>
+                x.Name.ToLower().Contains(term) ||
+                (x.Reference != null && (
+                    (x.Reference.ExternalId != null && x.Reference.ExternalId.ToLower().Contains(term)) ||
+                    (x.Reference.Url != null && x.Reference.Url.ToLower().Contains(term)) ||
+                    (x.Reference.Domain != null && x.Reference.Domain.ToLower().Contains(term)) ||
+                    (x.Reference.LanguageCode != null && x.Reference.LanguageCode.ToLower().Contains(term))
+                )));
+        }
+
+        if (type.HasValue)
+        {
+            query = query.Where(x => x.Type == type.Value);
+        }
+
+        if (status.HasValue)
+        {
+            query = query.Where(x => x.Status == status.Value);
+        }
+
+        query = query.OrderByDescending(x => x.CreatedAtUtc);
 
         var totalCount = await query.CountAsync(cancellationToken);
         var items = await query

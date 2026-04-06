@@ -61,8 +61,6 @@ $solutionPath = Join-Path $RootDir "VeritasAtlas.slnx"
 $apiProjectPath = Join-Path $RootDir $ApiProject
 $webRoot = Join-Path $RootDir $WebAppDir
 $apiDir = Join-Path $RootDir "apps\api\VeritasAtlas.Api"
-$appDir = Join-Path $RootDir "apps\api\VeritasAtlas.Application"
-$infraDir = Join-Path $RootDir "apps\api\VeritasAtlas.Infrastructure"
 
 if (-not (Test-Path $solutionPath)) {
     throw "Solution file not found: $solutionPath"
@@ -73,30 +71,6 @@ if (-not (Test-Path $apiProjectPath)) {
 if (-not (Test-Path $webRoot)) {
     throw "Web app folder not found: $webRoot"
 }
-
-$sourceInterfacePath = Join-Path $appDir "Interfaces\ISourceService.cs"
-$documentInterfacePath = Join-Path $appDir "Interfaces\IDocumentService.cs"
-$evidenceInterfacePath = Join-Path $appDir "Interfaces\IEvidenceService.cs"
-
-$sourceServicePath = Join-Path $infraDir "Services\SourceService.cs"
-$documentServicePath = Join-Path $infraDir "Services\DocumentService.cs"
-$evidenceServicePath = Join-Path $infraDir "Services\EvidenceService.cs"
-
-$sourcesControllerPath = Join-Path $apiDir "Controllers\SourcesController.cs"
-$documentsControllerPath = Join-Path $apiDir "Controllers\DocumentsController.cs"
-$evidenceControllerPath = Join-Path $apiDir "Controllers\EvidenceController.cs"
-
-$sourcesApiPath = Join-Path $webRoot "src\api\sources.ts"
-$documentsApiPath = Join-Path $webRoot "src\api\documents.ts"
-$evidenceApiPath = Join-Path $webRoot "src\api\evidenceList.ts"
-
-$useSourcesHookPath = Join-Path $webRoot "src\hooks\useSources.ts"
-$useDocumentsHookPath = Join-Path $webRoot "src\hooks\useDocuments.ts"
-$useEvidenceHookPath = Join-Path $webRoot "src\hooks\useEvidenceList.ts"
-
-$sourcesPagePath = Join-Path $webRoot "src\pages\SourcesPage.tsx"
-$documentsPagePath = Join-Path $webRoot "src\pages\DocumentsPage.tsx"
-$evidencePagePath = Join-Path $webRoot "src\pages\EvidencePage.tsx"
 
 Push-Location $RootDir
 
@@ -109,10 +83,10 @@ if ($LASTEXITCODE -ne 0) {
     throw "git add failed."
 }
 
-$commitMessage = "checkpoint before phase 6.4 - $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')"
+$commitMessage = "checkpoint before phase 6.5 - $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')"
 git commit -m $commitMessage
 if ($LASTEXITCODE -ne 0) {
-    Write-Host "No new commit created. Continuing with phase 6.4." -ForegroundColor Yellow
+    Write-Host "No new commit created. Continuing with phase 6.5." -ForegroundColor Yellow
 }
 else {
     Write-Host "Created git commit: $commitMessage" -ForegroundColor Green
@@ -120,438 +94,182 @@ else {
 
 Pop-Location
 
-$sourceInterface = @'
-using VeritasAtlas.Application.Models;
-using VeritasAtlas.Domain.Entities;
-using VeritasAtlas.Domain.Enums;
+$sourcesContractsPath = Join-Path $apiDir "Contracts\SourcesContracts.cs"
+$documentsContractsPath = Join-Path $apiDir "Contracts\DocumentsContracts.cs"
+$evidenceContractsPath = Join-Path $apiDir "Contracts\EvidenceContracts.cs"
 
-namespace VeritasAtlas.Application.Interfaces;
+$sourcesControllerPath = Join-Path $apiDir "Controllers\SourcesController.cs"
+$documentsControllerPath = Join-Path $apiDir "Controllers\DocumentsController.cs"
+$evidenceControllerPath = Join-Path $apiDir "Controllers\EvidenceController.cs"
 
-public interface ISourceService
-{
-    Task<Source> RegisterSourceAsync(
-        string name,
-        SourceType type,
-        string reference,
-        string? createdBy = null,
-        CancellationToken cancellationToken = default);
+$sourcesApiPath = Join-Path $webRoot "src\api\sources.ts"
+$documentsApiPath = Join-Path $webRoot "src\api\documents.ts"
+$evidenceApiPath = Join-Path $webRoot "src\api\evidenceList.ts"
 
-    Task<PagedListResult<Source>> GetSourcesAsync(
-        int page,
-        int pageSize,
-        string? search = null,
-        SourceType? type = null,
-        SourceStatus? status = null,
-        CancellationToken cancellationToken = default);
-}
+$useSourceDetailHookPath = Join-Path $webRoot "src\hooks\useSourceDetail.ts"
+$useDocumentDetailHookPath = Join-Path $webRoot "src\hooks\useDocumentDetail.ts"
+$useEvidenceDetailHookPath = Join-Path $webRoot "src\hooks\useEvidenceDetail.ts"
+
+$sourceDetailPagePath = Join-Path $webRoot "src\pages\SourceDetailPage.tsx"
+$documentDetailPagePath = Join-Path $webRoot "src\pages\DocumentDetailPage.tsx"
+$evidenceDetailPagePath = Join-Path $webRoot "src\pages\EvidenceDetailPage.tsx"
+
+$sourcesPagePath = Join-Path $webRoot "src\pages\SourcesPage.tsx"
+$documentsPagePath = Join-Path $webRoot "src\pages\DocumentsPage.tsx"
+$evidencePagePath = Join-Path $webRoot "src\pages\EvidencePage.tsx"
+$mainTsxPath = Join-Path $webRoot "src\main.tsx"
+
+$sourcesContracts = @'
+namespace VeritasAtlas.Api.Contracts.Sources;
+
+public sealed record SourceReferenceResponse(
+    string? ExternalId,
+    string? Url,
+    string? Domain,
+    string? LanguageCode);
+
+public sealed record CreateSourceRequest(
+    string Name,
+    string Type,
+    string? Reference,
+    string? CreatedBy);
+
+public sealed record CreateSourceResponse(
+    Guid Id,
+    string Name,
+    string Type,
+    SourceReferenceResponse? Reference,
+    string Status,
+    DateTime CreatedAtUtc,
+    DateTime UpdatedAtUtc);
+
+public sealed record GetSourcesItemResponse(
+    Guid Id,
+    string Name,
+    string Type,
+    SourceReferenceResponse? Reference,
+    string Status,
+    DateTime CreatedAtUtc,
+    DateTime UpdatedAtUtc);
+
+public sealed record GetSourceResponse(
+    Guid Id,
+    string Name,
+    string? Description,
+    string Type,
+    string Status,
+    string TrustTier,
+    SourceReferenceResponse? Reference,
+    DateTime CreatedAtUtc,
+    DateTime UpdatedAtUtc);
+
+public sealed record GetSourcesResponse(
+    IReadOnlyCollection<GetSourcesItemResponse> Items,
+    int Page,
+    int PageSize,
+    int TotalCount,
+    int TotalPages);
 '@
 
-$documentInterface = @'
-using VeritasAtlas.Application.Models;
-using VeritasAtlas.Domain.Entities;
-using VeritasAtlas.Domain.Enums;
+$documentsContracts = @'
+namespace VeritasAtlas.Api.Contracts.Documents;
 
-namespace VeritasAtlas.Application.Interfaces;
+public sealed record CreateDocumentRequest(
+    Guid SourceId,
+    string Title,
+    string Content,
+    string? ExternalReference,
+    string? CreatedBy);
 
-public interface IDocumentService
-{
-    Task<Document> AddDocumentAsync(
-        Guid sourceId,
-        string title,
-        string content,
-        string? externalReference = null,
-        string? createdBy = null,
-        CancellationToken cancellationToken = default);
+public sealed record CreateDocumentResponse(
+    Guid Id,
+    Guid SourceId,
+    string Title,
+    string Status,
+    DateTime CreatedAtUtc,
+    DateTime UpdatedAtUtc);
 
-    Task<PagedListResult<Document>> GetDocumentsAsync(
-        int page,
-        int pageSize,
-        Guid? sourceId = null,
-        DocumentStatus? status = null,
-        CancellationToken cancellationToken = default);
-}
+public sealed record GetDocumentsItemResponse(
+    Guid Id,
+    Guid SourceId,
+    string Title,
+    string Status,
+    DateTime CreatedAtUtc,
+    DateTime UpdatedAtUtc);
+
+public sealed record GetDocumentResponse(
+    Guid Id,
+    Guid SourceId,
+    string Title,
+    string Type,
+    string Status,
+    string? LanguageCode,
+    string? ExternalId,
+    string? Url,
+    string? ContentHash,
+    DateTime? PublishedAtUtc,
+    DateTime? RetrievedAtUtc,
+    DateTime CreatedAtUtc,
+    DateTime UpdatedAtUtc);
+
+public sealed record GetDocumentsResponse(
+    IReadOnlyCollection<GetDocumentsItemResponse> Items,
+    int Page,
+    int PageSize,
+    int TotalCount,
+    int TotalPages);
 '@
 
-$evidenceInterface = @'
-using VeritasAtlas.Application.Models;
-using VeritasAtlas.Domain.Entities;
-using VeritasAtlas.Domain.Enums;
+$evidenceContracts = @'
+namespace VeritasAtlas.Api.Contracts.Evidence;
 
-namespace VeritasAtlas.Application.Interfaces;
+public sealed record CreateEvidenceRequest(
+    Guid DocumentId,
+    string Quote,
+    int? StartOffset,
+    int? EndOffset,
+    string? Context,
+    string? CreatedBy);
 
-public interface IEvidenceService
-{
-    Task<Evidence> AddEvidenceAsync(
-        Guid documentId,
-        string quote,
-        int? startOffset = null,
-        int? endOffset = null,
-        string? context = null,
-        string? createdBy = null,
-        CancellationToken cancellationToken = default);
+public sealed record CreateEvidenceResponse(
+    Guid Id,
+    Guid? DocumentId,
+    string Quote,
+    string Status,
+    DateTime CreatedAtUtc,
+    DateTime UpdatedAtUtc);
 
-    Task<PagedListResult<Evidence>> GetEvidenceAsync(
-        int page,
-        int pageSize,
-        Guid? documentId = null,
-        EvidenceStatus? status = null,
-        CancellationToken cancellationToken = default);
-}
-'@
+public sealed record GetEvidenceItemResponse(
+    Guid Id,
+    Guid? DocumentId,
+    string Status,
+    DateTime CreatedAtUtc,
+    DateTime UpdatedAtUtc);
 
-$sourceService = @'
-using Microsoft.EntityFrameworkCore;
-using VeritasAtlas.Application.Interfaces;
-using VeritasAtlas.Application.Models;
-using VeritasAtlas.Domain.Entities;
-using VeritasAtlas.Domain.Enums;
-using VeritasAtlas.Domain.ValueObjects;
-using VeritasAtlas.Infrastructure.Persistence;
+public sealed record GetEvidenceResponseItemSpan(
+    int StartOffset,
+    int EndOffset);
 
-namespace VeritasAtlas.Infrastructure.Services;
+public sealed record GetEvidenceResponse(
+    Guid Id,
+    Guid SourceId,
+    Guid? DocumentId,
+    string Type,
+    string Status,
+    string Content,
+    string? ContentHash,
+    string? LanguageCode,
+    GetEvidenceResponseItemSpan? Span,
+    DateTime? CapturedAtUtc,
+    DateTime CreatedAtUtc,
+    DateTime UpdatedAtUtc);
 
-public sealed class SourceService : ISourceService
-{
-    private readonly VeritasAtlasDbContext _dbContext;
-
-    public SourceService(VeritasAtlasDbContext dbContext)
-    {
-        _dbContext = dbContext;
-    }
-
-    public async Task<Source> RegisterSourceAsync(
-        string name,
-        SourceType type,
-        string reference,
-        string? createdBy = null,
-        CancellationToken cancellationToken = default)
-    {
-        var entity = new Source
-        {
-            Name = name,
-            Type = type,
-            Status = default,
-            TrustTier = default,
-            Reference = BuildReference(reference)
-        };
-
-        _dbContext.Sources.Add(entity);
-        await _dbContext.SaveChangesAsync(cancellationToken);
-
-        return entity;
-    }
-
-    public async Task<PagedListResult<Source>> GetSourcesAsync(
-        int page,
-        int pageSize,
-        string? search = null,
-        SourceType? type = null,
-        SourceStatus? status = null,
-        CancellationToken cancellationToken = default)
-    {
-        page = page < 1 ? 1 : page;
-        pageSize = pageSize < 1 ? 20 : pageSize;
-
-        IQueryable<Source> query = _dbContext.Sources.AsNoTracking();
-
-        if (!string.IsNullOrWhiteSpace(search))
-        {
-            var term = search.Trim().ToLower();
-
-            query = query.Where(x =>
-                x.Name.ToLower().Contains(term) ||
-                (x.Reference != null && (
-                    (x.Reference.ExternalId != null && x.Reference.ExternalId.ToLower().Contains(term)) ||
-                    (x.Reference.Url != null && x.Reference.Url.ToLower().Contains(term)) ||
-                    (x.Reference.Domain != null && x.Reference.Domain.ToLower().Contains(term)) ||
-                    (x.Reference.LanguageCode != null && x.Reference.LanguageCode.ToLower().Contains(term))
-                )));
-        }
-
-        if (type.HasValue)
-        {
-            query = query.Where(x => x.Type == type.Value);
-        }
-
-        if (status.HasValue)
-        {
-            query = query.Where(x => x.Status == status.Value);
-        }
-
-        query = query.OrderByDescending(x => x.CreatedAtUtc);
-
-        var totalCount = await query.CountAsync(cancellationToken);
-        var items = await query
-            .Skip((page - 1) * pageSize)
-            .Take(pageSize)
-            .ToListAsync(cancellationToken);
-
-        return new PagedListResult<Source>
-        {
-            Items = items,
-            Page = page,
-            PageSize = pageSize,
-            TotalCount = totalCount,
-            TotalPages = totalCount == 0 ? 0 : (int)Math.Ceiling(totalCount / (double)pageSize)
-        };
-    }
-
-    private static SourceReference? BuildReference(string reference)
-    {
-        if (string.IsNullOrWhiteSpace(reference))
-        {
-            return null;
-        }
-
-        if (Uri.TryCreate(reference, UriKind.Absolute, out var uri))
-        {
-            return new SourceReference(
-                null,
-                uri.ToString(),
-                uri.Host,
-                null);
-        }
-
-        return new SourceReference(
-            reference,
-            null,
-            null,
-            null);
-    }
-}
-'@
-
-$documentService = @'
-using Microsoft.EntityFrameworkCore;
-using System.Security.Cryptography;
-using System.Text;
-using VeritasAtlas.Application.Interfaces;
-using VeritasAtlas.Application.Models;
-using VeritasAtlas.Domain.Entities;
-using VeritasAtlas.Domain.Enums;
-using VeritasAtlas.Infrastructure.Persistence;
-
-namespace VeritasAtlas.Infrastructure.Services;
-
-public sealed class DocumentService : IDocumentService
-{
-    private readonly VeritasAtlasDbContext _dbContext;
-
-    public DocumentService(VeritasAtlasDbContext dbContext)
-    {
-        _dbContext = dbContext;
-    }
-
-    public async Task<Document> AddDocumentAsync(
-        Guid sourceId,
-        string title,
-        string content,
-        string? externalReference = null,
-        string? createdBy = null,
-        CancellationToken cancellationToken = default)
-    {
-        string? externalId = null;
-        string? url = null;
-
-        if (!string.IsNullOrWhiteSpace(externalReference))
-        {
-            if (Uri.TryCreate(externalReference, UriKind.Absolute, out var uri))
-            {
-                url = uri.ToString();
-            }
-            else
-            {
-                externalId = externalReference;
-            }
-        }
-
-        var entity = new Document
-        {
-            SourceId = sourceId,
-            Title = title,
-            Type = default,
-            Status = default,
-            ExternalId = externalId,
-            Url = url,
-            ContentHash = ComputeSha256(content),
-            RetrievedAtUtc = DateTime.UtcNow
-        };
-
-        _dbContext.Documents.Add(entity);
-        await _dbContext.SaveChangesAsync(cancellationToken);
-
-        return entity;
-    }
-
-    public async Task<PagedListResult<Document>> GetDocumentsAsync(
-        int page,
-        int pageSize,
-        Guid? sourceId = null,
-        DocumentStatus? status = null,
-        CancellationToken cancellationToken = default)
-    {
-        page = page < 1 ? 1 : page;
-        pageSize = pageSize < 1 ? 20 : pageSize;
-
-        IQueryable<Document> query = _dbContext.Documents.AsNoTracking();
-
-        if (sourceId.HasValue)
-        {
-            query = query.Where(x => x.SourceId == sourceId.Value);
-        }
-
-        if (status.HasValue)
-        {
-            query = query.Where(x => x.Status == status.Value);
-        }
-
-        query = query.OrderByDescending(x => x.CreatedAtUtc);
-
-        var totalCount = await query.CountAsync(cancellationToken);
-        var items = await query
-            .Skip((page - 1) * pageSize)
-            .Take(pageSize)
-            .ToListAsync(cancellationToken);
-
-        return new PagedListResult<Document>
-        {
-            Items = items,
-            Page = page,
-            PageSize = pageSize,
-            TotalCount = totalCount,
-            TotalPages = totalCount == 0 ? 0 : (int)Math.Ceiling(totalCount / (double)pageSize)
-        };
-    }
-
-    private static string? ComputeSha256(string? input)
-    {
-        if (string.IsNullOrWhiteSpace(input))
-        {
-            return null;
-        }
-
-        var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(input));
-        return Convert.ToHexString(bytes);
-    }
-}
-'@
-
-$evidenceService = @'
-using Microsoft.EntityFrameworkCore;
-using System.Security.Cryptography;
-using System.Text;
-using VeritasAtlas.Application.Interfaces;
-using VeritasAtlas.Application.Models;
-using VeritasAtlas.Domain.Entities;
-using VeritasAtlas.Domain.Enums;
-using VeritasAtlas.Domain.ValueObjects;
-using VeritasAtlas.Infrastructure.Persistence;
-
-namespace VeritasAtlas.Infrastructure.Services;
-
-public sealed class EvidenceService : IEvidenceService
-{
-    private readonly VeritasAtlasDbContext _dbContext;
-
-    public EvidenceService(VeritasAtlasDbContext dbContext)
-    {
-        _dbContext = dbContext;
-    }
-
-    public async Task<Evidence> AddEvidenceAsync(
-        Guid documentId,
-        string quote,
-        int? startOffset = null,
-        int? endOffset = null,
-        string? context = null,
-        string? createdBy = null,
-        CancellationToken cancellationToken = default)
-    {
-        var document = await _dbContext.Documents
-            .AsNoTracking()
-            .FirstOrDefaultAsync(x => x.Id == documentId, cancellationToken);
-
-        if (document is null)
-        {
-            throw new InvalidOperationException($"Document '{documentId}' was not found.");
-        }
-
-        var content = string.IsNullOrWhiteSpace(context)
-            ? quote
-            : quote + Environment.NewLine + Environment.NewLine + context;
-
-        var entity = new Evidence
-        {
-            SourceId = document.SourceId,
-            DocumentId = documentId,
-            Type = default,
-            Status = default,
-            Content = content,
-            ContentHash = ComputeSha256(content),
-            LanguageCode = document.LanguageCode,
-            Span = (startOffset.HasValue && endOffset.HasValue)
-                ? new DocumentSpan(startOffset.Value, endOffset.Value)
-                : null,
-            CapturedAtUtc = DateTime.UtcNow
-        };
-
-        _dbContext.Evidences.Add(entity);
-        await _dbContext.SaveChangesAsync(cancellationToken);
-
-        return entity;
-    }
-
-    public async Task<PagedListResult<Evidence>> GetEvidenceAsync(
-        int page,
-        int pageSize,
-        Guid? documentId = null,
-        EvidenceStatus? status = null,
-        CancellationToken cancellationToken = default)
-    {
-        page = page < 1 ? 1 : page;
-        pageSize = pageSize < 1 ? 20 : pageSize;
-
-        IQueryable<Evidence> query = _dbContext.Evidences.AsNoTracking();
-
-        if (documentId.HasValue)
-        {
-            query = query.Where(x => x.DocumentId == documentId.Value);
-        }
-
-        if (status.HasValue)
-        {
-            query = query.Where(x => x.Status == status.Value);
-        }
-
-        query = query.OrderByDescending(x => x.CreatedAtUtc);
-
-        var totalCount = await query.CountAsync(cancellationToken);
-        var items = await query
-            .Skip((page - 1) * pageSize)
-            .Take(pageSize)
-            .ToListAsync(cancellationToken);
-
-        return new PagedListResult<Evidence>
-        {
-            Items = items,
-            Page = page,
-            PageSize = pageSize,
-            TotalCount = totalCount,
-            TotalPages = totalCount == 0 ? 0 : (int)Math.Ceiling(totalCount / (double)pageSize)
-        };
-    }
-
-    private static string? ComputeSha256(string? input)
-    {
-        if (string.IsNullOrWhiteSpace(input))
-        {
-            return null;
-        }
-
-        var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(input));
-        return Convert.ToHexString(bytes);
-    }
-}
+public sealed record GetEvidenceListResponse(
+    IReadOnlyCollection<GetEvidenceItemResponse> Items,
+    int Page,
+    int PageSize,
+    int TotalCount,
+    int TotalPages);
 '@
 
 $sourcesController = @'
@@ -628,6 +346,31 @@ public sealed class SourcesController : ControllerBase
             result.PageSize,
             result.TotalCount,
             result.TotalPages));
+    }
+
+    [HttpGet("{id:guid}")]
+    public async Task<ActionResult<GetSourceResponse>> GetSourceById(
+        [FromRoute] Guid id,
+        CancellationToken cancellationToken = default)
+    {
+        var result = await _sourceService.GetSourcesAsync(1, int.MaxValue, null, null, null, cancellationToken);
+        var entity = result.Items.FirstOrDefault(x => x.Id == id);
+
+        if (entity is null)
+        {
+            return NotFound();
+        }
+
+        return Ok(new GetSourceResponse(
+            entity.Id,
+            entity.Name,
+            entity.Description,
+            entity.Type.ToString(),
+            entity.Status.ToString(),
+            entity.TrustTier.ToString(),
+            MapReference(entity.Reference),
+            entity.CreatedAtUtc,
+            entity.UpdatedAtUtc));
     }
 
     [HttpPost]
@@ -737,6 +480,35 @@ public sealed class DocumentsController : ControllerBase
             result.TotalPages));
     }
 
+    [HttpGet("{id:guid}")]
+    public async Task<ActionResult<GetDocumentResponse>> GetDocumentById(
+        [FromRoute] Guid id,
+        CancellationToken cancellationToken = default)
+    {
+        var result = await _documentService.GetDocumentsAsync(1, int.MaxValue, null, null, cancellationToken);
+        var entity = result.Items.FirstOrDefault(x => x.Id == id);
+
+        if (entity is null)
+        {
+            return NotFound();
+        }
+
+        return Ok(new GetDocumentResponse(
+            entity.Id,
+            entity.SourceId,
+            entity.Title,
+            entity.Type.ToString(),
+            entity.Status.ToString(),
+            entity.LanguageCode,
+            entity.ExternalId,
+            entity.Url,
+            entity.ContentHash,
+            entity.PublishedAtUtc,
+            entity.RetrievedAtUtc,
+            entity.CreatedAtUtc,
+            entity.UpdatedAtUtc));
+    }
+
     [HttpPost]
     public async Task<ActionResult<CreateDocumentResponse>> CreateDocument(
         [FromBody] CreateDocumentRequest request,
@@ -783,7 +555,7 @@ public sealed class EvidenceController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<ActionResult<GetEvidenceResponse>> GetEvidence(
+    public async Task<ActionResult<GetEvidenceListResponse>> GetEvidence(
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 20,
         [FromQuery] Guid? documentId = null,
@@ -816,12 +588,40 @@ public sealed class EvidenceController : ControllerBase
                 entity.UpdatedAtUtc))
             .ToArray();
 
-        return Ok(new GetEvidenceResponse(
+        return Ok(new GetEvidenceListResponse(
             items,
             result.Page,
             result.PageSize,
             result.TotalCount,
             result.TotalPages));
+    }
+
+    [HttpGet("{id:guid}")]
+    public async Task<ActionResult<GetEvidenceResponse>> GetEvidenceById(
+        [FromRoute] Guid id,
+        CancellationToken cancellationToken = default)
+    {
+        var result = await _evidenceService.GetEvidenceAsync(1, int.MaxValue, null, null, cancellationToken);
+        var entity = result.Items.FirstOrDefault(x => x.Id == id);
+
+        if (entity is null)
+        {
+            return NotFound();
+        }
+
+        return Ok(new GetEvidenceResponse(
+            entity.Id,
+            entity.SourceId,
+            entity.DocumentId,
+            entity.Type.ToString(),
+            entity.Status.ToString(),
+            entity.Content,
+            entity.ContentHash,
+            entity.LanguageCode,
+            entity.Span.HasValue ? new GetEvidenceResponseItemSpan(entity.Span.Value.StartOffset, entity.Span.Value.EndOffset) : null,
+            entity.CapturedAtUtc,
+            entity.CreatedAtUtc,
+            entity.UpdatedAtUtc));
     }
 
     [HttpPost]
@@ -871,6 +671,18 @@ export type SourceItem = {
   updatedAtUtc: string;
 };
 
+export type SourceDetail = {
+  id: string;
+  name: string;
+  description: string | null;
+  type: string;
+  status: string;
+  trustTier: string;
+  reference: SourceReferenceResponse | null;
+  createdAtUtc: string;
+  updatedAtUtc: string;
+};
+
 export type SourcesResponse = {
   items: SourceItem[];
   page: number;
@@ -897,6 +709,10 @@ export async function getSources(query?: SourcesQuery): Promise<SourcesResponse>
 
   return apiGet<SourcesResponse>(`/api/v1/sources?${params.toString()}`);
 }
+
+export async function getSourceById(id: string): Promise<SourceDetail> {
+  return apiGet<SourceDetail>(`/api/v1/sources/${id}`);
+}
 '@
 
 $documentsApi = @'
@@ -907,6 +723,22 @@ export type DocumentItem = {
   sourceId: string;
   title: string;
   status: string;
+  createdAtUtc: string;
+  updatedAtUtc: string;
+};
+
+export type DocumentDetail = {
+  id: string;
+  sourceId: string;
+  title: string;
+  type: string;
+  status: string;
+  languageCode: string | null;
+  externalId: string | null;
+  url: string | null;
+  contentHash: string | null;
+  publishedAtUtc: string | null;
+  retrievedAtUtc: string | null;
   createdAtUtc: string;
   updatedAtUtc: string;
 };
@@ -935,6 +767,10 @@ export async function getDocuments(query?: DocumentsQuery): Promise<DocumentsRes
 
   return apiGet<DocumentsResponse>(`/api/v1/documents?${params.toString()}`);
 }
+
+export async function getDocumentById(id: string): Promise<DocumentDetail> {
+  return apiGet<DocumentDetail>(`/api/v1/documents/${id}`);
+}
 '@
 
 $evidenceApi = @'
@@ -944,6 +780,26 @@ export type EvidenceItem = {
   id: string;
   documentId: string | null;
   status: string;
+  createdAtUtc: string;
+  updatedAtUtc: string;
+};
+
+export type EvidenceSpan = {
+  startOffset: number;
+  endOffset: number;
+};
+
+export type EvidenceDetail = {
+  id: string;
+  sourceId: string;
+  documentId: string | null;
+  type: string;
+  status: string;
+  content: string;
+  contentHash: string | null;
+  languageCode: string | null;
+  span: EvidenceSpan | null;
+  capturedAtUtc: string | null;
   createdAtUtc: string;
   updatedAtUtc: string;
 };
@@ -972,57 +828,326 @@ export async function getEvidenceList(query?: EvidenceQuery): Promise<EvidenceRe
 
   return apiGet<EvidenceResponse>(`/api/v1/evidence?${params.toString()}`);
 }
+
+export async function getEvidenceById(id: string): Promise<EvidenceDetail> {
+  return apiGet<EvidenceDetail>(`/api/v1/evidence/${id}`);
+}
 '@
 
-$useSourcesHook = @'
+$useSourceDetailHook = @'
 import { useQuery } from "@tanstack/react-query";
-import { getSources, type SourcesQuery } from "../api/sources";
+import { getSourceById } from "../api/sources";
 
-export function useSources(query?: SourcesQuery) {
+export function useSourceDetail(id?: string) {
   return useQuery({
-    queryKey: ["sources", query ?? {}],
-    queryFn: () => getSources(query),
+    queryKey: ["source-detail", id],
+    queryFn: () => getSourceById(id!),
+    enabled: !!id,
   });
 }
 '@
 
-$useDocumentsHook = @'
+$useDocumentDetailHook = @'
 import { useQuery } from "@tanstack/react-query";
-import { getDocuments, type DocumentsQuery } from "../api/documents";
+import { getDocumentById } from "../api/documents";
 
-export function useDocuments(query?: DocumentsQuery) {
+export function useDocumentDetail(id?: string) {
   return useQuery({
-    queryKey: ["documents", query ?? {}],
-    queryFn: () => getDocuments(query),
+    queryKey: ["document-detail", id],
+    queryFn: () => getDocumentById(id!),
+    enabled: !!id,
   });
 }
 '@
 
-$useEvidenceHook = @'
+$useEvidenceDetailHook = @'
 import { useQuery } from "@tanstack/react-query";
-import { getEvidenceList, type EvidenceQuery } from "../api/evidenceList";
+import { getEvidenceById } from "../api/evidenceList";
 
-export function useEvidenceList(query?: EvidenceQuery) {
+export function useEvidenceDetail(id?: string) {
   return useQuery({
-    queryKey: ["evidence", query ?? {}],
-    queryFn: () => getEvidenceList(query),
+    queryKey: ["evidence-detail", id],
+    queryFn: () => getEvidenceById(id!),
+    enabled: !!id,
   });
 }
+'@
+
+$sourceDetailPage = @'
+import { Link, useParams } from "react-router-dom";
+import { useSourceDetail } from "../hooks/useSourceDetail";
+
+export function SourceDetailPage() {
+  const { id } = useParams();
+  const query = useSourceDetail(id);
+
+  if (query.isLoading) {
+    return <div style={{ fontFamily: "Arial, sans-serif", padding: "24px" }}>Loading source...</div>;
+  }
+
+  if (query.isError) {
+    return <div style={{ fontFamily: "Arial, sans-serif", padding: "24px", color: "crimson" }}>Failed to load source: {(query.error as Error).message}</div>;
+  }
+
+  if (!query.data) {
+    return <div style={{ fontFamily: "Arial, sans-serif", padding: "24px" }}>Source not found.</div>;
+  }
+
+  const item = query.data;
+
+  return (
+    <div style={{ fontFamily: "Arial, sans-serif", padding: "24px" }}>
+      <nav style={{ display: "flex", gap: "16px", marginBottom: "20px", flexWrap: "wrap" }}>
+        <Link to="/sources">Back to Sources</Link>
+        <Link to="/documents?sourceIdPlaceholder=1">Documents</Link>
+        <Link to="/documents/new">New Document</Link>
+      </nav>
+
+      <h1 style={{ marginTop: 0 }}>{item.name}</h1>
+
+      <div style={cardStyle}>
+        <Row label="Id" value={item.id} />
+        <Row label="Type" value={item.type} />
+        <Row label="Status" value={item.status} />
+        <Row label="Trust Tier" value={item.trustTier} />
+        <Row label="Description" value={item.description ?? "N/A"} />
+        <Row label="Created" value={formatDate(item.createdAtUtc)} />
+        <Row label="Updated" value={formatDate(item.updatedAtUtc)} />
+      </div>
+
+      <div style={cardStyle}>
+        <h3 style={{ marginTop: 0 }}>Reference</h3>
+        <Row label="ExternalId" value={item.reference?.externalId ?? "N/A"} />
+        <Row label="Url" value={item.reference?.url ?? "N/A"} />
+        <Row label="Domain" value={item.reference?.domain ?? "N/A"} />
+        <Row label="LanguageCode" value={item.reference?.languageCode ?? "N/A"} />
+      </div>
+
+      <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
+        <Link to={`/documents?sourceId=${item.id}`} style={actionLinkStyle}>View Documents For This Source</Link>
+        <Link to="/documents/new" style={actionLinkStyle}>Create Document</Link>
+      </div>
+    </div>
+  );
+}
+
+function Row({ label, value }: { label: string; value: string }) {
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "180px 1fr", gap: "12px", padding: "6px 0" }}>
+      <strong>{label}</strong>
+      <span>{value}</span>
+    </div>
+  );
+}
+
+function formatDate(value: string) {
+  return new Date(value).toLocaleString();
+}
+
+const cardStyle: React.CSSProperties = {
+  border: "1px solid #ddd",
+  borderRadius: "12px",
+  padding: "16px",
+  marginBottom: "16px",
+};
+
+const actionLinkStyle: React.CSSProperties = {
+  padding: "10px 16px",
+  borderRadius: "8px",
+  border: "1px solid #1976d2",
+  textDecoration: "none",
+  color: "inherit",
+};
+'@
+
+$documentDetailPage = @'
+import { Link, useParams } from "react-router-dom";
+import { useDocumentDetail } from "../hooks/useDocumentDetail";
+
+export function DocumentDetailPage() {
+  const { id } = useParams();
+  const query = useDocumentDetail(id);
+
+  if (query.isLoading) {
+    return <div style={{ fontFamily: "Arial, sans-serif", padding: "24px" }}>Loading document...</div>;
+  }
+
+  if (query.isError) {
+    return <div style={{ fontFamily: "Arial, sans-serif", padding: "24px", color: "crimson" }}>Failed to load document: {(query.error as Error).message}</div>;
+  }
+
+  if (!query.data) {
+    return <div style={{ fontFamily: "Arial, sans-serif", padding: "24px" }}>Document not found.</div>;
+  }
+
+  const item = query.data;
+
+  return (
+    <div style={{ fontFamily: "Arial, sans-serif", padding: "24px" }}>
+      <nav style={{ display: "flex", gap: "16px", marginBottom: "20px", flexWrap: "wrap" }}>
+        <Link to="/documents">Back to Documents</Link>
+        <Link to={`/sources/${item.sourceId}`}>Source</Link>
+        <Link to="/evidence/new">New Evidence</Link>
+      </nav>
+
+      <h1 style={{ marginTop: 0 }}>{item.title}</h1>
+
+      <div style={cardStyle}>
+        <Row label="Id" value={item.id} />
+        <Row label="Source Id" value={item.sourceId} />
+        <Row label="Type" value={item.type} />
+        <Row label="Status" value={item.status} />
+        <Row label="LanguageCode" value={item.languageCode ?? "N/A"} />
+        <Row label="ExternalId" value={item.externalId ?? "N/A"} />
+        <Row label="Url" value={item.url ?? "N/A"} />
+        <Row label="ContentHash" value={item.contentHash ?? "N/A"} />
+        <Row label="Published" value={item.publishedAtUtc ? formatDate(item.publishedAtUtc) : "N/A"} />
+        <Row label="Retrieved" value={item.retrievedAtUtc ? formatDate(item.retrievedAtUtc) : "N/A"} />
+        <Row label="Created" value={formatDate(item.createdAtUtc)} />
+        <Row label="Updated" value={formatDate(item.updatedAtUtc)} />
+      </div>
+
+      <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
+        <Link to={`/sources/${item.sourceId}`} style={actionLinkStyle}>Open Source</Link>
+        <Link to={`/evidence?documentId=${item.id}`} style={actionLinkStyle}>View Evidence For This Document</Link>
+        <Link to="/evidence/new" style={actionLinkStyle}>Create Evidence</Link>
+      </div>
+    </div>
+  );
+}
+
+function Row({ label, value }: { label: string; value: string }) {
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "180px 1fr", gap: "12px", padding: "6px 0" }}>
+      <strong>{label}</strong>
+      <span>{value}</span>
+    </div>
+  );
+}
+
+function formatDate(value: string) {
+  return new Date(value).toLocaleString();
+}
+
+const cardStyle: React.CSSProperties = {
+  border: "1px solid #ddd",
+  borderRadius: "12px",
+  padding: "16px",
+  marginBottom: "16px",
+};
+
+const actionLinkStyle: React.CSSProperties = {
+  padding: "10px 16px",
+  borderRadius: "8px",
+  border: "1px solid #1976d2",
+  textDecoration: "none",
+  color: "inherit",
+};
+'@
+
+$evidenceDetailPage = @'
+import { Link, useParams } from "react-router-dom";
+import { useEvidenceDetail } from "../hooks/useEvidenceDetail";
+
+export function EvidenceDetailPage() {
+  const { id } = useParams();
+  const query = useEvidenceDetail(id);
+
+  if (query.isLoading) {
+    return <div style={{ fontFamily: "Arial, sans-serif", padding: "24px" }}>Loading evidence...</div>;
+  }
+
+  if (query.isError) {
+    return <div style={{ fontFamily: "Arial, sans-serif", padding: "24px", color: "crimson" }}>Failed to load evidence: {(query.error as Error).message}</div>;
+  }
+
+  if (!query.data) {
+    return <div style={{ fontFamily: "Arial, sans-serif", padding: "24px" }}>Evidence not found.</div>;
+  }
+
+  const item = query.data;
+
+  return (
+    <div style={{ fontFamily: "Arial, sans-serif", padding: "24px" }}>
+      <nav style={{ display: "flex", gap: "16px", marginBottom: "20px", flexWrap: "wrap" }}>
+        <Link to="/evidence">Back to Evidence</Link>
+        {item.documentId && <Link to={`/documents/${item.documentId}`}>Document</Link>}
+      </nav>
+
+      <h1 style={{ marginTop: 0 }}>Evidence {item.id}</h1>
+
+      <div style={cardStyle}>
+        <Row label="Id" value={item.id} />
+        <Row label="Source Id" value={item.sourceId} />
+        <Row label="Document Id" value={item.documentId ?? "N/A"} />
+        <Row label="Type" value={item.type} />
+        <Row label="Status" value={item.status} />
+        <Row label="LanguageCode" value={item.languageCode ?? "N/A"} />
+        <Row label="ContentHash" value={item.contentHash ?? "N/A"} />
+        <Row label="Captured" value={item.capturedAtUtc ? formatDate(item.capturedAtUtc) : "N/A"} />
+        <Row label="Span" value={item.span ? `${item.span.startOffset} - ${item.span.endOffset}` : "N/A"} />
+        <Row label="Created" value={formatDate(item.createdAtUtc)} />
+        <Row label="Updated" value={formatDate(item.updatedAtUtc)} />
+      </div>
+
+      <div style={cardStyle}>
+        <h3 style={{ marginTop: 0 }}>Content</h3>
+        <pre style={{ whiteSpace: "pre-wrap", margin: 0, fontFamily: "inherit" }}>{item.content}</pre>
+      </div>
+
+      <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
+        {item.documentId && <Link to={`/documents/${item.documentId}`} style={actionLinkStyle}>Open Document</Link>}
+        <Link to="/statements/new" style={actionLinkStyle}>Create Statement</Link>
+      </div>
+    </div>
+  );
+}
+
+function Row({ label, value }: { label: string; value: string }) {
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "180px 1fr", gap: "12px", padding: "6px 0" }}>
+      <strong>{label}</strong>
+      <span>{value}</span>
+    </div>
+  );
+}
+
+function formatDate(value: string) {
+  return new Date(value).toLocaleString();
+}
+
+const cardStyle: React.CSSProperties = {
+  border: "1px solid #ddd",
+  borderRadius: "12px",
+  padding: "16px",
+  marginBottom: "16px",
+};
+
+const actionLinkStyle: React.CSSProperties = {
+  padding: "10px 16px",
+  borderRadius: "8px",
+  border: "1px solid #1976d2",
+  textDecoration: "none",
+  color: "inherit",
+};
 '@
 
 $sourcesPage = @'
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { useMemo, useState, type CSSProperties } from "react";
 import { useSources } from "../hooks/useSources";
 import type { SourceItem, SourceReferenceResponse } from "../api/sources";
 
 export function SourcesPage() {
+  const [params] = useSearchParams();
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState("All");
   const [statusFilter, setStatusFilter] = useState("All");
 
+  const forcedSearch = params.get("search") ?? undefined;
+
   const sourcesQuery = useSources({
-    search: search || undefined,
+    search: forcedSearch ?? (search || undefined),
     type: typeFilter,
     status: statusFilter,
   });
@@ -1062,7 +1187,7 @@ export function SourcesPage() {
 
       <section style={filterPanelStyle}>
         <input
-          value={search}
+          value={forcedSearch ?? search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search name, type, status, domain, url, or external id"
           style={inputStyle}
@@ -1112,7 +1237,7 @@ export function SourcesPage() {
                 <tbody>
                   {items.map((item: SourceItem) => (
                     <tr key={item.id}>
-                      <td style={tdStyle}>{item.name}</td>
+                      <td style={tdStyle}><Link to={`/sources/${item.id}`}>{item.name}</Link></td>
                       <td style={tdStyle}>{item.type}</td>
                       <td style={tdStyle}>{renderReference(item.reference)}</td>
                       <td style={tdStyle}>{item.status}</td>
@@ -1214,17 +1339,19 @@ const emptyStateStyle: CSSProperties = {
 '@
 
 $documentsPage = @'
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { useMemo, useState, type CSSProperties } from "react";
 import { useDocuments } from "../hooks/useDocuments";
 import type { DocumentItem } from "../api/documents";
 
 export function DocumentsPage() {
+  const [params] = useSearchParams();
+  const forcedSourceId = params.get("sourceId") ?? "";
   const [sourceIdFilter, setSourceIdFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
 
   const documentsQuery = useDocuments({
-    sourceId: sourceIdFilter || undefined,
+    sourceId: forcedSourceId || sourceIdFilter || undefined,
     status: statusFilter,
   });
 
@@ -1258,7 +1385,7 @@ export function DocumentsPage() {
 
       <section style={filterPanelStyle}>
         <input
-          value={sourceIdFilter}
+          value={forcedSourceId || sourceIdFilter}
           onChange={(e) => setSourceIdFilter(e.target.value)}
           placeholder="Filter by source id"
           style={inputStyle}
@@ -1303,8 +1430,8 @@ export function DocumentsPage() {
                 <tbody>
                   {items.map((item: DocumentItem) => (
                     <tr key={item.id}>
-                      <td style={tdStyle}>{item.id}</td>
-                      <td style={tdStyle}>{item.sourceId}</td>
+                      <td style={tdStyle}><Link to={`/documents/${item.id}`}>{item.id}</Link></td>
+                      <td style={tdStyle}><Link to={`/sources/${item.sourceId}`}>{item.sourceId}</Link></td>
                       <td style={tdStyle}>{item.title}</td>
                       <td style={tdStyle}>{item.status}</td>
                       <td style={tdStyle}>{formatDate(item.createdAtUtc)}</td>
@@ -1386,17 +1513,19 @@ const emptyStateStyle: CSSProperties = {
 '@
 
 $evidencePage = @'
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { useMemo, useState, type CSSProperties } from "react";
 import { useEvidenceList } from "../hooks/useEvidenceList";
 import type { EvidenceItem } from "../api/evidenceList";
 
 export function EvidencePage() {
+  const [params] = useSearchParams();
+  const forcedDocumentId = params.get("documentId") ?? "";
   const [documentIdFilter, setDocumentIdFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
 
   const evidenceQuery = useEvidenceList({
-    documentId: documentIdFilter || undefined,
+    documentId: forcedDocumentId || documentIdFilter || undefined,
     status: statusFilter,
   });
 
@@ -1430,7 +1559,7 @@ export function EvidencePage() {
 
       <section style={filterPanelStyle}>
         <input
-          value={documentIdFilter}
+          value={forcedDocumentId || documentIdFilter}
           onChange={(e) => setDocumentIdFilter(e.target.value)}
           placeholder="Filter by document id"
           style={inputStyle}
@@ -1474,8 +1603,8 @@ export function EvidencePage() {
                 <tbody>
                   {items.map((item: EvidenceItem) => (
                     <tr key={item.id}>
-                      <td style={tdStyle}>{item.id}</td>
-                      <td style={tdStyle}>{item.documentId ?? "N/A"}</td>
+                      <td style={tdStyle}><Link to={`/evidence/${item.id}`}>{item.id}</Link></td>
+                      <td style={tdStyle}>{item.documentId ? <Link to={`/documents/${item.documentId}`}>{item.documentId}</Link> : "N/A"}</td>
                       <td style={tdStyle}>{item.status}</td>
                       <td style={tdStyle}>{formatDate(item.createdAtUtc)}</td>
                     </tr>
@@ -1555,25 +1684,174 @@ const emptyStateStyle: CSSProperties = {
 };
 '@
 
+$mainTsx = @'
+import React from "react";
+import ReactDOM from "react-dom/client";
+import {
+  createBrowserRouter,
+  RouterProvider,
+  Link,
+} from "react-router-dom";
+import {
+  QueryClient,
+  QueryClientProvider,
+  useQuery,
+} from "@tanstack/react-query";
+import { getDatabaseHealth, getHealth } from "./api/health";
+import { PersonsPage } from "./pages/PersonsPage";
+import { PersonDetailPage } from "./pages/PersonDetailPage";
+import { CasesPage } from "./pages/CasesPage";
+import { CreateCasePage } from "./pages/CreateCasePage";
+import { CreatePersonPage } from "./pages/CreatePersonPage";
+import { CreateStatementPage } from "./pages/CreateStatementPage";
+import { CreateDocumentPage } from "./pages/CreateDocumentPage";
+import { CreateEvidencePage } from "./pages/CreateEvidencePage";
+import { CreateSourcePage } from "./pages/CreateSourcePage";
+import { IngestionWorkspacePage } from "./pages/IngestionWorkspacePage";
+import { SourcesPage } from "./pages/SourcesPage";
+import { SourceDetailPage } from "./pages/SourceDetailPage";
+import { DocumentsPage } from "./pages/DocumentsPage";
+import { DocumentDetailPage } from "./pages/DocumentDetailPage";
+import { EvidencePage } from "./pages/EvidencePage";
+import { EvidenceDetailPage } from "./pages/EvidenceDetailPage";
+import { CaseDetailPage } from "./pages/CaseDetailPage";
+import { ReviewsPage } from "./pages/ReviewsPage";
+import { DashboardPage } from "./pages/DashboardPage";
+import "./index.css";
+
+const queryClient = new QueryClient();
+
+function Layout({ children }: { children: React.ReactNode }) {
+  return (
+    <div style={{ fontFamily: "Arial, sans-serif", padding: "24px" }}>
+      <header style={{ marginBottom: "24px" }}>
+        <h1 style={{ margin: 0 }}>Veritas Atlas</h1>
+        <p style={{ color: "#555" }}>Frontend connected to live API</p>
+        <nav style={{ display: "flex", gap: "16px", marginTop: "12px", flexWrap: "wrap" }}>
+          <Link to="/">Home</Link>
+          <Link to="/dashboard">Dashboard</Link>
+          <Link to="/health">Health</Link>
+          <Link to="/persons">Persons</Link>
+          <Link to="/persons/new">New Person</Link>
+          <Link to="/cases">Cases</Link>
+          <Link to="/cases/new">New Case</Link>
+          <Link to="/reviews">Reviews</Link>
+          <Link to="/ingestion">Ingestion</Link>
+          <Link to="/sources">Sources</Link>
+          <Link to="/documents">Documents</Link>
+          <Link to="/evidence">Evidence</Link>
+          <Link to="/sources/new">New Source</Link>
+          <Link to="/documents/new">New Document</Link>
+          <Link to="/evidence/new">New Evidence</Link>
+          <Link to="/statements/new">New Statement</Link>
+        </nav>
+      </header>
+      <main>{children}</main>
+    </div>
+  );
+}
+
+function HomePage() {
+  return (
+    <Layout>
+      <h2>Home</h2>
+      <p>Detail pages and cross-links are now available for sources, documents, and evidence.</p>
+    </Layout>
+  );
+}
+
+function HealthPage() {
+  const healthQuery = useQuery({
+    queryKey: ["health"],
+    queryFn: getHealth,
+  });
+
+  const dbHealthQuery = useQuery({
+    queryKey: ["health-db"],
+    queryFn: getDatabaseHealth,
+  });
+
+  return (
+    <Layout>
+      <h2>Health</h2>
+
+      <section style={{ marginBottom: "24px" }}>
+        <h3>API</h3>
+        {healthQuery.isLoading && <p>Loading API health...</p>}
+        {healthQuery.isError && (
+          <p style={{ color: "crimson" }}>
+            API health failed: {(healthQuery.error as Error).message}
+          </p>
+        )}
+        {healthQuery.isSuccess && (
+          <pre>{JSON.stringify(healthQuery.data, null, 2)}</pre>
+        )}
+      </section>
+
+      <section>
+        <h3>Database</h3>
+        {dbHealthQuery.isLoading && <p>Loading DB health...</p>}
+        {dbHealthQuery.isError && (
+          <p style={{ color: "crimson" }}>
+            DB health failed: {(dbHealthQuery.error as Error).message}
+          </p>
+        )}
+        {dbHealthQuery.isSuccess && (
+          <pre>{JSON.stringify(dbHealthQuery.data, null, 2)}</pre>
+        )}
+      </section>
+    </Layout>
+  );
+}
+
+const router = createBrowserRouter([
+  { path: "/", element: <HomePage /> },
+  { path: "/dashboard", element: <DashboardPage /> },
+  { path: "/health", element: <HealthPage /> },
+  { path: "/persons", element: <PersonsPage /> },
+  { path: "/persons/new", element: <CreatePersonPage /> },
+  { path: "/persons/:id", element: <PersonDetailPage /> },
+  { path: "/cases", element: <CasesPage /> },
+  { path: "/cases/new", element: <CreateCasePage /> },
+  { path: "/cases/:id", element: <CaseDetailPage /> },
+  { path: "/reviews", element: <ReviewsPage /> },
+  { path: "/ingestion", element: <IngestionWorkspacePage /> },
+  { path: "/sources", element: <SourcesPage /> },
+  { path: "/sources/new", element: <CreateSourcePage /> },
+  { path: "/sources/:id", element: <SourceDetailPage /> },
+  { path: "/documents", element: <DocumentsPage /> },
+  { path: "/documents/new", element: <CreateDocumentPage /> },
+  { path: "/documents/:id", element: <DocumentDetailPage /> },
+  { path: "/evidence", element: <EvidencePage /> },
+  { path: "/evidence/new", element: <CreateEvidencePage /> },
+  { path: "/evidence/:id", element: <EvidenceDetailPage /> },
+  { path: "/statements/new", element: <CreateStatementPage /> },
+]);
+
+ReactDOM.createRoot(document.getElementById("root")!).render(
+  <React.StrictMode>
+    <QueryClientProvider client={queryClient}>
+      <RouterProvider router={router} />
+    </QueryClientProvider>
+  </React.StrictMode>
+);
+'@
+
 $timestamp = Get-Date -Format "yyyyMMdd-HHmmss"
-$diagDir = Join-Path $RootDir "_diagnostics\phase-6-4-$timestamp"
+$diagDir = Join-Path $RootDir "_diagnostics\phase-6-5-$timestamp"
 Ensure-Directory $diagDir
-$reportPath = Join-Path $diagDir "phase-6-4-report.txt"
+$reportPath = Join-Path $diagDir "phase-6-5-report.txt"
 $stdoutPath = Join-Path $diagDir "api-stdout.log"
 $stderrPath = Join-Path $diagDir "api-stderr.log"
 
-Set-Content -Path $reportPath -Value "Phase 6.4 cross-entity filtering verification`r`nGenerated: $(Get-Date -Format s)`r`nRoot: $RootDir" -Encoding UTF8
+Set-Content -Path $reportPath -Value "Phase 6.5 detail pages verification`r`nGenerated: $(Get-Date -Format s)`r`nRoot: $RootDir" -Encoding UTF8
 
 Write-Host ""
-Write-Host "Applying Phase 6.4 - cross-entity filtering..." -ForegroundColor Cyan
+Write-Host "Applying Phase 6.5 - detail pages + cross-links..." -ForegroundColor Cyan
 
-Write-Utf8File -Path $sourceInterfacePath -Content $sourceInterface
-Write-Utf8File -Path $documentInterfacePath -Content $documentInterface
-Write-Utf8File -Path $evidenceInterfacePath -Content $evidenceInterface
-
-Write-Utf8File -Path $sourceServicePath -Content $sourceService
-Write-Utf8File -Path $documentServicePath -Content $documentService
-Write-Utf8File -Path $evidenceServicePath -Content $evidenceService
+Write-Utf8File -Path $sourcesContractsPath -Content $sourcesContracts
+Write-Utf8File -Path $documentsContractsPath -Content $documentsContracts
+Write-Utf8File -Path $evidenceContractsPath -Content $evidenceContracts
 
 Write-Utf8File -Path $sourcesControllerPath -Content $sourcesController
 Write-Utf8File -Path $documentsControllerPath -Content $documentsController
@@ -1583,13 +1861,18 @@ Write-Utf8File -Path $sourcesApiPath -Content $sourcesApi
 Write-Utf8File -Path $documentsApiPath -Content $documentsApi
 Write-Utf8File -Path $evidenceApiPath -Content $evidenceApi
 
-Write-Utf8File -Path $useSourcesHookPath -Content $useSourcesHook
-Write-Utf8File -Path $useDocumentsHookPath -Content $useDocumentsHook
-Write-Utf8File -Path $useEvidenceHookPath -Content $useEvidenceHook
+Write-Utf8File -Path $useSourceDetailHookPath -Content $useSourceDetailHook
+Write-Utf8File -Path $useDocumentDetailHookPath -Content $useDocumentDetailHook
+Write-Utf8File -Path $useEvidenceDetailHookPath -Content $useEvidenceDetailHook
+
+Write-Utf8File -Path $sourceDetailPagePath -Content $sourceDetailPage
+Write-Utf8File -Path $documentDetailPagePath -Content $documentDetailPage
+Write-Utf8File -Path $evidenceDetailPagePath -Content $evidenceDetailPage
 
 Write-Utf8File -Path $sourcesPagePath -Content $sourcesPage
 Write-Utf8File -Path $documentsPagePath -Content $documentsPage
 Write-Utf8File -Path $evidencePagePath -Content $evidencePage
+Write-Utf8File -Path $mainTsxPath -Content $mainTsx
 
 Write-Host ""
 Write-Host "Running clean / restore / build..." -ForegroundColor Cyan
@@ -1624,7 +1907,7 @@ if ($LASTEXITCODE -ne 0) {
 Pop-Location
 
 Write-Host ""
-Write-Host "Starting API for phase 6.4 smoke test..." -ForegroundColor Cyan
+Write-Host "Starting API for phase 6.5 smoke test..." -ForegroundColor Cyan
 
 $apiProcess = Start-Process `
     -FilePath "dotnet" `
@@ -1641,65 +1924,49 @@ try {
     }
 
     $sourceBody = @{
-        name = "Filter Smoke Source"
+        name = "Detail Smoke Source"
         type = "Article"
-        reference = "https://example.com/filter-test"
-        createdBy = "phase-6-4"
+        reference = "https://example.com/detail-test"
+        createdBy = "phase-6-5"
     } | ConvertTo-Json -Depth 5
 
-    $sourceResponse = Invoke-RestMethod `
-        -Method Post `
-        -Uri "$BaseUrl/api/v1/sources" `
-        -ContentType "application/json" `
-        -Body $sourceBody
-
+    $sourceResponse = Invoke-RestMethod -Method Post -Uri "$BaseUrl/api/v1/sources" -ContentType "application/json" -Body $sourceBody
     Add-Section -OutputPath $reportPath -Title "POST /api/v1/sources" -Content (($sourceResponse | ConvertTo-Json -Depth 10))
 
     $documentBody = @{
         sourceId = $sourceResponse.id
-        title = "Filter Smoke Document"
-        content = "Document content for filtering."
-        externalReference = "filter-doc-001"
-        createdBy = "phase-6-4"
+        title = "Detail Smoke Document"
+        content = "Document content for detail test."
+        externalReference = "detail-doc-001"
+        createdBy = "phase-6-5"
     } | ConvertTo-Json -Depth 5
 
-    $documentResponse = Invoke-RestMethod `
-        -Method Post `
-        -Uri "$BaseUrl/api/v1/documents" `
-        -ContentType "application/json" `
-        -Body $documentBody
-
+    $documentResponse = Invoke-RestMethod -Method Post -Uri "$BaseUrl/api/v1/documents" -ContentType "application/json" -Body $documentBody
     Add-Section -OutputPath $reportPath -Title "POST /api/v1/documents" -Content (($documentResponse | ConvertTo-Json -Depth 10))
 
     $evidenceBody = @{
         documentId = $documentResponse.id
-        quote = "Evidence snippet for filtering."
+        quote = "Evidence snippet for detail test."
         startOffset = 0
-        endOffset = 30
-        context = "Evidence context"
-        createdBy = "phase-6-4"
+        endOffset = 32
+        context = "Evidence context for detail test."
+        createdBy = "phase-6-5"
     } | ConvertTo-Json -Depth 5
 
-    $evidenceResponse = Invoke-RestMethod `
-        -Method Post `
-        -Uri "$BaseUrl/api/v1/evidence" `
-        -ContentType "application/json" `
-        -Body $evidenceBody
-
+    $evidenceResponse = Invoke-RestMethod -Method Post -Uri "$BaseUrl/api/v1/evidence" -ContentType "application/json" -Body $evidenceBody
     Add-Section -OutputPath $reportPath -Title "POST /api/v1/evidence" -Content (($evidenceResponse | ConvertTo-Json -Depth 10))
 
-    $filteredSources = Invoke-RestMethod -Method Get -Uri "$BaseUrl/api/v1/sources?page=1&pageSize=10&search=filter&type=Article&status=Draft"
-    Add-Section -OutputPath $reportPath -Title "GET /api/v1/sources filtered" -Content (($filteredSources | ConvertTo-Json -Depth 10))
+    $sourceDetail = Invoke-RestMethod -Method Get -Uri "$BaseUrl/api/v1/sources/$($sourceResponse.id)"
+    Add-Section -OutputPath $reportPath -Title "GET /api/v1/sources/{id}" -Content (($sourceDetail | ConvertTo-Json -Depth 10))
 
-    $filteredDocuments = Invoke-RestMethod -Method Get -Uri "$BaseUrl/api/v1/documents?page=1&pageSize=10&sourceId=$($sourceResponse.id)&status=Draft"
-    Add-Section -OutputPath $reportPath -Title "GET /api/v1/documents filtered" -Content (($filteredDocuments | ConvertTo-Json -Depth 10))
+    $documentDetail = Invoke-RestMethod -Method Get -Uri "$BaseUrl/api/v1/documents/$($documentResponse.id)"
+    Add-Section -OutputPath $reportPath -Title "GET /api/v1/documents/{id}" -Content (($documentDetail | ConvertTo-Json -Depth 10))
 
-    $evidenceStatus = [uri]::EscapeDataString($evidenceResponse.status)
-    $filteredEvidence = Invoke-RestMethod -Method Get -Uri "$BaseUrl/api/v1/evidence?page=1&pageSize=10&documentId=$($documentResponse.id)&status=$evidenceStatus"
-    Add-Section -OutputPath $reportPath -Title "GET /api/v1/evidence filtered" -Content (($filteredEvidence | ConvertTo-Json -Depth 10))
+    $evidenceDetail = Invoke-RestMethod -Method Get -Uri "$BaseUrl/api/v1/evidence/$($evidenceResponse.id)"
+    Add-Section -OutputPath $reportPath -Title "GET /api/v1/evidence/{id}" -Content (($evidenceDetail | ConvertTo-Json -Depth 10))
 
     Write-Host ""
-    Write-Host "Phase 6.4 completed successfully." -ForegroundColor Green
+    Write-Host "Phase 6.5 completed successfully." -ForegroundColor Green
     Write-Host "Verification report: $reportPath" -ForegroundColor Cyan
 }
 finally {

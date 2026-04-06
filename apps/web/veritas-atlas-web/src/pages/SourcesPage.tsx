@@ -4,10 +4,15 @@ import { useSources } from "../hooks/useSources";
 import type { SourceItem, SourceReferenceResponse } from "../api/sources";
 
 export function SourcesPage() {
-  const sourcesQuery = useSources();
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState("All");
   const [statusFilter, setStatusFilter] = useState("All");
+
+  const sourcesQuery = useSources({
+    search: search || undefined,
+    type: typeFilter,
+    status: statusFilter,
+  });
 
   const items = sourcesQuery.data?.items ?? [];
 
@@ -20,26 +25,6 @@ export function SourcesPage() {
     () => ["All", ...Array.from(new Set(items.map((x) => x.status))).sort()],
     [items]
   );
-
-  const filteredItems = useMemo(() => {
-    const term = search.trim().toLowerCase();
-
-    return items.filter((item) => {
-      const refText = formatReferenceText(item.reference).toLowerCase();
-
-      const matchesSearch =
-        term.length === 0 ||
-        item.name.toLowerCase().includes(term) ||
-        item.type.toLowerCase().includes(term) ||
-        item.status.toLowerCase().includes(term) ||
-        refText.includes(term);
-
-      const matchesType = typeFilter === "All" || item.type === typeFilter;
-      const matchesStatus = statusFilter === "All" || item.status === statusFilter;
-
-      return matchesSearch && matchesType && matchesStatus;
-    });
-  }, [items, search, typeFilter, statusFilter]);
 
   return (
     <div style={{ fontFamily: "Arial, sans-serif", padding: "24px" }}>
@@ -92,10 +77,10 @@ export function SourcesPage() {
       {sourcesQuery.isSuccess && (
         <>
           <p>
-            Showing {filteredItems.length} of {sourcesQuery.data.totalCount} sources
+            Showing {items.length} of {sourcesQuery.data.totalCount} sources
           </p>
 
-          {filteredItems.length === 0 ? (
+          {items.length === 0 ? (
             <div style={emptyStateStyle}>
               <p style={{ margin: 0 }}>No sources match the current filters.</p>
             </div>
@@ -112,7 +97,7 @@ export function SourcesPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredItems.map((item: SourceItem) => (
+                  {items.map((item: SourceItem) => (
                     <tr key={item.id}>
                       <td style={tdStyle}>{item.name}</td>
                       <td style={tdStyle}>{item.type}</td>
@@ -148,19 +133,6 @@ function renderReference(reference: SourceReferenceResponse | null) {
       {reference.languageCode && <span>Lang: {reference.languageCode}</span>}
     </div>
   );
-}
-
-function formatReferenceText(reference: SourceReferenceResponse | null) {
-  if (!reference) {
-    return "";
-  }
-
-  return [
-    reference.externalId ?? "",
-    reference.url ?? "",
-    reference.domain ?? "",
-    reference.languageCode ?? ""
-  ].join(" ");
 }
 
 function formatDate(value: string) {

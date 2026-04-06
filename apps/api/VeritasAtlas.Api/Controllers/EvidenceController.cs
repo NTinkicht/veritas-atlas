@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using VeritasAtlas.Api.Contracts.Evidence;
 using VeritasAtlas.Application.Interfaces;
+using VeritasAtlas.Domain.Enums;
 
 namespace VeritasAtlas.Api.Controllers;
 
@@ -19,9 +20,26 @@ public sealed class EvidenceController : ControllerBase
     public async Task<ActionResult<GetEvidenceResponse>> GetEvidence(
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 20,
+        [FromQuery] Guid? documentId = null,
+        [FromQuery] string? status = null,
         CancellationToken cancellationToken = default)
     {
-        var result = await _evidenceService.GetEvidenceAsync(page, pageSize, cancellationToken);
+        EvidenceStatus? parsedStatus = null;
+        if (!string.IsNullOrWhiteSpace(status))
+        {
+            if (!Enum.TryParse<EvidenceStatus>(status, true, out var evidenceStatus))
+            {
+                return BadRequest(new { message = "Invalid evidence status filter." });
+            }
+            parsedStatus = evidenceStatus;
+        }
+
+        var result = await _evidenceService.GetEvidenceAsync(
+            page,
+            pageSize,
+            documentId,
+            parsedStatus,
+            cancellationToken);
 
         var items = result.Items
             .Select(entity => new GetEvidenceItemResponse(

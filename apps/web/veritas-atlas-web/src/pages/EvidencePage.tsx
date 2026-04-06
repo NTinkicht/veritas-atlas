@@ -4,9 +4,13 @@ import { useEvidenceList } from "../hooks/useEvidenceList";
 import type { EvidenceItem } from "../api/evidenceList";
 
 export function EvidencePage() {
-  const evidenceQuery = useEvidenceList();
-  const [search, setSearch] = useState("");
+  const [documentIdFilter, setDocumentIdFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
+
+  const evidenceQuery = useEvidenceList({
+    documentId: documentIdFilter || undefined,
+    status: statusFilter,
+  });
 
   const items = evidenceQuery.data?.items ?? [];
 
@@ -14,22 +18,6 @@ export function EvidencePage() {
     () => ["All", ...Array.from(new Set(items.map((x) => x.status))).sort()],
     [items]
   );
-
-  const filteredItems = useMemo(() => {
-    const term = search.trim().toLowerCase();
-
-    return items.filter((item) => {
-      const matchesSearch =
-        term.length === 0 ||
-        item.id.toLowerCase().includes(term) ||
-        (item.documentId ?? "").toLowerCase().includes(term) ||
-        item.status.toLowerCase().includes(term);
-
-      const matchesStatus = statusFilter === "All" || item.status === statusFilter;
-
-      return matchesSearch && matchesStatus;
-    });
-  }, [items, search, statusFilter]);
 
   return (
     <div style={{ fontFamily: "Arial, sans-serif", padding: "24px" }}>
@@ -54,9 +42,9 @@ export function EvidencePage() {
 
       <section style={filterPanelStyle}>
         <input
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search id, document id, or status"
+          value={documentIdFilter}
+          onChange={(e) => setDocumentIdFilter(e.target.value)}
+          placeholder="Filter by document id"
           style={inputStyle}
         />
         <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} style={selectStyle}>
@@ -77,10 +65,10 @@ export function EvidencePage() {
       {evidenceQuery.isSuccess && (
         <>
           <p>
-            Showing {filteredItems.length} of {evidenceQuery.data.totalCount} evidence items
+            Showing {items.length} of {evidenceQuery.data.totalCount} evidence items
           </p>
 
-          {filteredItems.length === 0 ? (
+          {items.length === 0 ? (
             <div style={emptyStateStyle}>
               <p style={{ margin: 0 }}>No evidence items match the current filters.</p>
             </div>
@@ -96,7 +84,7 @@ export function EvidencePage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredItems.map((item: EvidenceItem) => (
+                  {items.map((item: EvidenceItem) => (
                     <tr key={item.id}>
                       <td style={tdStyle}>{item.id}</td>
                       <td style={tdStyle}>{item.documentId ?? "N/A"}</td>

@@ -16,5 +16,8 @@ public interface ISourceService
     Task<PagedListResult<Source>> GetSourcesAsync(
         int page,
         int pageSize,
+        string? search = null,
+        SourceType? type = null,
+        SourceStatus? status = null,
         CancellationToken cancellationToken = default);
 }
