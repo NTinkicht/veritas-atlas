@@ -118,111 +118,112 @@ function Ensure-ImportLine {
     return $Content -replace [regex]::Escape($Anchor), ($Anchor + [Environment]::NewLine + $ImportLine)
 }
 
-function Ensure-NavLinks {
-    param([Parameter(Mandatory = $true)][string]$Content)
-
-    if ($Content -notmatch 'to="/review-queue"') {
-        $Content = $Content -replace '<Link to="/reviews">Reviews</Link>', '<Link to="/reviews">Reviews</Link>
-          <Link to="/review-queue">Review Queue</Link>
-          <Link to="/review-workspace">Review Workspace</Link>
-          <Link to="/publication-desk">Publication Desk</Link>'
-    }
-
-    return $Content
-}
-
-function Ensure-Routes {
-    param([Parameter(Mandatory = $true)][string]$Content)
-
-    $patterns = @(
-        'path: "/review-queue"',
-        'path: "/review-workspace"',
-        'path: "/publication-desk"'
+function Ensure-RouteBlock {
+    param(
+        [Parameter(Mandatory = $true)][string]$Content,
+        [Parameter(Mandatory = $true)][string]$AnchorRoute,
+        [Parameter(Mandatory = $true)][string]$RouteBlock,
+        [Parameter(Mandatory = $true)][string]$PresencePattern
     )
 
-    $allExist = $true
-    foreach ($pattern in $patterns) {
-        if ($Content -notmatch $pattern) {
-            $allExist = $false
-        }
+    if ($Content -match $PresencePattern) {
+        return $Content
     }
 
-    if (-not $allExist) {
-        $Content = $Content -replace '\{ path: "/reviews", element: <ReviewsPage /> \},', '{ path: "/reviews", element: <ReviewsPage /> },
-  { path: "/review-queue", element: <ReviewQueuePage /> },
-  { path: "/review-workspace", element: <ReviewWorkspacePage /> },
-  { path: "/publication-desk", element: <PublicationDeskPage /> },'
+    return $Content -replace [regex]::Escape($AnchorRoute), ($AnchorRoute + [Environment]::NewLine + $RouteBlock)
+}
+
+function Ensure-NavBlock {
+    param(
+        [Parameter(Mandatory = $true)][string]$Content,
+        [Parameter(Mandatory = $true)][string]$Anchor,
+        [Parameter(Mandatory = $true)][string]$NavBlock,
+        [Parameter(Mandatory = $true)][string]$PresencePattern
+    )
+
+    if ($Content -match $PresencePattern) {
+        return $Content
     }
 
-    return $Content
+    return $Content -replace [regex]::Escape($Anchor), ($Anchor + [Environment]::NewLine + $NavBlock)
 }
 
 Write-Host "Checkpointing current code with git..."
-Git-Checkpoint -Message ("checkpoint before phase 6.17 - " + (Get-Date -Format "yyyy-MM-dd HH:mm:ss"))
+Git-Checkpoint -Message ("checkpoint before phase 6.18 - " + (Get-Date -Format "yyyy-MM-dd HH:mm:ss"))
 
-Write-Host "Applying Phase 6.17 - Large Scope - Review and Publication Operations Pack..."
+Write-Host "Applying Phase 6.18 - Large Scope - Governance and Publication Console Pack..."
 
 $webRoot = Join-Path $RootDir "apps\web\veritas-atlas-web\src"
 
-$reviewQueuePath = Join-Path $webRoot "pages\ReviewQueuePage.tsx"
-$reviewWorkspacePath = Join-Path $webRoot "pages\ReviewWorkspacePage.tsx"
-$publicationDeskPath = Join-Path $webRoot "pages\PublicationDeskPage.tsx"
+$governanceConsolePath = Join-Path $webRoot "pages\GovernanceConsolePage.tsx"
+$publicationReadinessBoardPath = Join-Path $webRoot "pages\PublicationReadinessBoardPage.tsx"
+$decisionLogPath = Join-Path $webRoot "pages\DecisionLogPage.tsx"
+$reviewMetricsPanelPath = Join-Path $webRoot "components\ReviewMetricsPanel.tsx"
+$publicationStatusPanelPath = Join-Path $webRoot "components\PublicationStatusPanel.tsx"
 $mainPath = Join-Path $webRoot "main.tsx"
 
-Write-Utf8File -Path $reviewQueuePath -Content @'
-import { Link } from "react-router-dom";
-import { useClaims } from "../hooks/useClaims";
-
-export function ReviewQueuePage() {
-  const claimsQuery = useClaims();
-
-  const queueItems = (claimsQuery.data?.items ?? []).slice(0, 12);
-
+Write-Utf8File -Path $reviewMetricsPanelPath -Content @'
+export function ReviewMetricsPanel() {
   return (
-    <div style={{ padding: 24, fontFamily: "Arial, sans-serif" }}>
-      <h1>Review Queue</h1>
-      <p>Operational queue for human review across claims and contradiction preparation.</p>
-
-      <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 20 }}>
-        <Link to="/reviews">Reviews</Link>
-        <Link to="/review-workspace">Review Workspace</Link>
-        <Link to="/publication-desk">Publication Desk</Link>
-        <Link to="/claims">Claims</Link>
-      </div>
-
-      <section style={panelStyle}>
-        <h2 style={{ marginTop: 0 }}>Queue summary</h2>
-        <div style={summaryGridStyle}>
-          <SummaryCard title="Claims available" value={claimsQuery.data?.items.length ?? 0} />
-          <SummaryCard title="Ready for review" value={queueItems.length} />
-          <SummaryCard title="Escalation candidates" value={Math.min(queueItems.length, 3)} />
-        </div>
-      </section>
-
-      <section style={panelStyle}>
-        <h2 style={{ marginTop: 0 }}>Current queue</h2>
-        {claimsQuery.isLoading && <p>Loading queue...</p>}
-        {claimsQuery.isError && <p style={{ color: "crimson" }}>Failed to load queue.</p>}
-        {claimsQuery.isSuccess && queueItems.length === 0 && <p>No review items yet.</p>}
-        {claimsQuery.isSuccess && queueItems.length > 0 && (
-          <ul style={{ marginBottom: 0 }}>
-            {queueItems.map((item) => (
-              <li key={item.id}>
-                <Link to={`/claims/${item.id}`}>{item.topic}</Link> - {item.type} - {item.status}
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
+    <div style={{ border: "1px solid #ddd", borderRadius: 12, padding: 16 }}>
+      <h3 style={{ marginTop: 0 }}>Review Metrics</h3>
+      <ul style={{ marginBottom: 0 }}>
+        <li>Items in review: placeholder</li>
+        <li>Items escalated: placeholder</li>
+        <li>Average review turnaround: placeholder</li>
+      </ul>
     </div>
   );
 }
+'@
 
-function SummaryCard({ title, value }: { title: string; value: number }) {
+Write-Utf8File -Path $publicationStatusPanelPath -Content @'
+export function PublicationStatusPanel() {
   return (
-    <div style={summaryCardStyle}>
-      <span style={{ color: "#666" }}>{title}</span>
-      <strong style={{ fontSize: 28 }}>{value}</strong>
+    <div style={{ border: "1px solid #ddd", borderRadius: 12, padding: 16 }}>
+      <h3 style={{ marginTop: 0 }}>Publication Status</h3>
+      <ul style={{ marginBottom: 0 }}>
+        <li>Ready to publish: placeholder</li>
+        <li>Blocked by review: placeholder</li>
+        <li>Pending contradiction notes: placeholder</li>
+      </ul>
+    </div>
+  );
+}
+'@
+
+Write-Utf8File -Path $governanceConsolePath -Content @'
+import { Link } from "react-router-dom";
+import { ReviewMetricsPanel } from "../components/ReviewMetricsPanel";
+import { PublicationStatusPanel } from "../components/PublicationStatusPanel";
+
+export function GovernanceConsolePage() {
+  return (
+    <div style={{ padding: 24, fontFamily: "Arial, sans-serif" }}>
+      <h1>Governance Console</h1>
+      <p>Operational surface for review governance, escalation tracking, and publication readiness.</p>
+
+      <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 20 }}>
+        <Link to="/review-queue">Review Queue</Link>
+        <Link to="/review-workspace">Review Workspace</Link>
+        <Link to="/publication-desk">Publication Desk</Link>
+        <Link to="/publication-readiness">Publication Readiness</Link>
+        <Link to="/decision-log">Decision Log</Link>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 24 }}>
+        <ReviewMetricsPanel />
+        <PublicationStatusPanel />
+      </div>
+
+      <section style={panelStyle}>
+        <h2 style={{ marginTop: 0 }}>Governance priorities</h2>
+        <ul style={{ marginBottom: 0 }}>
+          <li>Keep publication decisions traceable</li>
+          <li>Escalate unresolved contradiction candidates</li>
+          <li>Route review-ready items into publication desk</li>
+        </ul>
+      </section>
     </div>
   );
 }
@@ -231,138 +232,104 @@ const panelStyle: React.CSSProperties = {
   border: "1px solid #ddd",
   borderRadius: 14,
   padding: 16,
-  marginBottom: 20,
-};
-
-const summaryGridStyle: React.CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-  gap: 16,
-};
-
-const summaryCardStyle: React.CSSProperties = {
-  border: "1px solid #eee",
-  borderRadius: 12,
-  padding: 16,
-  display: "grid",
-  gap: 8,
 };
 '@
 
-Write-Utf8File -Path $reviewWorkspacePath -Content @'
-import { Link, useSearchParams } from "react-router-dom";
-import { useClaimDetail } from "../hooks/useClaimDetail";
+Write-Utf8File -Path $publicationReadinessBoardPath -Content @'
+import { Link } from "react-router-dom";
+import { useClaims } from "../hooks/useClaims";
 
-export function ReviewWorkspacePage() {
-  const [params] = useSearchParams();
-  const claimId = params.get("claimId") ?? "";
-  const claimQuery = useClaimDetail(claimId || undefined);
+export function PublicationReadinessBoardPage() {
+  const claimsQuery = useClaims();
+  const items = (claimsQuery.data?.items ?? []).slice(0, 10);
 
   return (
-    <div style={{ padding: 24, fontFamily: "Arial, sans-serif", maxWidth: 980 }}>
-      <h1>Review Workspace</h1>
-      <p>Focused review surface for claim validation, escalation, and publication readiness.</p>
+    <div style={{ padding: 24, fontFamily: "Arial, sans-serif" }}>
+      <h1>Publication Readiness Board</h1>
+      <p>Board view for items approaching publication after review and contradiction preparation.</p>
 
       <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 20 }}>
-        <Link to="/review-queue">Review Queue</Link>
+        <Link to="/governance-console">Governance Console</Link>
         <Link to="/publication-desk">Publication Desk</Link>
-        {claimId && <Link to={`/claims/${claimId}`}>Claim</Link>}
+        <Link to="/review-queue">Review Queue</Link>
       </div>
 
-      <div style={panelStyle}>
-        <Row label="Claim Id" value={claimId || "N/A"} />
-        <Row label="Workspace Status" value="Ready for structured human review" />
-      </div>
+      <section style={gridStyle}>
+        <BoardColumn title="Needs Review" items={items.slice(0, 3)} />
+        <BoardColumn title="Needs Contradiction Check" items={items.slice(3, 6)} />
+        <BoardColumn title="Ready to Publish" items={items.slice(6, 10)} />
+      </section>
+    </div>
+  );
+}
 
-      {claimId && claimQuery.isLoading && <p>Loading claim context...</p>}
-      {claimId && claimQuery.isError && <p style={{ color: "crimson" }}>Failed to load claim context.</p>}
-
-      {claimId && claimQuery.isSuccess && claimQuery.data && (
-        <>
-          <div style={panelStyle}>
-            <h2 style={{ marginTop: 0 }}>Claim Context</h2>
-            <Row label="Topic" value={claimQuery.data.topic} />
-            <Row label="Type" value={claimQuery.data.type} />
-            <Row label="Status" value={claimQuery.data.status} />
-            <Row label="Material" value={claimQuery.data.isMaterial ? "Yes" : "No"} />
-            <Row label="Normalized Text" value={claimQuery.data.normalizedText} />
-          </div>
-
-          <div style={panelStyle}>
-            <h2 style={{ marginTop: 0 }}>Review actions</h2>
-            <ul style={{ marginBottom: 0 }}>
-              <li>Validate claim formulation</li>
-              <li>Check evidence alignment</li>
-              <li>Escalate to contradiction comparison</li>
-              <li>Mark ready for publication flow</li>
-            </ul>
-          </div>
-        </>
+function BoardColumn({
+  title,
+  items,
+}: {
+  title: string;
+  items: Array<{ id: string; topic: string; type: string; status: string }>;
+}) {
+  return (
+    <div style={columnStyle}>
+      <h3 style={{ marginTop: 0 }}>{title}</h3>
+      {items.length === 0 && <p>No items.</p>}
+      {items.length > 0 && (
+        <ul style={{ marginBottom: 0 }}>
+          {items.map((item) => (
+            <li key={item.id}>
+              <Link to={`/claims/${item.id}`}>{item.topic}</Link> - {item.type} - {item.status}
+            </li>
+          ))}
+        </ul>
       )}
     </div>
   );
 }
 
-function Row({ label, value }: { label: string; value: string }) {
-  return (
-    <div style={{ display: "grid", gridTemplateColumns: "180px 1fr", gap: 12, padding: "6px 0" }}>
-      <strong>{label}</strong>
-      <span>{value}</span>
-    </div>
-  );
-}
+const gridStyle: React.CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
+  gap: 16,
+};
 
-const panelStyle: React.CSSProperties = {
+const columnStyle: React.CSSProperties = {
   border: "1px solid #ddd",
   borderRadius: 14,
   padding: 16,
-  marginBottom: 20,
+  minHeight: 220,
 };
 '@
 
-Write-Utf8File -Path $publicationDeskPath -Content @'
+Write-Utf8File -Path $decisionLogPath -Content @'
 import { Link } from "react-router-dom";
-import { useClaims } from "../hooks/useClaims";
 
-export function PublicationDeskPage() {
-  const claimsQuery = useClaims();
-  const publicationCandidates = (claimsQuery.data?.items ?? []).slice(0, 8);
+export function DecisionLogPage() {
+  const decisions = [
+    "Review queue policy placeholder",
+    "Publication routing placeholder",
+    "Escalation rule placeholder",
+    "Contradiction severity placeholder",
+  ];
 
   return (
     <div style={{ padding: 24, fontFamily: "Arial, sans-serif" }}>
-      <h1>Publication Desk</h1>
-      <p>Operational surface for publication-ready outputs and final publication checks.</p>
+      <h1>Decision Log</h1>
+      <p>Central place for governance and publication decisions.</p>
 
       <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 20 }}>
-        <Link to="/review-queue">Review Queue</Link>
-        <Link to="/review-workspace">Review Workspace</Link>
-        <Link to="/claims">Claims</Link>
+        <Link to="/governance-console">Governance Console</Link>
+        <Link to="/publication-readiness">Publication Readiness</Link>
+        <Link to="/publication-desk">Publication Desk</Link>
       </div>
 
       <section style={panelStyle}>
-        <h2 style={{ marginTop: 0 }}>Publication readiness</h2>
+        <h2 style={{ marginTop: 0 }}>Current decisions</h2>
         <ul style={{ marginBottom: 0 }}>
-          <li>Claim quality and wording review</li>
-          <li>Evidence alignment check</li>
-          <li>Contradiction notes attached</li>
-          <li>Publication routing placeholder</li>
+          {decisions.map((item, index) => (
+            <li key={index}>{item}</li>
+          ))}
         </ul>
-      </section>
-
-      <section style={panelStyle}>
-        <h2 style={{ marginTop: 0 }}>Candidate items</h2>
-        {claimsQuery.isLoading && <p>Loading publication candidates...</p>}
-        {claimsQuery.isError && <p style={{ color: "crimson" }}>Failed to load publication candidates.</p>}
-        {claimsQuery.isSuccess && publicationCandidates.length === 0 && <p>No publication candidates yet.</p>}
-        {claimsQuery.isSuccess && publicationCandidates.length > 0 && (
-          <ul style={{ marginBottom: 0 }}>
-            {publicationCandidates.map((item) => (
-              <li key={item.id}>
-                <Link to={`/claims/${item.id}`}>{item.topic}</Link> - {item.type} - {item.status}
-              </li>
-            ))}
-          </ul>
-        )}
       </section>
     </div>
   );
@@ -372,18 +339,22 @@ const panelStyle: React.CSSProperties = {
   border: "1px solid #ddd",
   borderRadius: 14,
   padding: 16,
-  marginBottom: 20,
 };
 '@
 
 $mainContent = Get-Content $mainPath -Raw
 
-$mainContent = Ensure-ImportLine -Content $mainContent -Anchor 'import { ReviewsPage } from "./pages/ReviewsPage";' -ImportLine 'import { ReviewQueuePage } from "./pages/ReviewQueuePage";'
-$mainContent = Ensure-ImportLine -Content $mainContent -Anchor 'import { ReviewQueuePage } from "./pages/ReviewQueuePage";' -ImportLine 'import { ReviewWorkspacePage } from "./pages/ReviewWorkspacePage";'
-$mainContent = Ensure-ImportLine -Content $mainContent -Anchor 'import { ReviewWorkspacePage } from "./pages/ReviewWorkspacePage";' -ImportLine 'import { PublicationDeskPage } from "./pages/PublicationDeskPage";'
+$mainContent = Ensure-ImportLine -Content $mainContent -Anchor 'import { DashboardPage } from "./pages/DashboardPage";' -ImportLine 'import { GovernanceConsolePage } from "./pages/GovernanceConsolePage";'
+$mainContent = Ensure-ImportLine -Content $mainContent -Anchor 'import { GovernanceConsolePage } from "./pages/GovernanceConsolePage";' -ImportLine 'import { PublicationReadinessBoardPage } from "./pages/PublicationReadinessBoardPage";'
+$mainContent = Ensure-ImportLine -Content $mainContent -Anchor 'import { PublicationReadinessBoardPage } from "./pages/PublicationReadinessBoardPage";' -ImportLine 'import { DecisionLogPage } from "./pages/DecisionLogPage";'
 
-$mainContent = Ensure-NavLinks -Content $mainContent
-$mainContent = Ensure-Routes -Content $mainContent
+$mainContent = Ensure-NavBlock -Content $mainContent -Anchor '<Link to="/reviews">Reviews</Link>' -NavBlock '<Link to="/governance-console">Governance Console</Link>
+          <Link to="/publication-readiness">Publication Readiness</Link>
+          <Link to="/decision-log">Decision Log</Link>' -PresencePattern 'to="/governance-console"'
+
+$mainContent = Ensure-RouteBlock -Content $mainContent -AnchorRoute '{ path: "/dashboard", element: <DashboardPage /> },' -RouteBlock '{ path: "/governance-console", element: <GovernanceConsolePage /> },
+  { path: "/publication-readiness", element: <PublicationReadinessBoardPage /> },
+  { path: "/decision-log", element: <DecisionLogPage /> },' -PresencePattern 'path: "/governance-console"'
 
 Write-Utf8File -Path $mainPath -Content $mainContent
 
@@ -393,4 +364,4 @@ Build-Backend -RootDir $RootDir
 Write-Host "Building frontend..."
 Build-Frontend -RootDir $RootDir
 
-Write-Host "Phase 6.17 applied successfully."
+Write-Host "Phase 6.18 applied successfully."

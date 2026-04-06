@@ -37,6 +37,9 @@ import { OperationsHubPage } from "./pages/OperationsHubPage";
 import { InvestigationNavigatorPage } from "./pages/InvestigationNavigatorPage";
 import { CaseDetailPage } from "./pages/CaseDetailPage";
 import { ReviewsPage } from "./pages/ReviewsPage";
+import { ReviewQueuePage } from "./pages/ReviewQueuePage";
+import { ReviewWorkspacePage } from "./pages/ReviewWorkspacePage";
+import { PublicationDeskPage } from "./pages/PublicationDeskPage";
 import { DashboardPage } from "./pages/DashboardPage";
 import { OperationsIntelligencePage } from "./pages/OperationsIntelligencePage";
 import "./index.css";
@@ -62,6 +65,9 @@ function Layout({ children }: { children: React.ReactNode }) {
           <Link to="/cases">Cases</Link>
           <Link to="/cases/new">New Case</Link>
           <Link to="/reviews">Reviews</Link>
+          <Link to="/review-queue">Review Queue</Link>
+          <Link to="/review-workspace">Review Workspace</Link>
+          <Link to="/publication-desk">Publication Desk</Link>
           <Link to="/ingestion">Ingestion</Link>
           <Link to="/sources">Sources</Link>
           <Link to="/documents">Documents</Link>
@@ -175,6 +181,9 @@ const router = createBrowserRouter([
   { path: "/cases/new", element: <CreateCasePage /> },
   { path: "/cases/:id", element: <CaseDetailPage /> },
   { path: "/reviews", element: <ReviewsPage /> },
+  { path: "/review-queue", element: <ReviewQueuePage /> },
+  { path: "/review-workspace", element: <ReviewWorkspacePage /> },
+  { path: "/publication-desk", element: <PublicationDeskPage /> },
   { path: "/ingestion", element: <IngestionWorkspacePage /> },
   { path: "/sources", element: <SourcesPage /> },
   { path: "/sources/new", element: <CreateSourcePage /> },
