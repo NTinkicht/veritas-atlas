@@ -1,42 +1,42 @@
 ﻿using Microsoft.AspNetCore.Mvc;
-using VeritasAtlas.Api.Contracts.Statements;
-using VeritasAtlas.Application.Interfaces;
+using VeritasAtlas.Application.Contracts.Statements;
+using VeritasAtlas.Infrastructure.Services;
 
 namespace VeritasAtlas.Api.Controllers;
 
 [ApiController]
-[Route("api/v1/statements")]
-public sealed class StatementsController : ControllerBase
+[Route("api/statements")]
+public class StatementsController : ControllerBase
 {
-    private readonly IStatementService _statementService;
+    private readonly StatementService _service;
 
-    public StatementsController(IStatementService statementService)
+    public StatementsController(StatementService service)
     {
-        _statementService = statementService;
+        _service = service;
     }
 
-    [HttpPost]
-    public async Task<ActionResult<CreateStatementResponse>> CreateStatement(
-        [FromBody] CreateStatementRequest request,
-        CancellationToken cancellationToken = default)
+    [HttpGet]
+    public async Task<IActionResult> GetStatements([FromQuery] StatementListRequest request)
     {
-        var entity = await _statementService.ExtractStatementAsync(
-            request.EvidenceId,
-            request.Text,
-            request.CreatedBy,
-            cancellationToken);
+        var (total, items) = await _service.GetStatementsAsync(request.Page, request.PageSize);
 
-        var response = new CreateStatementResponse(
-            entity.Id,
-            entity.EvidenceId,
-            entity.DocumentId,
-            entity.Text.ToString(),
-            entity.Polarity.ToString(),
-            entity.Status.ToString(),
-            entity.Topic,
-            entity.CreatedAtUtc,
-            entity.UpdatedAtUtc);
+        return Ok(new
+        {
+            Total = total,
+            Page = request.Page,
+            PageSize = request.PageSize,
+            Items = items
+        });
+    }
 
-        return Ok(response);
+    [HttpGet("{id:guid}")]
+    public async Task<IActionResult> GetStatement(Guid id)
+    {
+        var result = await _service.GetStatementByIdAsync(id);
+
+        if (result == null)
+            return NotFound();
+
+        return Ok(result);
     }
 }

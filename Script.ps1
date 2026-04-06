@@ -5,194 +5,105 @@ param(
 $ErrorActionPreference = "Stop"
 
 $apiRoot = Join-Path $RootDir "apps\api"
-$applicationRoot = Join-Path $apiRoot "VeritasAtlas.Application"
-$infrastructureRoot = Join-Path $apiRoot "VeritasAtlas.Infrastructure"
-$apiProjectRoot = Join-Path $apiRoot "VeritasAtlas.Api"
+$infraRoot = Join-Path $apiRoot "VeritasAtlas.Infrastructure"
+
+$servicePath = Join-Path $infraRoot "Services\StatementService.cs"
 
 Push-Location $RootDir
 
 Write-Host ""
-Write-Host "Checkpointing before Phase 6.7..." -ForegroundColor Cyan
+Write-Host "Checkpointing before Phase 6.7 FIX..." -ForegroundColor Cyan
 
 git add -A
-git commit -m "checkpoint before phase 6.7 - $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')" 2>$null
+git commit -m "fix phase 6.7 - statement service injection error $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')" 2>$null
 
 # =========================
-# 1. CONTRACTS
+# CLEAN BAD BLOCK
 # =========================
 
-$contractsPath = Join-Path $applicationRoot "Contracts\Statements\StatementsContracts.cs"
-
-New-Item -ItemType Directory -Force -Path (Split-Path $contractsPath) | Out-Null
-
-@"
-using System;
-
-namespace VeritasAtlas.Application.Contracts.Statements;
-
-public class StatementListItemResponse
-{
-    public Guid Id { get; set; }
-    public string Text { get; set; } = default!;
-    public string? Topic { get; set; }
-    public string? Predicate { get; set; }
-    public string? Object { get; set; }
-    public string Polarity { get; set; } = default!;
-    public string Status { get; set; } = default!;
-    public DateTime CreatedAt { get; set; }
-}
-
-public class StatementDetailResponse
-{
-    public Guid Id { get; set; }
-    public string Text { get; set; } = default!;
-    public string? Topic { get; set; }
-    public string? Predicate { get; set; }
-    public string? Object { get; set; }
-    public string Polarity { get; set; } = default!;
-    public string Status { get; set; } = default!;
-    public Guid? EvidenceId { get; set; }
-    public Guid? PersonId { get; set; }
-    public DateTime CreatedAt { get; set; }
-}
-
-public class StatementListRequest
-{
-    public int Page { get; set; } = 1;
-    public int PageSize { get; set; } = 20;
-}
-"@ | Set-Content -Encoding UTF8 $contractsPath
-
-# =========================
-# 2. SERVICE UPDATE
-# =========================
-
-$servicePath = Join-Path $infrastructureRoot "Services\StatementService.cs"
+Write-Host "Cleaning invalid appended code..." -ForegroundColor Yellow
 
 $content = Get-Content $servicePath -Raw
 
-if ($content -notmatch "GetStatementsAsync") {
+# Remove wrongly appended using + methods block
+$pattern = "(using Microsoft\.EntityFrameworkCore;[\s\S]*?GetStatementByIdAsync\(Guid id\)[\s\S]*?\})"
 
-$append = @"
+$content = [regex]::Replace($content, $pattern, "", "Singleline")
 
-using Microsoft.EntityFrameworkCore;
-using VeritasAtlas.Application.Contracts.Statements;
+# =========================
+# INSERT METHODS PROPERLY
+# =========================
 
-public async Task<(int Total, List<StatementListItemResponse> Items)> GetStatementsAsync(int page, int pageSize)
-{
-    var query = _dbContext.Statements.AsNoTracking();
+Write-Host "Injecting correct methods inside class..." -ForegroundColor Cyan
 
-    var total = await query.CountAsync();
+$methods = @"
 
-    var items = await query
-        .OrderByDescending(x => x.CreatedAt)
-        .Skip((page - 1) * pageSize)
-        .Take(pageSize)
-        .Select(x => new StatementListItemResponse
-        {
-            Id = x.Id,
-            Text = x.Text.Value,
-            Topic = x.Topic,
-            Predicate = x.Predicate,
-            Object = x.Object,
-            Polarity = x.Polarity.ToString(),
-            Status = x.Status.ToString(),
-            CreatedAt = x.CreatedAt
-        })
-        .ToListAsync();
+    public async Task<(int Total, List<StatementListItemResponse> Items)> GetStatementsAsync(int page, int pageSize)
+    {
+        var query = _dbContext.Statements.AsNoTracking();
 
-    return (total, items);
-}
+        var total = await query.CountAsync();
 
-public async Task<StatementDetailResponse?> GetStatementByIdAsync(Guid id)
-{
-    return await _dbContext.Statements
-        .AsNoTracking()
-        .Where(x => x.Id == id)
-        .Select(x => new StatementDetailResponse
-        {
-            Id = x.Id,
-            Text = x.Text.Value,
-            Topic = x.Topic,
-            Predicate = x.Predicate,
-            Object = x.Object,
-            Polarity = x.Polarity.ToString(),
-            Status = x.Status.ToString(),
-            EvidenceId = x.EvidenceId,
-            PersonId = x.PersonId,
-            CreatedAt = x.CreatedAt
-        })
-        .FirstOrDefaultAsync();
-}
+        var items = await query
+            .OrderByDescending(x => x.CreatedAt)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .Select(x => new StatementListItemResponse
+            {
+                Id = x.Id,
+                Text = x.Text.Value,
+                Topic = x.Topic,
+                Predicate = x.Predicate,
+                Object = x.Object,
+                Polarity = x.Polarity.ToString(),
+                Status = x.Status.ToString(),
+                CreatedAt = x.CreatedAt
+            })
+            .ToListAsync();
+
+        return (total, items);
+    }
+
+    public async Task<StatementDetailResponse?> GetStatementByIdAsync(Guid id)
+    {
+        return await _dbContext.Statements
+            .AsNoTracking()
+            .Where(x => x.Id == id)
+            .Select(x => new StatementDetailResponse
+            {
+                Id = x.Id,
+                Text = x.Text.Value,
+                Topic = x.Topic,
+                Predicate = x.Predicate,
+                Object = x.Object,
+                Polarity = x.Polarity.ToString(),
+                Status = x.Status.ToString(),
+                EvidenceId = x.EvidenceId,
+                PersonId = x.PersonId,
+                CreatedAt = x.CreatedAt
+            })
+            .FirstOrDefaultAsync();
+    }
+
 "@
 
-    $content = $content + $append
-    Set-Content -Path $servicePath -Value $content -Encoding UTF8
-}
+# Inject BEFORE last closing brace of class
+$content = $content -replace "\}\s*$", "$methods`n}"
+
+Set-Content -Path $servicePath -Value $content -Encoding UTF8
 
 # =========================
-# 3. CONTROLLER
-# =========================
-
-$controllerPath = Join-Path $apiProjectRoot "Controllers\StatementsController.cs"
-
-@"
-using Microsoft.AspNetCore.Mvc;
-using VeritasAtlas.Application.Contracts.Statements;
-using VeritasAtlas.Infrastructure.Services;
-
-namespace VeritasAtlas.Api.Controllers;
-
-[ApiController]
-[Route("api/statements")]
-public class StatementsController : ControllerBase
-{
-    private readonly StatementService _service;
-
-    public StatementsController(StatementService service)
-    {
-        _service = service;
-    }
-
-    [HttpGet]
-    public async Task<IActionResult> GetStatements([FromQuery] StatementListRequest request)
-    {
-        var (total, items) = await _service.GetStatementsAsync(request.Page, request.PageSize);
-
-        return Ok(new
-        {
-            Total = total,
-            Page = request.Page,
-            PageSize = request.PageSize,
-            Items = items
-        });
-    }
-
-    [HttpGet("{id:guid}")]
-    public async Task<IActionResult> GetStatement(Guid id)
-    {
-        var result = await _service.GetStatementByIdAsync(id);
-
-        if (result == null)
-            return NotFound();
-
-        return Ok(result);
-    }
-}
-"@ | Set-Content -Encoding UTF8 $controllerPath
-
-# =========================
-# 4. BUILD CHECK
+# BUILD CHECK
 # =========================
 
 $solutionPath = Join-Path $RootDir "VeritasAtlas.slnx"
 
 Write-Host ""
-Write-Host "Building..." -ForegroundColor Cyan
+Write-Host "Building after fix..." -ForegroundColor Cyan
 
 dotnet build $solutionPath
 
-Write-Host ""
-Write-Host "Phase 6.7 completed successfully." -ForegroundColor Green
-
 Pop-Location
+
+Write-Host ""
+Write-Host "Phase 6.7 FIX completed successfully." -ForegroundColor Green
