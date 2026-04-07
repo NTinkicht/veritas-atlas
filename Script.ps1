@@ -1828,7 +1828,7 @@ $failed = $false
 
 Push-Location (Join-Path $RootDir "apps\api\VeritasAtlas.Api")
 try {
-    $apiProcess = Start-Process "dotnet" -ArgumentList "run" -RedirectStandardOutput $apiLog -RedirectStandardError $apiLog -PassThru
+    $apiProcess = Start-Process "dotnet" -ArgumentList "run" -NoNewWindow -Wait
     Start-Sleep -Seconds 8
 
     Invoke-Api -Url "$BaseUrl/api/v1/workflow-audit/clear" -Method POST -Role "admin" | Out-Null
