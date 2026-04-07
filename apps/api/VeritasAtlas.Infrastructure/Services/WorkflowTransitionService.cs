@@ -8,10 +8,14 @@ namespace VeritasAtlas.Infrastructure.Services;
 public sealed class WorkflowTransitionService
 {
     private readonly VeritasAtlasDbContext _dbContext;
+    private readonly ScenarioPersistenceService _scenarioPersistenceService;
 
-    public WorkflowTransitionService(VeritasAtlasDbContext dbContext)
+    public WorkflowTransitionService(
+        VeritasAtlasDbContext dbContext,
+        ScenarioPersistenceService scenarioPersistenceService)
     {
         _dbContext = dbContext;
+        _scenarioPersistenceService = scenarioPersistenceService;
     }
 
     public async Task<(Guid Id, string Status)> SubmitCaseAsync(Guid caseId, CancellationToken cancellationToken = default)
@@ -74,6 +78,7 @@ public sealed class WorkflowTransitionService
         entity.Status = ContradictionStatus.Resolved;
         Touch(entity);
         await _dbContext.SaveChangesAsync(cancellationToken);
+        await UpdateSnapshotAsync(cancellationToken);
         return (entity.Id, entity.Status.ToString());
     }
 
@@ -83,6 +88,7 @@ public sealed class WorkflowTransitionService
         entity.Status = ParseContradictionStatus("UnderReview", entity.Status);
         Touch(entity);
         await _dbContext.SaveChangesAsync(cancellationToken);
+        await UpdateSnapshotAsync(cancellationToken);
         return (entity.Id, entity.Status.ToString());
     }
 
@@ -129,7 +135,7 @@ public sealed class WorkflowTransitionService
 
         var @case = new Case
         {
-            Title = "Phase 8 Seed Case",
+            Title = "Phase 12 Seed Case",
             Status = caseStatus
         };
         Touch(@case);
@@ -174,7 +180,43 @@ public sealed class WorkflowTransitionService
         _dbContext.Contradictions.Add(contradiction);
         await _dbContext.SaveChangesAsync(cancellationToken);
 
+        await _scenarioPersistenceService.SaveSnapshotAsync(
+            new ScenarioSnapshot(
+                @case.Id,
+                claimA.Id,
+                claimB.Id,
+                contradiction.Id,
+                DateTime.UtcNow,
+                @case.Status.ToString(),
+                contradiction.Status.ToString()),
+            cancellationToken);
+
         return (@case.Id, claimA.Id, claimB.Id, contradiction.Id, @case.Status.ToString(), contradiction.Status.ToString());
+    }
+
+    public async Task UpdateSnapshotAsync(CancellationToken cancellationToken = default)
+    {
+        var snapshot = await _scenarioPersistenceService.LoadSnapshotAsync(cancellationToken);
+        if (snapshot is null)
+        {
+            return;
+        }
+
+        var @case = await _dbContext.Cases.FirstOrDefaultAsync(x => x.Id == snapshot.CaseId, cancellationToken);
+        var contradiction = await _dbContext.Contradictions.FirstOrDefaultAsync(x => x.Id == snapshot.ContradictionId, cancellationToken);
+
+        if (@case is null || contradiction is null)
+        {
+            return;
+        }
+
+        await _scenarioPersistenceService.SaveSnapshotAsync(
+            snapshot with
+            {
+                CaseStatus = @case.Status.ToString(),
+                ContradictionStatus = contradiction.Status.ToString()
+            },
+            cancellationToken);
     }
 
     private async Task<Case> GetCaseAsync(Guid caseId, CancellationToken cancellationToken)

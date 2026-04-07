@@ -29,6 +29,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<ContradictionSliceService>();
         services.AddScoped<WorkflowTransitionService>();
         services.AddSingleton<PersistentWorkflowAuditService>();
+        services.AddSingleton<ScenarioPersistenceService>();
         services.AddSingleton<WorkflowAuditStore>();
         services.AddSingleton<WorkflowIntegrityService>();
         services.AddScoped<WorkflowOrchestratorService>();

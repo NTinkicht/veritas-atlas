@@ -796,7 +796,7 @@ Write-File -Path (Join-Path $tools "tests\Run-Phase12-Verification.ps1") -Conten
 param(
     [Parameter(Mandatory = $true)]
     [string]$RootDir,
-    [string]$BaseUrl = "http://localhost:5209"
+    [string]$BaseUrl = "http://localhost:5091"
 )
 
 $ErrorActionPreference = "Stop"

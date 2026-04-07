@@ -45,6 +45,8 @@ import { PublicationDeskPage } from "./pages/PublicationDeskPage";
 import { CaseDetailPage } from "./pages/CaseDetailPage";
 import { ReviewsPage } from "./pages/ReviewsPage";
 import { DashboardPage } from "./pages/DashboardPage";
+import { PersistenceConsolePage } from "./pages/PersistenceConsolePage";
+import { Phase12DataCenterPage } from "./pages/Phase12DataCenterPage";
 import { LoginPage } from "./pages/LoginPage";
 import { AuthMePage } from "./pages/AuthMePage";
 import { Phase11AuthCenterPage } from "./pages/Phase11AuthCenterPage";
@@ -124,6 +126,8 @@ function Layout({ children }: { children: React.ReactNode }) {
 <Link to="/workflow-console">Workflow Console</Link>
 <Link to="/workflow-diagnostics">Workflow Diagnostics</Link>
 <Link to="/workflow-audit">Workflow Audit</Link>
+<Link to="/persistence-console">Persistence Console</Link>
+          <Link to="/phase-12-data-center">Phase 12 Data</Link>
 <Link to="/login">Login</Link>
           <Link to="/auth-me">Current User</Link>
           <Link to="/phase-11-auth-center">Phase 11 Auth</Link>
@@ -299,6 +303,8 @@ const router = createBrowserRouter([
   { path: "/admin", element: <AdminControlTowerPage /> },
   { path: "/", element: <HomePage /> },
   { path: "/dashboard", element: <DashboardPage /> },
+{ path: "/persistence-console", element: <PersistenceConsolePage /> },
+  { path: "/phase-12-data-center", element: <Phase12DataCenterPage /> },
 { path: "/login", element: <LoginPage /> },
   { path: "/auth-me", element: <AuthMePage /> },
   { path: "/phase-11-auth-center", element: <Phase11AuthCenterPage /> },
