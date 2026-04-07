@@ -16,9 +16,7 @@ public sealed class WorkflowTransitionService
 
     public async Task<(Guid Id, string Status)> SubmitCaseAsync(Guid caseId, CancellationToken cancellationToken = default)
     {
-        var entity = await _dbContext.Cases.FirstOrDefaultAsync(x => x.Id == caseId, cancellationToken)
-            ?? throw new InvalidOperationException($"Case '{caseId}' was not found.");
-
+        var entity = await GetCaseAsync(caseId, cancellationToken);
         entity.Status = ParseCaseStatus("InReview", entity.Status);
         Touch(entity);
         await _dbContext.SaveChangesAsync(cancellationToken);
@@ -27,9 +25,7 @@ public sealed class WorkflowTransitionService
 
     public async Task<(Guid Id, string Status)> ApproveCaseAsync(Guid caseId, CancellationToken cancellationToken = default)
     {
-        var entity = await _dbContext.Cases.FirstOrDefaultAsync(x => x.Id == caseId, cancellationToken)
-            ?? throw new InvalidOperationException($"Case '{caseId}' was not found.");
-
+        var entity = await GetCaseAsync(caseId, cancellationToken);
         entity.Status = ParseCaseStatus("Approved", entity.Status);
         Touch(entity);
         await _dbContext.SaveChangesAsync(cancellationToken);
@@ -38,9 +34,7 @@ public sealed class WorkflowTransitionService
 
     public async Task<(Guid Id, string Status)> RejectCaseAsync(Guid caseId, CancellationToken cancellationToken = default)
     {
-        var entity = await _dbContext.Cases.FirstOrDefaultAsync(x => x.Id == caseId, cancellationToken)
-            ?? throw new InvalidOperationException($"Case '{caseId}' was not found.");
-
+        var entity = await GetCaseAsync(caseId, cancellationToken);
         entity.Status = ParseCaseStatus("Rejected", entity.Status);
         Touch(entity);
         await _dbContext.SaveChangesAsync(cancellationToken);
@@ -49,9 +43,7 @@ public sealed class WorkflowTransitionService
 
     public async Task<(Guid Id, string Status)> PreparePublicationAsync(Guid caseId, CancellationToken cancellationToken = default)
     {
-        var entity = await _dbContext.Cases.FirstOrDefaultAsync(x => x.Id == caseId, cancellationToken)
-            ?? throw new InvalidOperationException($"Case '{caseId}' was not found.");
-
+        var entity = await GetCaseAsync(caseId, cancellationToken);
         entity.Status = ParseCaseStatus("ReadyForPublication", entity.Status);
         Touch(entity);
         await _dbContext.SaveChangesAsync(cancellationToken);
@@ -60,9 +52,7 @@ public sealed class WorkflowTransitionService
 
     public async Task<(Guid Id, string Status)> PublishCaseAsync(Guid caseId, CancellationToken cancellationToken = default)
     {
-        var entity = await _dbContext.Cases.FirstOrDefaultAsync(x => x.Id == caseId, cancellationToken)
-            ?? throw new InvalidOperationException($"Case '{caseId}' was not found.");
-
+        var entity = await GetCaseAsync(caseId, cancellationToken);
         entity.Status = ParseCaseStatus("Published", entity.Status);
         Touch(entity);
         await _dbContext.SaveChangesAsync(cancellationToken);
@@ -71,9 +61,7 @@ public sealed class WorkflowTransitionService
 
     public async Task<(Guid Id, string Status)> HoldCaseAsync(Guid caseId, CancellationToken cancellationToken = default)
     {
-        var entity = await _dbContext.Cases.FirstOrDefaultAsync(x => x.Id == caseId, cancellationToken)
-            ?? throw new InvalidOperationException($"Case '{caseId}' was not found.");
-
+        var entity = await GetCaseAsync(caseId, cancellationToken);
         entity.Status = ParseCaseStatus("OnHold", entity.Status);
         Touch(entity);
         await _dbContext.SaveChangesAsync(cancellationToken);
@@ -82,9 +70,7 @@ public sealed class WorkflowTransitionService
 
     public async Task<(Guid Id, string Status)> ResolveContradictionAsync(Guid contradictionId, CancellationToken cancellationToken = default)
     {
-        var entity = await _dbContext.Contradictions.FirstOrDefaultAsync(x => x.Id == contradictionId, cancellationToken)
-            ?? throw new InvalidOperationException($"Contradiction '{contradictionId}' was not found.");
-
+        var entity = await GetContradictionAsync(contradictionId, cancellationToken);
         entity.Status = ContradictionStatus.Resolved;
         Touch(entity);
         await _dbContext.SaveChangesAsync(cancellationToken);
@@ -93,9 +79,7 @@ public sealed class WorkflowTransitionService
 
     public async Task<(Guid Id, string Status)> EscalateContradictionAsync(Guid contradictionId, CancellationToken cancellationToken = default)
     {
-        var entity = await _dbContext.Contradictions.FirstOrDefaultAsync(x => x.Id == contradictionId, cancellationToken)
-            ?? throw new InvalidOperationException($"Contradiction '{contradictionId}' was not found.");
-
+        var entity = await GetContradictionAsync(contradictionId, cancellationToken);
         entity.Status = ParseContradictionStatus("UnderReview", entity.Status);
         Touch(entity);
         await _dbContext.SaveChangesAsync(cancellationToken);
@@ -104,9 +88,7 @@ public sealed class WorkflowTransitionService
 
     public async Task<(Guid Id, string Status)> SendClaimToReviewAsync(Guid claimId, CancellationToken cancellationToken = default)
     {
-        var entity = await _dbContext.Claims.FirstOrDefaultAsync(x => x.Id == claimId, cancellationToken)
-            ?? throw new InvalidOperationException($"Claim '{claimId}' was not found.");
-
+        var entity = await GetClaimAsync(claimId, cancellationToken);
         entity.Status = ParseClaimStatus("InReview", entity.Status);
         Touch(entity);
         await _dbContext.SaveChangesAsync(cancellationToken);
@@ -115,9 +97,7 @@ public sealed class WorkflowTransitionService
 
     public async Task<(Guid Id, string Status)> ReturnClaimForEditAsync(Guid claimId, CancellationToken cancellationToken = default)
     {
-        var entity = await _dbContext.Claims.FirstOrDefaultAsync(x => x.Id == claimId, cancellationToken)
-            ?? throw new InvalidOperationException($"Claim '{claimId}' was not found.");
-
+        var entity = await GetClaimAsync(claimId, cancellationToken);
         entity.Status = ParseClaimStatus("Draft", entity.Status);
         Touch(entity);
         await _dbContext.SaveChangesAsync(cancellationToken);
@@ -126,9 +106,7 @@ public sealed class WorkflowTransitionService
 
     public async Task<(Guid Id, string Status)> CompleteReviewAsync(Guid reviewId, CancellationToken cancellationToken = default)
     {
-        var entity = await _dbContext.Reviews.FirstOrDefaultAsync(x => x.Id == reviewId, cancellationToken)
-            ?? throw new InvalidOperationException($"Review '{reviewId}' was not found.");
-
+        var entity = await GetReviewAsync(reviewId, cancellationToken);
         entity.Status = ParseReviewStatus("Completed", entity.Status);
         Touch(entity);
         await _dbContext.SaveChangesAsync(cancellationToken);
@@ -137,9 +115,7 @@ public sealed class WorkflowTransitionService
 
     public async Task<(Guid Id, string Status)> ReopenReviewAsync(Guid reviewId, CancellationToken cancellationToken = default)
     {
-        var entity = await _dbContext.Reviews.FirstOrDefaultAsync(x => x.Id == reviewId, cancellationToken)
-            ?? throw new InvalidOperationException($"Review '{reviewId}' was not found.");
-
+        var entity = await GetReviewAsync(reviewId, cancellationToken);
         entity.Status = ParseReviewStatus("Open", entity.Status);
         Touch(entity);
         await _dbContext.SaveChangesAsync(cancellationToken);
@@ -148,22 +124,26 @@ public sealed class WorkflowTransitionService
 
     public async Task<(Guid CaseId, Guid ClaimAId, Guid ClaimBId, Guid ContradictionId, string CaseStatus, string ContradictionStatus)> SeedLifecycleAsync(CancellationToken cancellationToken = default)
     {
+        var caseStatus = ParseCaseStatus("Draft", default);
+        var claimStatus = ParseClaimStatus("Draft", default);
+
         var @case = new Case
         {
             Title = "Phase 8 Seed Case",
-            Status = ParseCaseStatus("Draft", default)
+            Status = caseStatus
         };
-
         Touch(@case);
+
+        _dbContext.Cases.Add(@case);
+        await _dbContext.SaveChangesAsync(cancellationToken);
 
         var claimA = new Claim
         {
             CaseId = @case.Id,
             Topic = "Seed Claim A",
             NormalizedText = "Seed claim A normalized text",
-            Status = ParseClaimStatus("Draft", default)
+            Status = claimStatus
         };
-
         Touch(claimA);
 
         var claimB = new Claim
@@ -171,10 +151,13 @@ public sealed class WorkflowTransitionService
             CaseId = @case.Id,
             Topic = "Seed Claim B",
             NormalizedText = "Seed claim B normalized text",
-            Status = ParseClaimStatus("Draft", default)
+            Status = claimStatus
         };
-
         Touch(claimB);
+
+        _dbContext.Claims.Add(claimA);
+        _dbContext.Claims.Add(claimB);
+        await _dbContext.SaveChangesAsync(cancellationToken);
 
         var contradiction = new Contradiction
         {
@@ -186,16 +169,36 @@ public sealed class WorkflowTransitionService
             Status = ContradictionStatus.Draft,
             Summary = "Seed contradiction"
         };
-
         Touch(contradiction);
 
-        _dbContext.Cases.Add(@case);
-        _dbContext.Claims.Add(claimA);
-        _dbContext.Claims.Add(claimB);
         _dbContext.Contradictions.Add(contradiction);
         await _dbContext.SaveChangesAsync(cancellationToken);
 
         return (@case.Id, claimA.Id, claimB.Id, contradiction.Id, @case.Status.ToString(), contradiction.Status.ToString());
+    }
+
+    private async Task<Case> GetCaseAsync(Guid caseId, CancellationToken cancellationToken)
+    {
+        return await _dbContext.Cases.FirstOrDefaultAsync(x => x.Id == caseId, cancellationToken)
+            ?? throw new InvalidOperationException($"Case '{caseId}' was not found.");
+    }
+
+    private async Task<Claim> GetClaimAsync(Guid claimId, CancellationToken cancellationToken)
+    {
+        return await _dbContext.Claims.FirstOrDefaultAsync(x => x.Id == claimId, cancellationToken)
+            ?? throw new InvalidOperationException($"Claim '{claimId}' was not found.");
+    }
+
+    private async Task<Contradiction> GetContradictionAsync(Guid contradictionId, CancellationToken cancellationToken)
+    {
+        return await _dbContext.Contradictions.FirstOrDefaultAsync(x => x.Id == contradictionId, cancellationToken)
+            ?? throw new InvalidOperationException($"Contradiction '{contradictionId}' was not found.");
+    }
+
+    private async Task<Review> GetReviewAsync(Guid reviewId, CancellationToken cancellationToken)
+    {
+        return await _dbContext.Reviews.FirstOrDefaultAsync(x => x.Id == reviewId, cancellationToken)
+            ?? throw new InvalidOperationException($"Review '{reviewId}' was not found.");
     }
 
     private static void Touch(object entity)

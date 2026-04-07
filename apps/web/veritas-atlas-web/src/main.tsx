@@ -45,6 +45,9 @@ import { PublicationDeskPage } from "./pages/PublicationDeskPage";
 import { CaseDetailPage } from "./pages/CaseDetailPage";
 import { ReviewsPage } from "./pages/ReviewsPage";
 import { DashboardPage } from "./pages/DashboardPage";
+import { SeededLifecycleRunnerPage } from "./pages/SeededLifecycleRunnerPage";
+import { WorkflowValidationPage } from "./pages/WorkflowValidationPage";
+import { IntegrationTestCenterPage } from "./pages/IntegrationTestCenterPage";
 import { LifecycleSeedPage } from "./pages/LifecycleSeedPage";
 import { WorkflowDiagnosticsPage } from "./pages/WorkflowDiagnosticsPage";
 import { MutationPlaygroundPage } from "./pages/MutationPlaygroundPage";
@@ -112,6 +115,9 @@ function Layout({ children }: { children: React.ReactNode }) {
 <Link to="/operational-actions">Operational Actions</Link>
 <Link to="/workflow-console">Workflow Console</Link>
 <Link to="/workflow-diagnostics">Workflow Diagnostics</Link>
+<Link to="/seeded-lifecycle-runner">Seeded Lifecycle Runner</Link>
+          <Link to="/workflow-validation">Workflow Validation</Link>
+          <Link to="/integration-test-center">Integration Test Center</Link>
 <Link to="/lifecycle-seed">Lifecycle Seed</Link>
           <Link to="/mutation-playground">Mutation Playground</Link>
           <Link to="/phase-7-closeout">Phase 7 Closeout</Link>
@@ -277,6 +283,9 @@ const router = createBrowserRouter([
   { path: "/admin", element: <AdminControlTowerPage /> },
   { path: "/", element: <HomePage /> },
   { path: "/dashboard", element: <DashboardPage /> },
+{ path: "/seeded-lifecycle-runner", element: <SeededLifecycleRunnerPage /> },
+  { path: "/workflow-validation", element: <WorkflowValidationPage /> },
+  { path: "/integration-test-center", element: <IntegrationTestCenterPage /> },
 { path: "/lifecycle-seed", element: <LifecycleSeedPage /> },
 { path: "/workflow-diagnostics", element: <WorkflowDiagnosticsPage /> },
   { path: "/mutation-playground", element: <MutationPlaygroundPage /> },
