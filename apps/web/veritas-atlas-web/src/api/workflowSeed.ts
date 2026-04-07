@@ -1,3 +1,5 @@
+import { getWorkflowRoleHeaders } from "./workflowRoleContext";
+
 export type WorkflowSeedResponse = {
   caseId: string;
   primaryClaimId: string;
@@ -9,7 +11,10 @@ export type WorkflowSeedResponse = {
 };
 
 export async function seedWorkflowLifecycle(): Promise<WorkflowSeedResponse> {
-  const response = await fetch("/api/v1/actions/seed/lifecycle", { method: "POST" });
+  const response = await fetch("/api/v1/actions/seed/lifecycle", {
+    method: "POST",
+    headers: getWorkflowRoleHeaders(),
+  });
 
   if (!response.ok) {
     const text = await response.text();

@@ -8,10 +8,14 @@ export function WorkflowActionPanel({
   title,
   buttons,
   message,
+  error,
+  isBusy,
 }: {
   title: string;
   buttons: WorkflowActionButton[];
   message?: string;
+  error?: string;
+  isBusy?: boolean;
 }) {
   return (
     <div style={panelStyle}>
@@ -21,14 +25,16 @@ export function WorkflowActionPanel({
           <button
             key={button.label}
             onClick={button.onClick}
-            disabled={button.disabled}
+            disabled={button.disabled || isBusy}
             style={buttonStyle}
           >
             {button.label}
           </button>
         ))}
       </div>
+      {isBusy && <p style={{ marginTop: 12, marginBottom: 0 }}>Working...</p>}
       {message && <p style={{ marginTop: 12, marginBottom: 0 }}>{message}</p>}
+      {error && <p style={{ marginTop: 12, marginBottom: 0, color: "crimson" }}>{error}</p>}
     </div>
   );
 }

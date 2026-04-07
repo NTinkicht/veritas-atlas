@@ -45,6 +45,8 @@ import { PublicationDeskPage } from "./pages/PublicationDeskPage";
 import { CaseDetailPage } from "./pages/CaseDetailPage";
 import { ReviewsPage } from "./pages/ReviewsPage";
 import { DashboardPage } from "./pages/DashboardPage";
+import { WorkflowAuditPage } from "./pages/WorkflowAuditPage";
+import { Phase9IntegrityCenterPage } from "./pages/Phase9IntegrityCenterPage";
 import { SeededLifecycleRunnerPage } from "./pages/SeededLifecycleRunnerPage";
 import { WorkflowValidationPage } from "./pages/WorkflowValidationPage";
 import { IntegrationTestCenterPage } from "./pages/IntegrationTestCenterPage";
@@ -115,6 +117,8 @@ function Layout({ children }: { children: React.ReactNode }) {
 <Link to="/operational-actions">Operational Actions</Link>
 <Link to="/workflow-console">Workflow Console</Link>
 <Link to="/workflow-diagnostics">Workflow Diagnostics</Link>
+<Link to="/workflow-audit">Workflow Audit</Link>
+          <Link to="/phase-9-integrity-center">Phase 9 Integrity</Link>
 <Link to="/seeded-lifecycle-runner">Seeded Lifecycle Runner</Link>
           <Link to="/workflow-validation">Workflow Validation</Link>
           <Link to="/integration-test-center">Integration Test Center</Link>
@@ -283,6 +287,8 @@ const router = createBrowserRouter([
   { path: "/admin", element: <AdminControlTowerPage /> },
   { path: "/", element: <HomePage /> },
   { path: "/dashboard", element: <DashboardPage /> },
+{ path: "/workflow-audit", element: <WorkflowAuditPage /> },
+  { path: "/phase-9-integrity-center", element: <Phase9IntegrityCenterPage /> },
 { path: "/seeded-lifecycle-runner", element: <SeededLifecycleRunnerPage /> },
   { path: "/workflow-validation", element: <WorkflowValidationPage /> },
   { path: "/integration-test-center", element: <IntegrationTestCenterPage /> },

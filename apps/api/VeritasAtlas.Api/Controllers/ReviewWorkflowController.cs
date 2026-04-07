@@ -8,38 +8,71 @@ namespace VeritasAtlas.Api.Controllers;
 [Route("api/v1/review-workflow")]
 public class ReviewWorkflowController : ControllerBase
 {
-    private readonly WorkflowTransitionService _workflowTransitionService;
+    private readonly WorkflowOrchestratorService _workflowOrchestratorService;
 
-    public ReviewWorkflowController(WorkflowTransitionService workflowTransitionService)
+    public ReviewWorkflowController(WorkflowOrchestratorService workflowOrchestratorService)
     {
-        _workflowTransitionService = workflowTransitionService;
+        _workflowOrchestratorService = workflowOrchestratorService;
     }
 
     [HttpPost("claims/{claimId}/send-to-review")]
     public async Task<ActionResult<WorkflowTransitionResponse>> SendClaimToReview(Guid claimId, CancellationToken cancellationToken)
     {
-        var result = await _workflowTransitionService.SendClaimToReviewAsync(claimId, cancellationToken);
-        return Ok(new WorkflowTransitionResponse("Claim", result.Id, result.Status, DateTime.UtcNow, "Claim sent to review."));
+        return await ExecuteTransition(
+            "Claim",
+            claimId,
+            () => _workflowOrchestratorService.SendClaimToReviewAsync(claimId, Request.Headers["X-Role"], cancellationToken),
+            "Claim sent to review.");
     }
 
     [HttpPost("claims/{claimId}/return-for-edit")]
     public async Task<ActionResult<WorkflowTransitionResponse>> ReturnClaimForEdit(Guid claimId, CancellationToken cancellationToken)
     {
-        var result = await _workflowTransitionService.ReturnClaimForEditAsync(claimId, cancellationToken);
-        return Ok(new WorkflowTransitionResponse("Claim", result.Id, result.Status, DateTime.UtcNow, "Claim returned for edit."));
+        return await ExecuteTransition(
+            "Claim",
+            claimId,
+            () => _workflowOrchestratorService.ReturnClaimForEditAsync(claimId, Request.Headers["X-Role"], cancellationToken),
+            "Claim returned for edit.");
     }
 
     [HttpPost("contradictions/{id}/escalate")]
     public async Task<ActionResult<WorkflowTransitionResponse>> EscalateContradiction(Guid id, CancellationToken cancellationToken)
     {
-        var result = await _workflowTransitionService.EscalateContradictionAsync(id, cancellationToken);
-        return Ok(new WorkflowTransitionResponse("Contradiction", result.Id, result.Status, DateTime.UtcNow, "Contradiction escalated."));
+        return await ExecuteTransition(
+            "Contradiction",
+            id,
+            () => _workflowOrchestratorService.EscalateContradictionAsync(id, Request.Headers["X-Role"], cancellationToken),
+            "Contradiction escalated.");
     }
 
     [HttpPost("reviews/{id}/reopen")]
     public async Task<ActionResult<WorkflowTransitionResponse>> ReopenReview(Guid id, CancellationToken cancellationToken)
     {
-        var result = await _workflowTransitionService.ReopenReviewAsync(id, cancellationToken);
-        return Ok(new WorkflowTransitionResponse("Review", result.Id, result.Status, DateTime.UtcNow, "Review reopened."));
+        return await ExecuteTransition(
+            "Review",
+            id,
+            () => _workflowOrchestratorService.ReopenReviewAsync(id, Request.Headers["X-Role"], cancellationToken),
+            "Review reopened.");
+    }
+
+    private async Task<ActionResult<WorkflowTransitionResponse>> ExecuteTransition(
+        string entityType,
+        Guid entityId,
+        Func<Task<(Guid Id, string Status)>> action,
+        string message)
+    {
+        try
+        {
+            var result = await action();
+            return Ok(new WorkflowTransitionResponse(entityType, result.Id, result.Status, DateTime.UtcNow, message));
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new WorkflowValidationFailureResponse(entityType, entityId, message, ex.Message, DateTime.UtcNow));
+        }
     }
 }

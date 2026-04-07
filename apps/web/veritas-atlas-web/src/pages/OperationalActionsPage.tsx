@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { ActionButtonsPanel } from "../components/ActionButtonsPanel";
+import { RoleSelectorPanel } from "../components/RoleSelectorPanel";
 import {
   useApproveCaseAction,
   useCompleteReviewAction,
@@ -19,6 +20,17 @@ export function OperationalActionsPage() {
   const resolveContradictionAction = useResolveContradictionAction();
   const completeReviewAction = useCompleteReviewAction();
 
+  const caseMessage = submitCaseAction.data?.status || approveCaseAction.data?.status || rejectCaseAction.data?.status;
+  const caseError =
+    (submitCaseAction.error as Error | null)?.message ||
+    (approveCaseAction.error as Error | null)?.message ||
+    (rejectCaseAction.error as Error | null)?.message;
+
+  const reviewMessage = resolveContradictionAction.data?.status || completeReviewAction.data?.status;
+  const reviewError =
+    (resolveContradictionAction.error as Error | null)?.message ||
+    (completeReviewAction.error as Error | null)?.message;
+
   return (
     <div style={{ fontFamily: "Arial, sans-serif", padding: 24 }}>
       <h1 style={{ marginTop: 0 }}>Operational Actions</h1>
@@ -26,7 +38,9 @@ export function OperationalActionsPage() {
         Manual action surface for submitting, approving, rejecting, resolving, and completing operational items.
       </p>
 
-      <div style={panelStyle}>
+      <RoleSelectorPanel />
+
+      <div style={{ ...panelStyle, marginTop: 16 }}>
         <label style={labelStyle}>
           Case Id
           <input value={caseId} onChange={(e) => setCaseId(e.target.value)} style={inputStyle} />
@@ -49,12 +63,9 @@ export function OperationalActionsPage() {
             { label: "Approve Case", onClick: () => approveCaseAction.mutate(caseId), disabled: !caseId },
             { label: "Reject Case", onClick: () => rejectCaseAction.mutate(caseId), disabled: !caseId },
           ]}
-          message={
-            submitCaseAction.data?.status ||
-            approveCaseAction.data?.status ||
-            rejectCaseAction.data?.status ||
-            undefined
-          }
+          message={caseMessage}
+          error={caseError}
+          isBusy={submitCaseAction.isPending || approveCaseAction.isPending || rejectCaseAction.isPending}
         />
 
         <ActionButtonsPanel
@@ -63,11 +74,9 @@ export function OperationalActionsPage() {
             { label: "Resolve Contradiction", onClick: () => resolveContradictionAction.mutate(contradictionId), disabled: !contradictionId },
             { label: "Complete Review", onClick: () => completeReviewAction.mutate(reviewId), disabled: !reviewId },
           ]}
-          message={
-            resolveContradictionAction.data?.status ||
-            completeReviewAction.data?.status ||
-            undefined
-          }
+          message={reviewMessage}
+          error={reviewError}
+          isBusy={resolveContradictionAction.isPending || completeReviewAction.isPending}
         />
       </div>
     </div>

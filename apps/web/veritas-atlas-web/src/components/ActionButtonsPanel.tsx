@@ -8,10 +8,14 @@ export function ActionButtonsPanel({
   title,
   items,
   message,
+  error,
+  isBusy,
 }: {
   title: string;
   items: ActionButtonItem[];
   message?: string;
+  error?: string;
+  isBusy?: boolean;
 }) {
   return (
     <div style={panelStyle}>
@@ -21,14 +25,16 @@ export function ActionButtonsPanel({
           <button
             key={item.label}
             onClick={item.onClick}
-            disabled={item.disabled}
+            disabled={item.disabled || isBusy}
             style={buttonStyle}
           >
             {item.label}
           </button>
         ))}
       </div>
+      {isBusy && <p style={{ marginTop: 12, marginBottom: 0 }}>Working...</p>}
       {message && <p style={{ marginTop: 12, marginBottom: 0 }}>{message}</p>}
+      {error && <p style={{ marginTop: 12, marginBottom: 0, color: "crimson" }}>{error}</p>}
     </div>
   );
 }

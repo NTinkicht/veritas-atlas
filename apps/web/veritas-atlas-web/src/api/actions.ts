@@ -1,14 +1,18 @@
+import { getWorkflowRoleHeaders } from "./workflowRoleContext";
+
 export type ActionResponse = {
   caseId?: string;
   contradictionId?: string;
   reviewId?: string;
   status: string;
-  timestamp: string;
+  timestampUtc?: string;
+  timestamp?: string;
 };
 
 async function postAction(url: string): Promise<ActionResponse> {
   const response = await fetch(url, {
     method: "POST",
+    headers: getWorkflowRoleHeaders(),
   });
 
   if (!response.ok) {

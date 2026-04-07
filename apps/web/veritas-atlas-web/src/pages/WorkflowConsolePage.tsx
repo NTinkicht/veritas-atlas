@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { WorkflowActionPanel } from "../components/WorkflowActionPanel";
+import { RoleSelectorPanel } from "../components/RoleSelectorPanel";
 import {
   useEscalateContradictionAction,
   useHoldCaseAction,
@@ -24,12 +25,27 @@ export function WorkflowConsolePage() {
   const publish = usePublishCaseAction();
   const hold = useHoldCaseAction();
 
+  const reviewMessage = sendClaim.data?.status || returnClaim.data?.status || escalate.data?.status || reopen.data?.status;
+  const reviewError =
+    (sendClaim.error as Error | null)?.message ||
+    (returnClaim.error as Error | null)?.message ||
+    (escalate.error as Error | null)?.message ||
+    (reopen.error as Error | null)?.message;
+
+  const publicationMessage = prepare.data?.status || publish.data?.status || hold.data?.status;
+  const publicationError =
+    (prepare.error as Error | null)?.message ||
+    (publish.error as Error | null)?.message ||
+    (hold.error as Error | null)?.message;
+
   return (
     <div style={{ fontFamily: "Arial, sans-serif", padding: 24 }}>
       <h1 style={{ marginTop: 0 }}>Workflow Console</h1>
       <p style={{ color: "#555" }}>
         Console for review routing, contradiction escalation, and publication workflow actions.
       </p>
+
+      <RoleSelectorPanel />
 
       <div style={inputGridStyle}>
         <label style={labelStyle}>
@@ -59,7 +75,9 @@ export function WorkflowConsolePage() {
             { label: "Escalate Contradiction", onClick: () => escalate.mutate(contradictionId), disabled: !contradictionId },
             { label: "Reopen Review", onClick: () => reopen.mutate(reviewId), disabled: !reviewId },
           ]}
-          message={sendClaim.data?.status || returnClaim.data?.status || escalate.data?.status || reopen.data?.status}
+          message={reviewMessage}
+          error={reviewError}
+          isBusy={sendClaim.isPending || returnClaim.isPending || escalate.isPending || reopen.isPending}
         />
 
         <WorkflowActionPanel
@@ -69,7 +87,9 @@ export function WorkflowConsolePage() {
             { label: "Publish Case", onClick: () => publish.mutate(caseId), disabled: !caseId },
             { label: "Hold Case", onClick: () => hold.mutate(caseId), disabled: !caseId },
           ]}
-          message={prepare.data?.status || publish.data?.status || hold.data?.status}
+          message={publicationMessage}
+          error={publicationError}
+          isBusy={prepare.isPending || publish.isPending || hold.isPending}
         />
       </div>
     </div>
@@ -80,6 +100,7 @@ const inputGridStyle: React.CSSProperties = {
   display: "grid",
   gridTemplateColumns: "1fr 1fr",
   gap: 12,
+  marginTop: 16,
 };
 
 const labelStyle: React.CSSProperties = {

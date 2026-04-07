@@ -28,6 +28,9 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IClaimService, ClaimService>();
         services.AddScoped<ContradictionSliceService>();
         services.AddScoped<WorkflowTransitionService>();
+        services.AddSingleton<WorkflowAuditStore>();
+        services.AddSingleton<WorkflowIntegrityService>();
+        services.AddScoped<WorkflowOrchestratorService>();
         services.AddScoped<ClaimSliceService>();
         services.AddScoped<IContradictionService, ContradictionService>();
         services.AddScoped<ICaseService, CaseService>();
