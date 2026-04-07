@@ -45,6 +45,7 @@ import { PublicationDeskPage } from "./pages/PublicationDeskPage";
 import { CaseDetailPage } from "./pages/CaseDetailPage";
 import { ReviewsPage } from "./pages/ReviewsPage";
 import { DashboardPage } from "./pages/DashboardPage";
+import { WorkflowConsolePage } from "./pages/WorkflowConsolePage";
 import { OperationalActionsPage } from "./pages/OperationalActionsPage";
 import { AppSurfaceCatalogPage } from "./pages/AppSurfaceCatalogPage";
 import { UICompletionCenterPage } from "./pages/UICompletionCenterPage";
@@ -105,6 +106,7 @@ function Layout({ children }: { children: React.ReactNode }) {
           <Link to="/dashboard">Dashboard</Link>
           <Link to="/decision-intelligence">Decision Intelligence</Link>
 <Link to="/operational-actions">Operational Actions</Link>
+<Link to="/workflow-console">Workflow Console</Link>
 <Link to="/knowledge-graph-hub">Knowledge Graph Hub</Link>
 <Link to="/release-readiness-hub">Release Readiness Hub</Link>
 <Link to="/system-readiness-map">System Readiness Map</Link>
@@ -267,6 +269,7 @@ const router = createBrowserRouter([
   { path: "/admin", element: <AdminControlTowerPage /> },
   { path: "/", element: <HomePage /> },
   { path: "/dashboard", element: <DashboardPage /> },
+{ path: "/workflow-console", element: <WorkflowConsolePage /> },
 { path: "/operational-actions", element: <OperationalActionsPage /> },
   { path: "/decision-intelligence", element: <DecisionIntelligencePage /> },
 { path: "/knowledge-graph-hub", element: <KnowledgeGraphHubPage /> },

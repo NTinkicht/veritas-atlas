@@ -119,140 +119,215 @@ function Ensure-RouteBlock {
 }
 
 Write-Host "Checkpointing current code with git..." -ForegroundColor Cyan
-Git-Checkpoint -Message ("checkpoint before phase 7.4-7.8 bundle - " + (Get-Date -Format "yyyy-MM-dd HH:mm:ss"))
+Git-Checkpoint -Message ("checkpoint before phase 7 final bundle - " + (Get-Date -Format "yyyy-MM-dd HH:mm:ss"))
 
-Write-Host "Applying bundled phases 7.4 to 7.8..." -ForegroundColor Cyan
+Write-Host "Applying final Phase 7 bundle..." -ForegroundColor Cyan
 
 $api = Join-Path $RootDir "apps\api\VeritasAtlas.Api"
 $web = Join-Path $RootDir "apps\web\veritas-atlas-web\src"
-$diag = Join-Path $RootDir "_diagnostics\phase-7-4-to-7-8"
+$tools = Join-Path $RootDir "tools"
+$diag = Join-Path $RootDir "_diagnostics\phase-7-final"
 Ensure-Dir $diag
 
 # =========================
-# 7.4 Review action endpoints
+# Backend diagnostics + smoke utilities
 # =========================
-Write-File (Join-Path $api "Controllers\ReviewWorkflowController.cs") @'
+
+Write-File (Join-Path $api "Controllers\WorkflowDiagnosticsController.cs") @'
 using Microsoft.AspNetCore.Mvc;
 
 namespace VeritasAtlas.Api.Controllers;
 
 [ApiController]
-[Route("api/v1/review-workflow")]
-public class ReviewWorkflowController : ControllerBase
+[Route("api/v1/workflow-diagnostics")]
+public class WorkflowDiagnosticsController : ControllerBase
 {
-    [HttpPost("claims/{claimId}/send-to-review")]
-    public IActionResult SendClaimToReview(Guid claimId)
+    [HttpGet("summary")]
+    public IActionResult GetSummary()
     {
-        return Ok(new { ClaimId = claimId, Status = "InReview", Timestamp = DateTime.UtcNow });
+        var summary = new
+        {
+            Actions = new[]
+            {
+                "SubmitCase",
+                "ApproveCase",
+                "RejectCase",
+                "ResolveContradiction",
+                "CompleteReview",
+                "SendClaimToReview",
+                "ReturnClaimForEdit",
+                "EscalateContradiction",
+                "ReopenReview",
+                "PreparePublication",
+                "PublishCase",
+                "HoldCase"
+            },
+            Stage = "Phase7DepthTrack",
+            Timestamp = DateTime.UtcNow
+        };
+
+        return Ok(summary);
     }
 
-    [HttpPost("claims/{claimId}/return-for-edit")]
-    public IActionResult ReturnClaimForEdit(Guid claimId)
+    [HttpGet("routes")]
+    public IActionResult GetRouteRegistry()
     {
-        return Ok(new { ClaimId = claimId, Status = "NeedsEdit", Timestamp = DateTime.UtcNow });
-    }
+        var routes = new[]
+        {
+            "/api/v1/actions/cases/{caseId}/submit",
+            "/api/v1/actions/cases/{caseId}/approve",
+            "/api/v1/actions/cases/{caseId}/reject",
+            "/api/v1/actions/contradictions/{id}/resolve",
+            "/api/v1/actions/reviews/{id}/complete",
+            "/api/v1/review-workflow/claims/{claimId}/send-to-review",
+            "/api/v1/review-workflow/claims/{claimId}/return-for-edit",
+            "/api/v1/review-workflow/contradictions/{id}/escalate",
+            "/api/v1/review-workflow/reviews/{id}/reopen",
+            "/api/v1/publication-workflow/cases/{caseId}/prepare",
+            "/api/v1/publication-workflow/cases/{caseId}/publish",
+            "/api/v1/publication-workflow/cases/{caseId}/hold"
+        };
 
-    [HttpPost("contradictions/{id}/escalate")]
-    public IActionResult EscalateContradiction(Guid id)
-    {
-        return Ok(new { ContradictionId = id, Status = "Escalated", Timestamp = DateTime.UtcNow });
+        return Ok(routes);
     }
+}
+'@
 
-    [HttpPost("reviews/{id}/reopen")]
-    public IActionResult ReopenReview(Guid id)
-    {
-        return Ok(new { ReviewId = id, Status = "Reopened", Timestamp = DateTime.UtcNow });
+Write-File (Join-Path $tools "smoke\Run-VeritasAtlas-Workflow-Smoke.ps1") @'
+param(
+    [Parameter(Mandatory = $true)]
+    [string]$RootDir,
+    [string]$BaseUrl = "http://localhost:5209",
+    [string]$CaseId = "11111111-1111-1111-1111-111111111111",
+    [string]$ContradictionId = "22222222-2222-2222-2222-222222222222",
+    [string]$ReviewId = "33333333-3333-3333-3333-333333333333",
+    [string]$ClaimId = "44444444-4444-4444-4444-444444444444"
+)
+
+$ErrorActionPreference = "Stop"
+
+function Ensure-Dir {
+    param([string]$Path)
+    if (-not (Test-Path $Path)) {
+        New-Item -ItemType Directory -Path $Path -Force | Out-Null
+    }
+}
+
+$timestamp = Get-Date -Format "yyyyMMdd-HHmmss"
+$diag = Join-Path $RootDir "_diagnostics\workflow-smoke-$timestamp"
+Ensure-Dir $diag
+$report = Join-Path $diag "workflow-smoke-report.md"
+$apiLog = Join-Path $diag "api.log"
+
+Set-Content -Path $report -Value "# Workflow Smoke Report`r`n" -Encoding UTF8
+Add-Content -Path $report -Value ("Generated: " + (Get-Date -Format "yyyy-MM-dd HH:mm:ss"))
+Add-Content -Path $report -Value ""
+
+$apiProcess = $null
+Push-Location (Join-Path $RootDir "apps\api\VeritasAtlas.Api")
+try {
+    $apiProcess = Start-Process "dotnet" -ArgumentList "run" -RedirectStandardOutput $apiLog -RedirectStandardError $apiLog -PassThru
+    Start-Sleep -Seconds 8
+
+    $checks = @(
+        @{ Name = "Workflow Summary"; Method = "GET"; Url = "$BaseUrl/api/v1/workflow-diagnostics/summary" },
+        @{ Name = "Workflow Routes"; Method = "GET"; Url = "$BaseUrl/api/v1/workflow-diagnostics/routes" },
+        @{ Name = "Submit Case"; Method = "POST"; Url = "$BaseUrl/api/v1/actions/cases/$CaseId/submit" },
+        @{ Name = "Approve Case"; Method = "POST"; Url = "$BaseUrl/api/v1/actions/cases/$CaseId/approve" },
+        @{ Name = "Reject Case"; Method = "POST"; Url = "$BaseUrl/api/v1/actions/cases/$CaseId/reject" },
+        @{ Name = "Resolve Contradiction"; Method = "POST"; Url = "$BaseUrl/api/v1/actions/contradictions/$ContradictionId/resolve" },
+        @{ Name = "Complete Review"; Method = "POST"; Url = "$BaseUrl/api/v1/actions/reviews/$ReviewId/complete" },
+        @{ Name = "Send Claim To Review"; Method = "POST"; Url = "$BaseUrl/api/v1/review-workflow/claims/$ClaimId/send-to-review" },
+        @{ Name = "Return Claim For Edit"; Method = "POST"; Url = "$BaseUrl/api/v1/review-workflow/claims/$ClaimId/return-for-edit" },
+        @{ Name = "Escalate Contradiction"; Method = "POST"; Url = "$BaseUrl/api/v1/review-workflow/contradictions/$ContradictionId/escalate" },
+        @{ Name = "Reopen Review"; Method = "POST"; Url = "$BaseUrl/api/v1/review-workflow/reviews/$ReviewId/reopen" },
+        @{ Name = "Prepare Publication"; Method = "POST"; Url = "$BaseUrl/api/v1/publication-workflow/cases/$CaseId/prepare" },
+        @{ Name = "Publish Case"; Method = "POST"; Url = "$BaseUrl/api/v1/publication-workflow/cases/$CaseId/publish" },
+        @{ Name = "Hold Case"; Method = "POST"; Url = "$BaseUrl/api/v1/publication-workflow/cases/$CaseId/hold" }
+    )
+
+    foreach ($check in $checks) {
+        try {
+            $response = Invoke-WebRequest -Uri $check.Url -Method $check.Method -UseBasicParsing -TimeoutSec 15
+            Add-Content -Path $report -Value ("## " + $check.Name)
+            Add-Content -Path $report -Value ("- StatusCode: " + $response.StatusCode)
+            Add-Content -Path $report -Value ("- Url: " + $check.Url)
+            Add-Content -Path $report -Value ""
+        }
+        catch {
+            Add-Content -Path $report -Value ("## " + $check.Name)
+            Add-Content -Path $report -Value ("- FAILED: " + $_.Exception.Message)
+            Add-Content -Path $report -Value ("- Url: " + $check.Url)
+            Add-Content -Path $report -Value ""
+        }
+    }
+}
+finally {
+    Pop-Location
+    if ($apiProcess -and -not $apiProcess.HasExited) {
+        Stop-Process -Id $apiProcess.Id -Force
     }
 }
 '@
 
 # =========================
-# 7.5 Publication action endpoints
+# Frontend diagnostics + workflow UX
 # =========================
-Write-File (Join-Path $api "Controllers\PublicationWorkflowController.cs") @'
-using Microsoft.AspNetCore.Mvc;
 
-namespace VeritasAtlas.Api.Controllers;
-
-[ApiController]
-[Route("api/v1/publication-workflow")]
-public class PublicationWorkflowController : ControllerBase
-{
-    [HttpPost("cases/{caseId}/prepare")]
-    public IActionResult PreparePublication(Guid caseId)
-    {
-        return Ok(new { CaseId = caseId, Status = "PreparedForPublication", Timestamp = DateTime.UtcNow });
-    }
-
-    [HttpPost("cases/{caseId}/publish")]
-    public IActionResult PublishCase(Guid caseId)
-    {
-        return Ok(new { CaseId = caseId, Status = "Published", Timestamp = DateTime.UtcNow });
-    }
-
-    [HttpPost("cases/{caseId}/hold")]
-    public IActionResult HoldCase(Guid caseId)
-    {
-        return Ok(new { CaseId = caseId, Status = "PublicationHold", Timestamp = DateTime.UtcNow });
-    }
-}
-'@
-
-# =========================
-# 7.6 Frontend workflow APIs + hooks
-# =========================
-Write-File (Join-Path $web "api\workflowActions.ts") @'
-export type WorkflowActionResponse = {
-  claimId?: string;
-  contradictionId?: string;
-  reviewId?: string;
-  caseId?: string;
-  status: string;
+Write-File (Join-Path $web "api\workflowDiagnostics.ts") @'
+export type WorkflowDiagnosticsSummary = {
+  actions: string[];
+  stage: string;
   timestamp: string;
 };
 
-async function postAction(url: string): Promise<WorkflowActionResponse> {
-  const response = await fetch(url, { method: "POST" });
+export async function getWorkflowDiagnosticsSummary(): Promise<WorkflowDiagnosticsSummary> {
+  const response = await fetch("/api/v1/workflow-diagnostics/summary");
 
   if (!response.ok) {
     const text = await response.text();
     throw new Error(text || `HTTP ${response.status}`);
   }
 
-  return response.json() as Promise<WorkflowActionResponse>;
+  return response.json() as Promise<WorkflowDiagnosticsSummary>;
 }
 
-export function sendClaimToReview(claimId: string) {
-  return postAction(`/api/v1/review-workflow/claims/${claimId}/send-to-review`);
+export async function getWorkflowDiagnosticsRoutes(): Promise<string[]> {
+  const response = await fetch("/api/v1/workflow-diagnostics/routes");
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(text || `HTTP ${response.status}`);
+  }
+
+  return response.json() as Promise<string[]>;
+}
+'@
+
+Write-File (Join-Path $web "hooks\useWorkflowDiagnostics.ts") @'
+import { useQuery } from "@tanstack/react-query";
+import {
+  getWorkflowDiagnosticsRoutes,
+  getWorkflowDiagnosticsSummary,
+} from "../api/workflowDiagnostics";
+
+export function useWorkflowDiagnosticsSummary() {
+  return useQuery({
+    queryKey: ["workflow-diagnostics-summary"],
+    queryFn: () => getWorkflowDiagnosticsSummary(),
+  });
 }
 
-export function returnClaimForEdit(claimId: string) {
-  return postAction(`/api/v1/review-workflow/claims/${claimId}/return-for-edit`);
-}
-
-export function escalateContradiction(contradictionId: string) {
-  return postAction(`/api/v1/review-workflow/contradictions/${contradictionId}/escalate`);
-}
-
-export function reopenReview(reviewId: string) {
-  return postAction(`/api/v1/review-workflow/reviews/${reviewId}/reopen`);
-}
-
-export function preparePublication(caseId: string) {
-  return postAction(`/api/v1/publication-workflow/cases/${caseId}/prepare`);
-}
-
-export function publishCase(caseId: string) {
-  return postAction(`/api/v1/publication-workflow/cases/${caseId}/publish`);
-}
-
-export function holdCase(caseId: string) {
-  return postAction(`/api/v1/publication-workflow/cases/${caseId}/hold`);
+export function useWorkflowDiagnosticsRoutes() {
+  return useQuery({
+    queryKey: ["workflow-diagnostics-routes"],
+    queryFn: () => getWorkflowDiagnosticsRoutes(),
+  });
 }
 '@
 
 Write-File (Join-Path $web "hooks\useWorkflowActions.ts") @'
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   sendClaimToReview,
   returnClaimForEdit,
@@ -264,80 +339,120 @@ import {
 } from "../api/workflowActions";
 
 export function useSendClaimToReviewAction() {
+  const queryClient = useQueryClient();
+
   return useMutation({
     mutationFn: (claimId: string) => sendClaimToReview(claimId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["claims"] });
+    },
   });
 }
 
 export function useReturnClaimForEditAction() {
+  const queryClient = useQueryClient();
+
   return useMutation({
     mutationFn: (claimId: string) => returnClaimForEdit(claimId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["claims"] });
+    },
   });
 }
 
 export function useEscalateContradictionAction() {
+  const queryClient = useQueryClient();
+
   return useMutation({
     mutationFn: (contradictionId: string) => escalateContradiction(contradictionId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["contradictions"] });
+    },
   });
 }
 
 export function useReopenReviewAction() {
+  const queryClient = useQueryClient();
+
   return useMutation({
     mutationFn: (reviewId: string) => reopenReview(reviewId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["reviews"] });
+    },
   });
 }
 
 export function usePreparePublicationAction() {
+  const queryClient = useQueryClient();
+
   return useMutation({
     mutationFn: (caseId: string) => preparePublication(caseId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["case-explorer"] });
+      queryClient.invalidateQueries({ queryKey: ["cases"] });
+    },
   });
 }
 
 export function usePublishCaseAction() {
+  const queryClient = useQueryClient();
+
   return useMutation({
     mutationFn: (caseId: string) => publishCase(caseId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["case-explorer"] });
+      queryClient.invalidateQueries({ queryKey: ["cases"] });
+    },
   });
 }
 
 export function useHoldCaseAction() {
+  const queryClient = useQueryClient();
+
   return useMutation({
     mutationFn: (caseId: string) => holdCase(caseId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["case-explorer"] });
+      queryClient.invalidateQueries({ queryKey: ["cases"] });
+    },
   });
 }
 '@
 
-Write-File (Join-Path $web "components\WorkflowActionPanel.tsx") @'
-type WorkflowActionButton = {
-  label: string;
-  onClick: () => void;
-  disabled?: boolean;
-};
-
-export function WorkflowActionPanel({
-  title,
-  buttons,
-  message,
+Write-File (Join-Path $web "components\WorkflowDiagnosticsPanel.tsx") @'
+export function WorkflowDiagnosticsPanel({
+  stage,
+  actions,
+  routes,
 }: {
-  title: string;
-  buttons: WorkflowActionButton[];
-  message?: string;
+  stage: string;
+  actions: string[];
+  routes: string[];
 }) {
   return (
     <div style={panelStyle}>
-      <h3 style={{ marginTop: 0 }}>{title}</h3>
-      <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-        {buttons.map((button) => (
-          <button
-            key={button.label}
-            onClick={button.onClick}
-            disabled={button.disabled}
-            style={buttonStyle}
-          >
-            {button.label}
-          </button>
-        ))}
+      <h3 style={{ marginTop: 0 }}>Workflow Diagnostics</h3>
+      <p><strong>Stage:</strong> {stage}</p>
+
+      <div style={gridStyle}>
+        <div>
+          <h4>Actions</h4>
+          <ul style={{ marginBottom: 0 }}>
+            {actions.map((action) => (
+              <li key={action}>{action}</li>
+            ))}
+          </ul>
+        </div>
+
+        <div>
+          <h4>Routes</h4>
+          <ul style={{ marginBottom: 0 }}>
+            {routes.map((route) => (
+              <li key={route}>{route}</li>
+            ))}
+          </ul>
+        </div>
       </div>
-      {message && <p style={{ marginTop: 12, marginBottom: 0 }}>{message}</p>}
     </div>
   );
 }
@@ -348,22 +463,56 @@ const panelStyle: React.CSSProperties = {
   padding: 16,
 };
 
-const buttonStyle: React.CSSProperties = {
-  border: "1px solid #bbb",
-  borderRadius: 10,
-  padding: "10px 14px",
-  background: "white",
-  cursor: "pointer",
-  font: "inherit",
+const gridStyle: React.CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "1fr 1fr",
+  gap: 16,
 };
 '@
 
-# =========================
-# 7.7 Operational workflow console page
-# =========================
-Write-File (Join-Path $web "pages\WorkflowConsolePage.tsx") @'
+Write-File (Join-Path $web "pages\WorkflowDiagnosticsPage.tsx") @'
+import { WorkflowDiagnosticsPanel } from "../components/WorkflowDiagnosticsPanel";
+import {
+  useWorkflowDiagnosticsRoutes,
+  useWorkflowDiagnosticsSummary,
+} from "../hooks/useWorkflowDiagnostics";
+
+export function WorkflowDiagnosticsPage() {
+  const summaryQuery = useWorkflowDiagnosticsSummary();
+  const routesQuery = useWorkflowDiagnosticsRoutes();
+
+  if (summaryQuery.isLoading || routesQuery.isLoading) {
+    return <div style={{ fontFamily: "Arial, sans-serif", padding: 24 }}>Loading workflow diagnostics...</div>;
+  }
+
+  if (summaryQuery.isError || routesQuery.isError) {
+    return <div style={{ fontFamily: "Arial, sans-serif", padding: 24, color: "crimson" }}>Failed to load workflow diagnostics.</div>;
+  }
+
+  if (!summaryQuery.data || !routesQuery.data) {
+    return <div style={{ fontFamily: "Arial, sans-serif", padding: 24 }}>Workflow diagnostics unavailable.</div>;
+  }
+
+  return (
+    <div style={{ fontFamily: "Arial, sans-serif", padding: 24 }}>
+      <h1 style={{ marginTop: 0 }}>Workflow Diagnostics</h1>
+      <p style={{ color: "#555" }}>
+        Diagnostics surface for the write-action workflow layer added during Phase 7.
+      </p>
+
+      <WorkflowDiagnosticsPanel
+        stage={summaryQuery.data.stage}
+        actions={summaryQuery.data.actions}
+        routes={routesQuery.data}
+      />
+    </div>
+  );
+}
+'@
+
+Write-File (Join-Path $web "pages\MutationPlaygroundPage.tsx") @'
 import { useState } from "react";
-import { WorkflowActionPanel } from "../components/WorkflowActionPanel";
+import { ActionButtonsPanel } from "../components/ActionButtonsPanel";
 import {
   useEscalateContradictionAction,
   useHoldCaseAction,
@@ -374,7 +523,7 @@ import {
   useSendClaimToReviewAction,
 } from "../hooks/useWorkflowActions";
 
-export function WorkflowConsolePage() {
+export function MutationPlaygroundPage() {
   const [claimId, setClaimId] = useState("");
   const [caseId, setCaseId] = useState("");
   const [contradictionId, setContradictionId] = useState("");
@@ -390,12 +539,12 @@ export function WorkflowConsolePage() {
 
   return (
     <div style={{ fontFamily: "Arial, sans-serif", padding: 24 }}>
-      <h1 style={{ marginTop: 0 }}>Workflow Console</h1>
+      <h1 style={{ marginTop: 0 }}>Mutation Playground</h1>
       <p style={{ color: "#555" }}>
-        Console for review routing, contradiction escalation, and publication workflow actions.
+        Playground for exercising review and publication workflow mutations from the frontend.
       </p>
 
-      <div style={inputGridStyle}>
+      <div style={gridStyle}>
         <label style={labelStyle}>
           Claim Id
           <input value={claimId} onChange={(e) => setClaimId(e.target.value)} style={inputStyle} />
@@ -415,9 +564,9 @@ export function WorkflowConsolePage() {
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginTop: 20 }}>
-        <WorkflowActionPanel
-          title="Review Workflow"
-          buttons={[
+        <ActionButtonsPanel
+          title="Review Routing Mutations"
+          items={[
             { label: "Send Claim To Review", onClick: () => sendClaim.mutate(claimId), disabled: !claimId },
             { label: "Return Claim For Edit", onClick: () => returnClaim.mutate(claimId), disabled: !claimId },
             { label: "Escalate Contradiction", onClick: () => escalate.mutate(contradictionId), disabled: !contradictionId },
@@ -426,9 +575,9 @@ export function WorkflowConsolePage() {
           message={sendClaim.data?.status || returnClaim.data?.status || escalate.data?.status || reopen.data?.status}
         />
 
-        <WorkflowActionPanel
-          title="Publication Workflow"
-          buttons={[
+        <ActionButtonsPanel
+          title="Publication Mutations"
+          items={[
             { label: "Prepare Publication", onClick: () => prepare.mutate(caseId), disabled: !caseId },
             { label: "Publish Case", onClick: () => publish.mutate(caseId), disabled: !caseId },
             { label: "Hold Case", onClick: () => hold.mutate(caseId), disabled: !caseId },
@@ -440,7 +589,7 @@ export function WorkflowConsolePage() {
   );
 }
 
-const inputGridStyle: React.CSSProperties = {
+const gridStyle: React.CSSProperties = {
   display: "grid",
   gridTemplateColumns: "1fr 1fr",
   gap: 12,
@@ -459,49 +608,95 @@ const inputStyle: React.CSSProperties = {
 };
 '@
 
-# =========================
-# 7.8 Route/nav integration + report
-# =========================
+Write-File (Join-Path $web "pages\Phase7CloseoutPage.tsx") @'
+export function Phase7CloseoutPage() {
+  const items = [
+    "Smoke and workflow diagnostics added",
+    "Write action endpoints added",
+    "Review workflow endpoints added",
+    "Publication workflow endpoints added",
+    "Frontend action and workflow mutation wiring added",
+    "Workflow console and mutation playground added",
+    "Phase 7 ready to hand off into deeper persistence and business logic"
+  ];
+
+  return (
+    <div style={{ fontFamily: "Arial, sans-serif", padding: 24 }}>
+      <h1 style={{ marginTop: 0 }}>Phase 7 Closeout</h1>
+      <p style={{ color: "#555" }}>
+        Closeout summary for the entire Phase 7 depth track.
+      </p>
+
+      <div style={panelStyle}>
+        <ul style={{ marginBottom: 0 }}>
+          {items.map((item) => (
+            <li key={item}>{item}</li>
+          ))}
+        </ul>
+      </div>
+    </div>
+  );
+}
+
+const panelStyle: React.CSSProperties = {
+  border: "1px solid #ddd",
+  borderRadius: 14,
+  padding: 16,
+};
+'@
+
 $main = Join-Path $web "main.tsx"
 $content = Get-Content $main -Raw
 
-if ($content -notmatch 'import \{ WorkflowConsolePage \} from "\./pages/WorkflowConsolePage";') {
+if ($content -notmatch 'import \{ WorkflowDiagnosticsPage \} from "\./pages/WorkflowDiagnosticsPage";') {
     $content = $content -replace 'import \{ DashboardPage \} from "\./pages/DashboardPage";', @'
 import { DashboardPage } from "./pages/DashboardPage";
-import { WorkflowConsolePage } from "./pages/WorkflowConsolePage";
+import { WorkflowDiagnosticsPage } from "./pages/WorkflowDiagnosticsPage";
+import { MutationPlaygroundPage } from "./pages/MutationPlaygroundPage";
+import { Phase7CloseoutPage } from "./pages/Phase7CloseoutPage";
 '@
 }
 
-$content = Ensure-RouteBlock -Content $content -AnchorRoute '{ path: "/dashboard", element: <DashboardPage /> },' -RouteBlock '{ path: "/workflow-console", element: <WorkflowConsolePage /> },' -PresencePattern 'path: "/workflow-console"'
-$content = Ensure-NavBlock -Content $content -Anchor '<Link to="/operational-actions">Operational Actions</Link>' -NavBlock '<Link to="/workflow-console">Workflow Console</Link>' -PresencePattern 'to="/workflow-console"'
+$content = Ensure-RouteBlock -Content $content -AnchorRoute '{ path: "/dashboard", element: <DashboardPage /> },' -RouteBlock '{ path: "/workflow-diagnostics", element: <WorkflowDiagnosticsPage /> },
+  { path: "/mutation-playground", element: <MutationPlaygroundPage /> },
+  { path: "/phase-7-closeout", element: <Phase7CloseoutPage /> },' -PresencePattern 'path: "/workflow-diagnostics"'
+
+$content = Ensure-NavBlock -Content $content -Anchor '<Link to="/workflow-console">Workflow Console</Link>' -NavBlock '<Link to="/workflow-diagnostics">Workflow Diagnostics</Link>
+          <Link to="/mutation-playground">Mutation Playground</Link>
+          <Link to="/phase-7-closeout">Phase 7 Closeout</Link>' -PresencePattern 'to="/workflow-diagnostics"'
 
 Write-File $main $content
 
-Write-File (Join-Path $diag "phase-7-4-to-7-8-summary.md") @'
-# Phase 7.4 to 7.8 Bundle Summary
+Write-File (Join-Path $diag "phase-7-final-bundle-summary.md") @'
+# Phase 7 Final Bundle Summary
 
 ## Included
-- Review workflow backend action endpoints
-- Publication workflow backend action endpoints
-- Frontend workflow action API and hooks
-- Reusable workflow action panel
-- Workflow Console page
-- Router and navigation integration
+- workflow diagnostics backend endpoints
+- workflow smoke runner
+- workflow diagnostics frontend API and hooks
+- query invalidation for workflow mutations
+- workflow diagnostics page
+- mutation playground page
+- phase 7 closeout page
 
-## Purpose
-- move beyond passive UI shells
-- establish interactive review and publication controls
-- create a base for later real service wiring and persistence
+## Outcome
+Phase 7 now includes:
+- backend smoke tooling
+- write actions foundation
+- review workflow action layer
+- publication workflow action layer
+- frontend mutation wiring
+- diagnostics and closeout surfaces
 
-## Next likely depth work
-- connect action endpoints to application services
-- persist state transitions
+## Next recommended phase
+- connect controllers to real application services
+- persist workflow transitions
 - validate business rules
-- refresh affected queries after mutations
-- add seeded end-to-end test scenario
+- add seeded integration tests
+- add auth and role-based control over actions
 '@
 
 Write-Host "Building..." -ForegroundColor Cyan
 Build-All -RootDir $RootDir
 
-Write-Host "Bundled phases 7.4 to 7.8 DONE" -ForegroundColor Green
+Write-Host "Final Phase 7 bundle DONE" -ForegroundColor Green
