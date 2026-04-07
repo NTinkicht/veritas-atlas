@@ -1,4 +1,4 @@
-import { getWorkflowRoleHeaders } from "./workflowRoleContext";
+import { getAuthHeaders } from "./httpAuth";
 
 export type ActionResponse = {
   caseId?: string;
@@ -12,7 +12,7 @@ export type ActionResponse = {
 async function postAction(url: string): Promise<ActionResponse> {
   const response = await fetch(url, {
     method: "POST",
-    headers: getWorkflowRoleHeaders(),
+    headers: getAuthHeaders(),
   });
 
   if (!response.ok) {

@@ -45,6 +45,9 @@ import { PublicationDeskPage } from "./pages/PublicationDeskPage";
 import { CaseDetailPage } from "./pages/CaseDetailPage";
 import { ReviewsPage } from "./pages/ReviewsPage";
 import { DashboardPage } from "./pages/DashboardPage";
+import { LoginPage } from "./pages/LoginPage";
+import { AuthMePage } from "./pages/AuthMePage";
+import { Phase11AuthCenterPage } from "./pages/Phase11AuthCenterPage";
 import { RolePolicyPage } from "./pages/RolePolicyPage";
 import { AuditPersistencePage } from "./pages/AuditPersistencePage";
 import { Phase10HardeningCenterPage } from "./pages/Phase10HardeningCenterPage";
@@ -121,6 +124,9 @@ function Layout({ children }: { children: React.ReactNode }) {
 <Link to="/workflow-console">Workflow Console</Link>
 <Link to="/workflow-diagnostics">Workflow Diagnostics</Link>
 <Link to="/workflow-audit">Workflow Audit</Link>
+<Link to="/login">Login</Link>
+          <Link to="/auth-me">Current User</Link>
+          <Link to="/phase-11-auth-center">Phase 11 Auth</Link>
 <Link to="/role-policy">Role Policy</Link>
           <Link to="/audit-persistence">Audit Persistence</Link>
           <Link to="/phase-10-hardening-center">Phase 10 Hardening</Link>
@@ -293,6 +299,9 @@ const router = createBrowserRouter([
   { path: "/admin", element: <AdminControlTowerPage /> },
   { path: "/", element: <HomePage /> },
   { path: "/dashboard", element: <DashboardPage /> },
+{ path: "/login", element: <LoginPage /> },
+  { path: "/auth-me", element: <AuthMePage /> },
+  { path: "/phase-11-auth-center", element: <Phase11AuthCenterPage /> },
 { path: "/role-policy", element: <RolePolicyPage /> },
   { path: "/audit-persistence", element: <AuditPersistencePage /> },
   { path: "/phase-10-hardening-center", element: <Phase10HardeningCenterPage /> },

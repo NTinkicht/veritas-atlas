@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using VeritasAtlas.Api.Contracts.Workflow;
 using VeritasAtlas.Infrastructure.Services;
@@ -5,6 +6,7 @@ using VeritasAtlas.Infrastructure.Services;
 namespace VeritasAtlas.Api.Controllers;
 
 [ApiController]
+[Authorize]
 [Route("api/v1/workflow-audit")]
 public class WorkflowAuditController : ControllerBase
 {

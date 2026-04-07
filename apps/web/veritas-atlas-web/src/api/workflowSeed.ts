@@ -1,4 +1,4 @@
-import { getWorkflowRoleHeaders } from "./workflowRoleContext";
+import { getAuthHeaders } from "./httpAuth";
 
 export type WorkflowSeedResponse = {
   caseId: string;
@@ -13,7 +13,7 @@ export type WorkflowSeedResponse = {
 export async function seedWorkflowLifecycle(): Promise<WorkflowSeedResponse> {
   const response = await fetch("/api/v1/actions/seed/lifecycle", {
     method: "POST",
-    headers: getWorkflowRoleHeaders(),
+    headers: getAuthHeaders(),
   });
 
   if (!response.ok) {

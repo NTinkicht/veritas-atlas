@@ -1,3 +1,6 @@
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.Tokens;
+using System.Text;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using VeritasAtlas.Api.Infrastructure;
 using VeritasAtlas.Application.Extensions;
@@ -31,6 +34,33 @@ builder.Services.AddHealthChecks()
         name: "postgresql",
         tags: new[] { "db", "postgres", "ready" });
 
+
+builder.Services.AddSingleton<VeritasAtlas.Api.Infrastructure.Auth.JwtTokenService>();
+builder.Services.AddSingleton<VeritasAtlas.Api.Infrastructure.Auth.DevUserStore>();
+builder.Services.AddSingleton<VeritasAtlas.Api.Infrastructure.Auth.AuthRequestContext>();
+
+var jwtSecret = builder.Configuration["Auth:Jwt:Secret"] ?? "veritas-atlas-dev-secret-key-change-in-production-123456";
+var jwtIssuer = builder.Configuration["Auth:Jwt:Issuer"] ?? "VeritasAtlas";
+var jwtAudience = builder.Configuration["Auth:Jwt:Audience"] ?? "VeritasAtlasUsers";
+
+builder.Services
+    .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
+    {
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidIssuer = jwtIssuer,
+            ValidateAudience = true,
+            ValidAudience = jwtAudience,
+            ValidateIssuerSigningKey = true,
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecret)),
+            ValidateLifetime = true,
+            ClockSkew = TimeSpan.FromMinutes(2)
+        };
+    });
+
+builder.Services.AddAuthorization();
 var app = builder.Build();
 
 app.UseMiddleware<CorrelationIdMiddleware>();
@@ -44,6 +74,7 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
 
