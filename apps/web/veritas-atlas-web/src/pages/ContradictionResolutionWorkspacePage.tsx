@@ -1,6 +1,8 @@
 import { Link, useParams } from "react-router-dom";
 import { useContradictionDetail } from "../hooks/useContradictionDetail";
 import { ResolutionActionsPanel } from "../components/ResolutionActionsPanel";
+import { ActionButtonsPanel } from "../components/ActionButtonsPanel";
+import { useResolveContradictionAction } from "../hooks/useActionMutations";
 
 export function ContradictionResolutionWorkspacePage() {
   const { id } = useParams();
@@ -19,6 +21,7 @@ export function ContradictionResolutionWorkspacePage() {
   }
 
   const item = query.data;
+  const resolveAction = useResolveContradictionAction();
 
   return (
     <div style={{ fontFamily: "Arial, sans-serif", padding: 24 }}>
@@ -51,6 +54,16 @@ export function ContradictionResolutionWorkspacePage() {
 
       <div style={{ marginTop: 20 }}>
         <ResolutionActionsPanel contradictionId={item.id} caseId={item.caseId ?? undefined} />
+      </div>
+
+      <div style={{ marginTop: 20 }}>
+        <ActionButtonsPanel
+          title="Contradiction Resolution Action"
+          items={[
+            { label: "Resolve Contradiction", onClick: () => resolveAction.mutate(item.id) },
+          ]}
+          message={resolveAction.data?.status}
+        />
       </div>
     </div>
   );

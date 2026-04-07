@@ -1,10 +1,19 @@
 import { Link, useParams } from "react-router-dom";
 import { useCaseWorkbench } from "../hooks/useCaseWorkbench";
 import { ContradictionQueuePanel } from "../components/ContradictionQueuePanel";
+import { ActionButtonsPanel } from "../components/ActionButtonsPanel";
+import {
+  useApproveCaseAction,
+  useRejectCaseAction,
+  useSubmitCaseAction,
+} from "../hooks/useActionMutations";
 
 export function CaseWorkbenchPage() {
   const { id } = useParams();
   const { caseQuery, linkedClaims, contradictionItems, claimsQuery, contradictionsQuery } = useCaseWorkbench(id);
+  const submitCaseAction = useSubmitCaseAction();
+  const approveCaseAction = useApproveCaseAction();
+  const rejectCaseAction = useRejectCaseAction();
 
   if (caseQuery.isLoading) {
     return <div style={{ fontFamily: "Arial, sans-serif", padding: 24 }}>Loading case workbench...</div>;
@@ -63,6 +72,23 @@ export function CaseWorkbenchPage() {
           <Link to="/resolution-board">Open Resolution Board</Link>
         </div>
         {contradictionsQuery.isLoading && <p style={{ marginTop: 12 }}>Refreshing contradictions...</p>}
+      </div>
+
+      <div style={{ marginTop: 20 }}>
+        <ActionButtonsPanel
+          title="Case Actions"
+          items={[
+            { label: "Submit Case", onClick: () => submitCaseAction.mutate(item.id) },
+            { label: "Approve Case", onClick: () => approveCaseAction.mutate(item.id) },
+            { label: "Reject Case", onClick: () => rejectCaseAction.mutate(item.id) },
+          ]}
+          message={
+            submitCaseAction.data?.status ||
+            approveCaseAction.data?.status ||
+            rejectCaseAction.data?.status ||
+            undefined
+          }
+        />
       </div>
     </div>
   );
