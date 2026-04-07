@@ -64,395 +64,558 @@ function Build-All {
     }
 
     $web = Join-Path $RootDir "apps\web\veritas-atlas-web"
-    Push-Location $web
-    try {
-        npm run build
-        if ($LASTEXITCODE -ne 0) { throw "Frontend failed" }
-    }
-    finally {
-        Pop-Location
+    if (Test-Path $web) {
+        Push-Location $web
+        try {
+            npm run build
+            if ($LASTEXITCODE -ne 0) { throw "Frontend failed" }
+        }
+        finally {
+            Pop-Location
+        }
     }
 }
 
-function Ensure-ImportLine {
+function Replace-InFile {
     param(
-        [string]$Content,
-        [string]$Anchor,
-        [string]$ImportLine
+        [string]$Path,
+        [string]$Pattern,
+        [string]$Replacement
     )
 
-    if ($Content -match [regex]::Escape($ImportLine)) {
-        return $Content
+    if (-not (Test-Path $Path)) {
+        throw "File not found: $Path"
     }
 
-    return $Content -replace [regex]::Escape($Anchor), ($Anchor + [Environment]::NewLine + $ImportLine)
-}
-
-function Ensure-NavBlock {
-    param(
-        [string]$Content,
-        [string]$Anchor,
-        [string]$NavBlock,
-        [string]$PresencePattern
-    )
-
-    if ($Content -match $PresencePattern) {
-        return $Content
-    }
-
-    return $Content -replace [regex]::Escape($Anchor), ($Anchor + [Environment]::NewLine + $NavBlock)
-}
-
-function Ensure-RouteBlock {
-    param(
-        [string]$Content,
-        [string]$AnchorRoute,
-        [string]$RouteBlock,
-        [string]$PresencePattern
-    )
-
-    if ($Content -match $PresencePattern) {
-        return $Content
-    }
-
-    return $Content -replace [regex]::Escape($AnchorRoute), ($AnchorRoute + [Environment]::NewLine + $RouteBlock)
+    $content = Get-Content $Path -Raw
+    $updated = [regex]::Replace($content, $Pattern, $Replacement, [System.Text.RegularExpressions.RegexOptions]::Singleline)
+    Write-File -Path $Path -Content $updated
 }
 
 Write-Host "Checkpointing current code with git..." -ForegroundColor Cyan
-Git-Checkpoint -Message ("checkpoint before phase 7 final bundle - " + (Get-Date -Format "yyyy-MM-dd HH:mm:ss"))
+Git-Checkpoint -Message ("checkpoint before phase 8.0 - " + (Get-Date -Format "yyyy-MM-dd HH:mm:ss"))
 
-Write-Host "Applying final Phase 7 bundle..." -ForegroundColor Cyan
+Write-Host "Applying Phase 8.0 - persisted workflow transitions and seeded lifecycle..." -ForegroundColor Cyan
 
-$api = Join-Path $RootDir "apps\api\VeritasAtlas.Api"
-$web = Join-Path $RootDir "apps\web\veritas-atlas-web\src"
-$tools = Join-Path $RootDir "tools"
-$diag = Join-Path $RootDir "_diagnostics\phase-7-final"
+$api = Join-Path $RootDir "apps\api"
+$infra = Join-Path $api "VeritasAtlas.Infrastructure"
+$app = Join-Path $api "VeritasAtlas.Application"
+$domain = Join-Path $api "VeritasAtlas.Domain"
+$apiProj = Join-Path $api "VeritasAtlas.Api"
+$diag = Join-Path $RootDir "_diagnostics\phase-8-0"
 Ensure-Dir $diag
 
-# =========================
-# Backend diagnostics + smoke utilities
-# =========================
+# =========================================
+# Contracts and service for persisted transitions
+# =========================================
 
-Write-File (Join-Path $api "Controllers\WorkflowDiagnosticsController.cs") @'
+Write-File (Join-Path $apiProj "Contracts\Workflow\WorkflowContracts.cs") @'
+namespace VeritasAtlas.Api.Contracts.Workflow;
+
+public sealed record WorkflowTransitionResponse(
+    string EntityType,
+    Guid EntityId,
+    string Status,
+    DateTime TimestampUtc,
+    string Message);
+
+public sealed record WorkflowSeedResponse(
+    Guid CaseId,
+    Guid PrimaryClaimId,
+    Guid SecondaryClaimId,
+    Guid ContradictionId,
+    string CaseStatus,
+    string ContradictionStatus,
+    DateTime TimestampUtc);
+'@
+
+Write-File (Join-Path $infra "Services\WorkflowTransitionService.cs") @'
+using Microsoft.EntityFrameworkCore;
+using VeritasAtlas.Domain.Entities;
+using VeritasAtlas.Domain.Enums;
+using VeritasAtlas.Infrastructure.Persistence;
+
+namespace VeritasAtlas.Infrastructure.Services;
+
+public sealed class WorkflowTransitionService
+{
+    private readonly VeritasAtlasDbContext _dbContext;
+
+    public WorkflowTransitionService(VeritasAtlasDbContext dbContext)
+    {
+        _dbContext = dbContext;
+    }
+
+    public async Task<(Guid Id, string Status)> SubmitCaseAsync(Guid caseId, CancellationToken cancellationToken = default)
+    {
+        var entity = await _dbContext.Cases.FirstOrDefaultAsync(x => x.Id == caseId, cancellationToken)
+            ?? throw new InvalidOperationException($"Case '{caseId}' was not found.");
+
+        entity.Status = ParseCaseStatus("InReview", entity.Status);
+        Touch(entity);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        return (entity.Id, entity.Status.ToString());
+    }
+
+    public async Task<(Guid Id, string Status)> ApproveCaseAsync(Guid caseId, CancellationToken cancellationToken = default)
+    {
+        var entity = await _dbContext.Cases.FirstOrDefaultAsync(x => x.Id == caseId, cancellationToken)
+            ?? throw new InvalidOperationException($"Case '{caseId}' was not found.");
+
+        entity.Status = ParseCaseStatus("Approved", entity.Status);
+        Touch(entity);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        return (entity.Id, entity.Status.ToString());
+    }
+
+    public async Task<(Guid Id, string Status)> RejectCaseAsync(Guid caseId, CancellationToken cancellationToken = default)
+    {
+        var entity = await _dbContext.Cases.FirstOrDefaultAsync(x => x.Id == caseId, cancellationToken)
+            ?? throw new InvalidOperationException($"Case '{caseId}' was not found.");
+
+        entity.Status = ParseCaseStatus("Rejected", entity.Status);
+        Touch(entity);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        return (entity.Id, entity.Status.ToString());
+    }
+
+    public async Task<(Guid Id, string Status)> PreparePublicationAsync(Guid caseId, CancellationToken cancellationToken = default)
+    {
+        var entity = await _dbContext.Cases.FirstOrDefaultAsync(x => x.Id == caseId, cancellationToken)
+            ?? throw new InvalidOperationException($"Case '{caseId}' was not found.");
+
+        entity.Status = ParseCaseStatus("ReadyForPublication", entity.Status);
+        Touch(entity);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        return (entity.Id, entity.Status.ToString());
+    }
+
+    public async Task<(Guid Id, string Status)> PublishCaseAsync(Guid caseId, CancellationToken cancellationToken = default)
+    {
+        var entity = await _dbContext.Cases.FirstOrDefaultAsync(x => x.Id == caseId, cancellationToken)
+            ?? throw new InvalidOperationException($"Case '{caseId}' was not found.");
+
+        entity.Status = ParseCaseStatus("Published", entity.Status);
+        Touch(entity);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        return (entity.Id, entity.Status.ToString());
+    }
+
+    public async Task<(Guid Id, string Status)> HoldCaseAsync(Guid caseId, CancellationToken cancellationToken = default)
+    {
+        var entity = await _dbContext.Cases.FirstOrDefaultAsync(x => x.Id == caseId, cancellationToken)
+            ?? throw new InvalidOperationException($"Case '{caseId}' was not found.");
+
+        entity.Status = ParseCaseStatus("OnHold", entity.Status);
+        Touch(entity);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        return (entity.Id, entity.Status.ToString());
+    }
+
+    public async Task<(Guid Id, string Status)> ResolveContradictionAsync(Guid contradictionId, CancellationToken cancellationToken = default)
+    {
+        var entity = await _dbContext.Contradictions.FirstOrDefaultAsync(x => x.Id == contradictionId, cancellationToken)
+            ?? throw new InvalidOperationException($"Contradiction '{contradictionId}' was not found.");
+
+        entity.Status = ContradictionStatus.Resolved;
+        Touch(entity);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        return (entity.Id, entity.Status.ToString());
+    }
+
+    public async Task<(Guid Id, string Status)> EscalateContradictionAsync(Guid contradictionId, CancellationToken cancellationToken = default)
+    {
+        var entity = await _dbContext.Contradictions.FirstOrDefaultAsync(x => x.Id == contradictionId, cancellationToken)
+            ?? throw new InvalidOperationException($"Contradiction '{contradictionId}' was not found.");
+
+        entity.Status = ParseContradictionStatus("UnderReview", entity.Status);
+        Touch(entity);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        return (entity.Id, entity.Status.ToString());
+    }
+
+    public async Task<(Guid Id, string Status)> SendClaimToReviewAsync(Guid claimId, CancellationToken cancellationToken = default)
+    {
+        var entity = await _dbContext.Claims.FirstOrDefaultAsync(x => x.Id == claimId, cancellationToken)
+            ?? throw new InvalidOperationException($"Claim '{claimId}' was not found.");
+
+        entity.Status = ParseClaimStatus("InReview", entity.Status);
+        Touch(entity);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        return (entity.Id, entity.Status.ToString());
+    }
+
+    public async Task<(Guid Id, string Status)> ReturnClaimForEditAsync(Guid claimId, CancellationToken cancellationToken = default)
+    {
+        var entity = await _dbContext.Claims.FirstOrDefaultAsync(x => x.Id == claimId, cancellationToken)
+            ?? throw new InvalidOperationException($"Claim '{claimId}' was not found.");
+
+        entity.Status = ParseClaimStatus("Draft", entity.Status);
+        Touch(entity);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        return (entity.Id, entity.Status.ToString());
+    }
+
+    public async Task<(Guid Id, string Status)> CompleteReviewAsync(Guid reviewId, CancellationToken cancellationToken = default)
+    {
+        var entity = await _dbContext.Reviews.FirstOrDefaultAsync(x => x.Id == reviewId, cancellationToken)
+            ?? throw new InvalidOperationException($"Review '{reviewId}' was not found.");
+
+        entity.Status = ParseReviewStatus("Completed", entity.Status);
+        Touch(entity);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        return (entity.Id, entity.Status.ToString());
+    }
+
+    public async Task<(Guid Id, string Status)> ReopenReviewAsync(Guid reviewId, CancellationToken cancellationToken = default)
+    {
+        var entity = await _dbContext.Reviews.FirstOrDefaultAsync(x => x.Id == reviewId, cancellationToken)
+            ?? throw new InvalidOperationException($"Review '{reviewId}' was not found.");
+
+        entity.Status = ParseReviewStatus("Open", entity.Status);
+        Touch(entity);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        return (entity.Id, entity.Status.ToString());
+    }
+
+    public async Task<(Guid CaseId, Guid ClaimAId, Guid ClaimBId, Guid ContradictionId, string CaseStatus, string ContradictionStatus)> SeedLifecycleAsync(CancellationToken cancellationToken = default)
+    {
+        var @case = new Case
+        {
+            Id = Guid.NewGuid(),
+            Title = "Phase 8 Seed Case",
+            Description = "Seeded lifecycle case for workflow verification",
+            Status = ParseCaseStatus("Draft", default),
+            CreatedAtUtc = DateTime.UtcNow,
+            UpdatedAtUtc = DateTime.UtcNow
+        };
+
+        var claimA = new Claim
+        {
+            Id = Guid.NewGuid(),
+            CaseId = @case.Id,
+            Topic = "Seed Claim A",
+            NormalizedText = "Seed claim A normalized text",
+            Status = ParseClaimStatus("Draft", default),
+            CreatedAtUtc = DateTime.UtcNow,
+            UpdatedAtUtc = DateTime.UtcNow
+        };
+
+        var claimB = new Claim
+        {
+            Id = Guid.NewGuid(),
+            CaseId = @case.Id,
+            Topic = "Seed Claim B",
+            NormalizedText = "Seed claim B normalized text",
+            Status = ParseClaimStatus("Draft", default),
+            CreatedAtUtc = DateTime.UtcNow,
+            UpdatedAtUtc = DateTime.UtcNow
+        };
+
+        var contradiction = new Contradiction
+        {
+            Id = Guid.NewGuid(),
+            CaseId = @case.Id,
+            LeftClaimId = claimA.Id,
+            RightClaimId = claimB.Id,
+            Type = ContradictionType.Direct,
+            Severity = ContradictionSeverity.Medium,
+            Status = ContradictionStatus.Draft,
+            Summary = "Seed contradiction",
+            CreatedAtUtc = DateTime.UtcNow,
+            UpdatedAtUtc = DateTime.UtcNow
+        };
+
+        _dbContext.Cases.Add(@case);
+        _dbContext.Claims.Add(claimA);
+        _dbContext.Claims.Add(claimB);
+        _dbContext.Contradictions.Add(contradiction);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+
+        return (@case.Id, claimA.Id, claimB.Id, contradiction.Id, @case.Status.ToString(), contradiction.Status.ToString());
+    }
+
+    private static void Touch(object entity)
+    {
+        var type = entity.GetType();
+
+        var updatedAt = type.GetProperty("UpdatedAtUtc");
+        if (updatedAt is not null && updatedAt.CanWrite)
+        {
+            updatedAt.SetValue(entity, DateTime.UtcNow);
+        }
+    }
+
+    private static TEnum ParseEnum<TEnum>(string desired, TEnum fallback) where TEnum : struct, Enum
+    {
+        if (Enum.TryParse<TEnum>(desired, true, out var parsed))
+        {
+            return parsed;
+        }
+
+        var names = Enum.GetNames(typeof(TEnum));
+        var exact = names.FirstOrDefault(x => string.Equals(x, desired, StringComparison.OrdinalIgnoreCase));
+        if (exact is not null && Enum.TryParse<TEnum>(exact, true, out parsed))
+        {
+            return parsed;
+        }
+
+        return fallback;
+    }
+
+    private static dynamic ParseCaseStatus(string desired, dynamic fallback)
+    {
+        return ParseEnum(desired, fallback);
+    }
+
+    private static dynamic ParseClaimStatus(string desired, dynamic fallback)
+    {
+        return ParseEnum(desired, fallback);
+    }
+
+    private static dynamic ParseReviewStatus(string desired, dynamic fallback)
+    {
+        return ParseEnum(desired, fallback);
+    }
+
+    private static ContradictionStatus ParseContradictionStatus(string desired, ContradictionStatus fallback)
+    {
+        return ParseEnum(desired, fallback);
+    }
+}
+'@
+
+# Wire DI
+$diPath = Join-Path $infra "Extensions\ServiceCollectionExtensions.cs"
+if (Test-Path $diPath) {
+    $diContent = Get-Content $diPath -Raw
+    if ($diContent -notmatch 'WorkflowTransitionService') {
+        $diContent = $diContent -replace '(services\.AddScoped<ContradictionSliceService>\(\);)', '$1
+        services.AddScoped<WorkflowTransitionService>();'
+        Write-File $diPath $diContent
+    }
+}
+
+# Replace stub actions controller with persisted version
+Write-File (Join-Path $apiProj "Controllers\ActionsController.cs") @'
 using Microsoft.AspNetCore.Mvc;
+using VeritasAtlas.Api.Contracts.Workflow;
+using VeritasAtlas.Infrastructure.Services;
 
 namespace VeritasAtlas.Api.Controllers;
 
 [ApiController]
-[Route("api/v1/workflow-diagnostics")]
-public class WorkflowDiagnosticsController : ControllerBase
+[Route("api/v1/actions")]
+public class ActionsController : ControllerBase
 {
-    [HttpGet("summary")]
-    public IActionResult GetSummary()
-    {
-        var summary = new
-        {
-            Actions = new[]
-            {
-                "SubmitCase",
-                "ApproveCase",
-                "RejectCase",
-                "ResolveContradiction",
-                "CompleteReview",
-                "SendClaimToReview",
-                "ReturnClaimForEdit",
-                "EscalateContradiction",
-                "ReopenReview",
-                "PreparePublication",
-                "PublishCase",
-                "HoldCase"
-            },
-            Stage = "Phase7DepthTrack",
-            Timestamp = DateTime.UtcNow
-        };
+    private readonly WorkflowTransitionService _workflowTransitionService;
 
-        return Ok(summary);
+    public ActionsController(WorkflowTransitionService workflowTransitionService)
+    {
+        _workflowTransitionService = workflowTransitionService;
     }
 
-    [HttpGet("routes")]
-    public IActionResult GetRouteRegistry()
+    [HttpPost("cases/{caseId}/submit")]
+    public async Task<ActionResult<WorkflowTransitionResponse>> SubmitCase(Guid caseId, CancellationToken cancellationToken)
     {
-        var routes = new[]
-        {
-            "/api/v1/actions/cases/{caseId}/submit",
-            "/api/v1/actions/cases/{caseId}/approve",
-            "/api/v1/actions/cases/{caseId}/reject",
-            "/api/v1/actions/contradictions/{id}/resolve",
-            "/api/v1/actions/reviews/{id}/complete",
-            "/api/v1/review-workflow/claims/{claimId}/send-to-review",
-            "/api/v1/review-workflow/claims/{claimId}/return-for-edit",
-            "/api/v1/review-workflow/contradictions/{id}/escalate",
-            "/api/v1/review-workflow/reviews/{id}/reopen",
-            "/api/v1/publication-workflow/cases/{caseId}/prepare",
-            "/api/v1/publication-workflow/cases/{caseId}/publish",
-            "/api/v1/publication-workflow/cases/{caseId}/hold"
-        };
+        var result = await _workflowTransitionService.SubmitCaseAsync(caseId, cancellationToken);
+        return Ok(new WorkflowTransitionResponse("Case", result.Id, result.Status, DateTime.UtcNow, "Case submitted."));
+    }
 
-        return Ok(routes);
+    [HttpPost("cases/{caseId}/approve")]
+    public async Task<ActionResult<WorkflowTransitionResponse>> ApproveCase(Guid caseId, CancellationToken cancellationToken)
+    {
+        var result = await _workflowTransitionService.ApproveCaseAsync(caseId, cancellationToken);
+        return Ok(new WorkflowTransitionResponse("Case", result.Id, result.Status, DateTime.UtcNow, "Case approved."));
+    }
+
+    [HttpPost("cases/{caseId}/reject")]
+    public async Task<ActionResult<WorkflowTransitionResponse>> RejectCase(Guid caseId, CancellationToken cancellationToken)
+    {
+        var result = await _workflowTransitionService.RejectCaseAsync(caseId, cancellationToken);
+        return Ok(new WorkflowTransitionResponse("Case", result.Id, result.Status, DateTime.UtcNow, "Case rejected."));
+    }
+
+    [HttpPost("contradictions/{id}/resolve")]
+    public async Task<ActionResult<WorkflowTransitionResponse>> ResolveContradiction(Guid id, CancellationToken cancellationToken)
+    {
+        var result = await _workflowTransitionService.ResolveContradictionAsync(id, cancellationToken);
+        return Ok(new WorkflowTransitionResponse("Contradiction", result.Id, result.Status, DateTime.UtcNow, "Contradiction resolved."));
+    }
+
+    [HttpPost("reviews/{id}/complete")]
+    public async Task<ActionResult<WorkflowTransitionResponse>> CompleteReview(Guid id, CancellationToken cancellationToken)
+    {
+        var result = await _workflowTransitionService.CompleteReviewAsync(id, cancellationToken);
+        return Ok(new WorkflowTransitionResponse("Review", result.Id, result.Status, DateTime.UtcNow, "Review completed."));
+    }
+
+    [HttpPost("seed/lifecycle")]
+    public async Task<ActionResult<WorkflowSeedResponse>> SeedLifecycle(CancellationToken cancellationToken)
+    {
+        var result = await _workflowTransitionService.SeedLifecycleAsync(cancellationToken);
+
+        return Ok(new WorkflowSeedResponse(
+            result.CaseId,
+            result.ClaimAId,
+            result.ClaimBId,
+            result.ContradictionId,
+            result.CaseStatus,
+            result.ContradictionStatus,
+            DateTime.UtcNow));
     }
 }
 '@
 
-Write-File (Join-Path $tools "smoke\Run-VeritasAtlas-Workflow-Smoke.ps1") @'
-param(
-    [Parameter(Mandatory = $true)]
-    [string]$RootDir,
-    [string]$BaseUrl = "http://localhost:5209",
-    [string]$CaseId = "11111111-1111-1111-1111-111111111111",
-    [string]$ContradictionId = "22222222-2222-2222-2222-222222222222",
-    [string]$ReviewId = "33333333-3333-3333-3333-333333333333",
-    [string]$ClaimId = "44444444-4444-4444-4444-444444444444"
-)
+Write-File (Join-Path $apiProj "Controllers\ReviewWorkflowController.cs") @'
+using Microsoft.AspNetCore.Mvc;
+using VeritasAtlas.Api.Contracts.Workflow;
+using VeritasAtlas.Infrastructure.Services;
 
-$ErrorActionPreference = "Stop"
+namespace VeritasAtlas.Api.Controllers;
 
-function Ensure-Dir {
-    param([string]$Path)
-    if (-not (Test-Path $Path)) {
-        New-Item -ItemType Directory -Path $Path -Force | Out-Null
+[ApiController]
+[Route("api/v1/review-workflow")]
+public class ReviewWorkflowController : ControllerBase
+{
+    private readonly WorkflowTransitionService _workflowTransitionService;
+
+    public ReviewWorkflowController(WorkflowTransitionService workflowTransitionService)
+    {
+        _workflowTransitionService = workflowTransitionService;
     }
-}
 
-$timestamp = Get-Date -Format "yyyyMMdd-HHmmss"
-$diag = Join-Path $RootDir "_diagnostics\workflow-smoke-$timestamp"
-Ensure-Dir $diag
-$report = Join-Path $diag "workflow-smoke-report.md"
-$apiLog = Join-Path $diag "api.log"
-
-Set-Content -Path $report -Value "# Workflow Smoke Report`r`n" -Encoding UTF8
-Add-Content -Path $report -Value ("Generated: " + (Get-Date -Format "yyyy-MM-dd HH:mm:ss"))
-Add-Content -Path $report -Value ""
-
-$apiProcess = $null
-Push-Location (Join-Path $RootDir "apps\api\VeritasAtlas.Api")
-try {
-    $apiProcess = Start-Process "dotnet" -ArgumentList "run" -RedirectStandardOutput $apiLog -RedirectStandardError $apiLog -PassThru
-    Start-Sleep -Seconds 8
-
-    $checks = @(
-        @{ Name = "Workflow Summary"; Method = "GET"; Url = "$BaseUrl/api/v1/workflow-diagnostics/summary" },
-        @{ Name = "Workflow Routes"; Method = "GET"; Url = "$BaseUrl/api/v1/workflow-diagnostics/routes" },
-        @{ Name = "Submit Case"; Method = "POST"; Url = "$BaseUrl/api/v1/actions/cases/$CaseId/submit" },
-        @{ Name = "Approve Case"; Method = "POST"; Url = "$BaseUrl/api/v1/actions/cases/$CaseId/approve" },
-        @{ Name = "Reject Case"; Method = "POST"; Url = "$BaseUrl/api/v1/actions/cases/$CaseId/reject" },
-        @{ Name = "Resolve Contradiction"; Method = "POST"; Url = "$BaseUrl/api/v1/actions/contradictions/$ContradictionId/resolve" },
-        @{ Name = "Complete Review"; Method = "POST"; Url = "$BaseUrl/api/v1/actions/reviews/$ReviewId/complete" },
-        @{ Name = "Send Claim To Review"; Method = "POST"; Url = "$BaseUrl/api/v1/review-workflow/claims/$ClaimId/send-to-review" },
-        @{ Name = "Return Claim For Edit"; Method = "POST"; Url = "$BaseUrl/api/v1/review-workflow/claims/$ClaimId/return-for-edit" },
-        @{ Name = "Escalate Contradiction"; Method = "POST"; Url = "$BaseUrl/api/v1/review-workflow/contradictions/$ContradictionId/escalate" },
-        @{ Name = "Reopen Review"; Method = "POST"; Url = "$BaseUrl/api/v1/review-workflow/reviews/$ReviewId/reopen" },
-        @{ Name = "Prepare Publication"; Method = "POST"; Url = "$BaseUrl/api/v1/publication-workflow/cases/$CaseId/prepare" },
-        @{ Name = "Publish Case"; Method = "POST"; Url = "$BaseUrl/api/v1/publication-workflow/cases/$CaseId/publish" },
-        @{ Name = "Hold Case"; Method = "POST"; Url = "$BaseUrl/api/v1/publication-workflow/cases/$CaseId/hold" }
-    )
-
-    foreach ($check in $checks) {
-        try {
-            $response = Invoke-WebRequest -Uri $check.Url -Method $check.Method -UseBasicParsing -TimeoutSec 15
-            Add-Content -Path $report -Value ("## " + $check.Name)
-            Add-Content -Path $report -Value ("- StatusCode: " + $response.StatusCode)
-            Add-Content -Path $report -Value ("- Url: " + $check.Url)
-            Add-Content -Path $report -Value ""
-        }
-        catch {
-            Add-Content -Path $report -Value ("## " + $check.Name)
-            Add-Content -Path $report -Value ("- FAILED: " + $_.Exception.Message)
-            Add-Content -Path $report -Value ("- Url: " + $check.Url)
-            Add-Content -Path $report -Value ""
-        }
+    [HttpPost("claims/{claimId}/send-to-review")]
+    public async Task<ActionResult<WorkflowTransitionResponse>> SendClaimToReview(Guid claimId, CancellationToken cancellationToken)
+    {
+        var result = await _workflowTransitionService.SendClaimToReviewAsync(claimId, cancellationToken);
+        return Ok(new WorkflowTransitionResponse("Claim", result.Id, result.Status, DateTime.UtcNow, "Claim sent to review."));
     }
-}
-finally {
-    Pop-Location
-    if ($apiProcess -and -not $apiProcess.HasExited) {
-        Stop-Process -Id $apiProcess.Id -Force
+
+    [HttpPost("claims/{claimId}/return-for-edit")]
+    public async Task<ActionResult<WorkflowTransitionResponse>> ReturnClaimForEdit(Guid claimId, CancellationToken cancellationToken)
+    {
+        var result = await _workflowTransitionService.ReturnClaimForEditAsync(claimId, cancellationToken);
+        return Ok(new WorkflowTransitionResponse("Claim", result.Id, result.Status, DateTime.UtcNow, "Claim returned for edit."));
+    }
+
+    [HttpPost("contradictions/{id}/escalate")]
+    public async Task<ActionResult<WorkflowTransitionResponse>> EscalateContradiction(Guid id, CancellationToken cancellationToken)
+    {
+        var result = await _workflowTransitionService.EscalateContradictionAsync(id, cancellationToken);
+        return Ok(new WorkflowTransitionResponse("Contradiction", result.Id, result.Status, DateTime.UtcNow, "Contradiction escalated."));
+    }
+
+    [HttpPost("reviews/{id}/reopen")]
+    public async Task<ActionResult<WorkflowTransitionResponse>> ReopenReview(Guid id, CancellationToken cancellationToken)
+    {
+        var result = await _workflowTransitionService.ReopenReviewAsync(id, cancellationToken);
+        return Ok(new WorkflowTransitionResponse("Review", result.Id, result.Status, DateTime.UtcNow, "Review reopened."));
     }
 }
 '@
 
-# =========================
-# Frontend diagnostics + workflow UX
-# =========================
+Write-File (Join-Path $apiProj "Controllers\PublicationWorkflowController.cs") @'
+using Microsoft.AspNetCore.Mvc;
+using VeritasAtlas.Api.Contracts.Workflow;
+using VeritasAtlas.Infrastructure.Services;
 
-Write-File (Join-Path $web "api\workflowDiagnostics.ts") @'
-export type WorkflowDiagnosticsSummary = {
-  actions: string[];
-  stage: string;
-  timestamp: string;
+namespace VeritasAtlas.Api.Controllers;
+
+[ApiController]
+[Route("api/v1/publication-workflow")]
+public class PublicationWorkflowController : ControllerBase
+{
+    private readonly WorkflowTransitionService _workflowTransitionService;
+
+    public PublicationWorkflowController(WorkflowTransitionService workflowTransitionService)
+    {
+        _workflowTransitionService = workflowTransitionService;
+    }
+
+    [HttpPost("cases/{caseId}/prepare")]
+    public async Task<ActionResult<WorkflowTransitionResponse>> PreparePublication(Guid caseId, CancellationToken cancellationToken)
+    {
+        var result = await _workflowTransitionService.PreparePublicationAsync(caseId, cancellationToken);
+        return Ok(new WorkflowTransitionResponse("Case", result.Id, result.Status, DateTime.UtcNow, "Case prepared for publication."));
+    }
+
+    [HttpPost("cases/{caseId}/publish")]
+    public async Task<ActionResult<WorkflowTransitionResponse>> PublishCase(Guid caseId, CancellationToken cancellationToken)
+    {
+        var result = await _workflowTransitionService.PublishCaseAsync(caseId, cancellationToken);
+        return Ok(new WorkflowTransitionResponse("Case", result.Id, result.Status, DateTime.UtcNow, "Case published."));
+    }
+
+    [HttpPost("cases/{caseId}/hold")]
+    public async Task<ActionResult<WorkflowTransitionResponse>> HoldCase(Guid caseId, CancellationToken cancellationToken)
+    {
+        var result = await _workflowTransitionService.HoldCaseAsync(caseId, cancellationToken);
+        return Ok(new WorkflowTransitionResponse("Case", result.Id, result.Status, DateTime.UtcNow, "Case put on hold."));
+    }
+}
+'@
+
+# Frontend helpers for seeding lifecycle
+Write-File (Join-Path $web "api\workflowSeed.ts") @'
+export type WorkflowSeedResponse = {
+  caseId: string;
+  primaryClaimId: string;
+  secondaryClaimId: string;
+  contradictionId: string;
+  caseStatus: string;
+  contradictionStatus: string;
+  timestampUtc: string;
 };
 
-export async function getWorkflowDiagnosticsSummary(): Promise<WorkflowDiagnosticsSummary> {
-  const response = await fetch("/api/v1/workflow-diagnostics/summary");
+export async function seedWorkflowLifecycle(): Promise<WorkflowSeedResponse> {
+  const response = await fetch("/api/v1/actions/seed/lifecycle", { method: "POST" });
 
   if (!response.ok) {
     const text = await response.text();
     throw new Error(text || `HTTP ${response.status}`);
   }
 
-  return response.json() as Promise<WorkflowDiagnosticsSummary>;
-}
-
-export async function getWorkflowDiagnosticsRoutes(): Promise<string[]> {
-  const response = await fetch("/api/v1/workflow-diagnostics/routes");
-
-  if (!response.ok) {
-    const text = await response.text();
-    throw new Error(text || `HTTP ${response.status}`);
-  }
-
-  return response.json() as Promise<string[]>;
+  return response.json() as Promise<WorkflowSeedResponse>;
 }
 '@
 
-Write-File (Join-Path $web "hooks\useWorkflowDiagnostics.ts") @'
-import { useQuery } from "@tanstack/react-query";
-import {
-  getWorkflowDiagnosticsRoutes,
-  getWorkflowDiagnosticsSummary,
-} from "../api/workflowDiagnostics";
-
-export function useWorkflowDiagnosticsSummary() {
-  return useQuery({
-    queryKey: ["workflow-diagnostics-summary"],
-    queryFn: () => getWorkflowDiagnosticsSummary(),
-  });
-}
-
-export function useWorkflowDiagnosticsRoutes() {
-  return useQuery({
-    queryKey: ["workflow-diagnostics-routes"],
-    queryFn: () => getWorkflowDiagnosticsRoutes(),
-  });
-}
-'@
-
-Write-File (Join-Path $web "hooks\useWorkflowActions.ts") @'
+Write-File (Join-Path $web "hooks\useWorkflowSeed.ts") @'
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import {
-  sendClaimToReview,
-  returnClaimForEdit,
-  escalateContradiction,
-  reopenReview,
-  preparePublication,
-  publishCase,
-  holdCase,
-} from "../api/workflowActions";
+import { seedWorkflowLifecycle } from "../api/workflowSeed";
 
-export function useSendClaimToReviewAction() {
+export function useWorkflowSeed() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (claimId: string) => sendClaimToReview(claimId),
+    mutationFn: () => seedWorkflowLifecycle(),
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["case-explorer"] });
+      queryClient.invalidateQueries({ queryKey: ["cases"] });
       queryClient.invalidateQueries({ queryKey: ["claims"] });
-    },
-  });
-}
-
-export function useReturnClaimForEditAction() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: (claimId: string) => returnClaimForEdit(claimId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["claims"] });
-    },
-  });
-}
-
-export function useEscalateContradictionAction() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: (contradictionId: string) => escalateContradiction(contradictionId),
-    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["contradictions"] });
     },
   });
 }
-
-export function useReopenReviewAction() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: (reviewId: string) => reopenReview(reviewId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["reviews"] });
-    },
-  });
-}
-
-export function usePreparePublicationAction() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: (caseId: string) => preparePublication(caseId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["case-explorer"] });
-      queryClient.invalidateQueries({ queryKey: ["cases"] });
-    },
-  });
-}
-
-export function usePublishCaseAction() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: (caseId: string) => publishCase(caseId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["case-explorer"] });
-      queryClient.invalidateQueries({ queryKey: ["cases"] });
-    },
-  });
-}
-
-export function useHoldCaseAction() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: (caseId: string) => holdCase(caseId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["case-explorer"] });
-      queryClient.invalidateQueries({ queryKey: ["cases"] });
-    },
-  });
-}
 '@
 
-Write-File (Join-Path $web "components\WorkflowDiagnosticsPanel.tsx") @'
-export function WorkflowDiagnosticsPanel({
-  stage,
-  actions,
-  routes,
+Write-File (Join-Path $web "components\SeedScenarioPanel.tsx") @'
+export function SeedScenarioPanel({
+  onSeed,
+  isPending,
+  message,
 }: {
-  stage: string;
-  actions: string[];
-  routes: string[];
+  onSeed: () => void;
+  isPending: boolean;
+  message?: string;
 }) {
   return (
     <div style={panelStyle}>
-      <h3 style={{ marginTop: 0 }}>Workflow Diagnostics</h3>
-      <p><strong>Stage:</strong> {stage}</p>
-
-      <div style={gridStyle}>
-        <div>
-          <h4>Actions</h4>
-          <ul style={{ marginBottom: 0 }}>
-            {actions.map((action) => (
-              <li key={action}>{action}</li>
-            ))}
-          </ul>
-        </div>
-
-        <div>
-          <h4>Routes</h4>
-          <ul style={{ marginBottom: 0 }}>
-            {routes.map((route) => (
-              <li key={route}>{route}</li>
-            ))}
-          </ul>
-        </div>
-      </div>
+      <h3 style={{ marginTop: 0 }}>Seed Scenario</h3>
+      <button onClick={onSeed} disabled={isPending} style={buttonStyle}>
+        {isPending ? "Seeding..." : "Seed Lifecycle Scenario"}
+      </button>
+      {message && <p style={{ marginTop: 12, marginBottom: 0 }}>{message}</p>}
     </div>
   );
 }
@@ -463,240 +626,80 @@ const panelStyle: React.CSSProperties = {
   padding: 16,
 };
 
-const gridStyle: React.CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "1fr 1fr",
-  gap: 16,
+const buttonStyle: React.CSSProperties = {
+  border: "1px solid #bbb",
+  borderRadius: 10,
+  padding: "10px 14px",
+  background: "white",
+  cursor: "pointer",
+  font: "inherit",
 };
 '@
 
-Write-File (Join-Path $web "pages\WorkflowDiagnosticsPage.tsx") @'
-import { WorkflowDiagnosticsPanel } from "../components/WorkflowDiagnosticsPanel";
-import {
-  useWorkflowDiagnosticsRoutes,
-  useWorkflowDiagnosticsSummary,
-} from "../hooks/useWorkflowDiagnostics";
+Write-File (Join-Path $web "pages\LifecycleSeedPage.tsx") @'
+import { SeedScenarioPanel } from "../components/SeedScenarioPanel";
+import { useWorkflowSeed } from "../hooks/useWorkflowSeed";
 
-export function WorkflowDiagnosticsPage() {
-  const summaryQuery = useWorkflowDiagnosticsSummary();
-  const routesQuery = useWorkflowDiagnosticsRoutes();
+export function LifecycleSeedPage() {
+  const seedMutation = useWorkflowSeed();
 
-  if (summaryQuery.isLoading || routesQuery.isLoading) {
-    return <div style={{ fontFamily: "Arial, sans-serif", padding: 24 }}>Loading workflow diagnostics...</div>;
-  }
-
-  if (summaryQuery.isError || routesQuery.isError) {
-    return <div style={{ fontFamily: "Arial, sans-serif", padding: 24, color: "crimson" }}>Failed to load workflow diagnostics.</div>;
-  }
-
-  if (!summaryQuery.data || !routesQuery.data) {
-    return <div style={{ fontFamily: "Arial, sans-serif", padding: 24 }}>Workflow diagnostics unavailable.</div>;
-  }
+  const message = seedMutation.data
+    ? `Case ${seedMutation.data.caseId} seeded with contradiction ${seedMutation.data.contradictionId}.`
+    : undefined;
 
   return (
     <div style={{ fontFamily: "Arial, sans-serif", padding: 24 }}>
-      <h1 style={{ marginTop: 0 }}>Workflow Diagnostics</h1>
+      <h1 style={{ marginTop: 0 }}>Lifecycle Seed</h1>
       <p style={{ color: "#555" }}>
-        Diagnostics surface for the write-action workflow layer added during Phase 7.
+        Seed a minimal end-to-end workflow scenario for validation and UI interaction.
       </p>
 
-      <WorkflowDiagnosticsPanel
-        stage={summaryQuery.data.stage}
-        actions={summaryQuery.data.actions}
-        routes={routesQuery.data}
+      <SeedScenarioPanel
+        onSeed={() => seedMutation.mutate()}
+        isPending={seedMutation.isPending}
+        message={message}
       />
     </div>
   );
 }
 '@
 
-Write-File (Join-Path $web "pages\MutationPlaygroundPage.tsx") @'
-import { useState } from "react";
-import { ActionButtonsPanel } from "../components/ActionButtonsPanel";
-import {
-  useEscalateContradictionAction,
-  useHoldCaseAction,
-  usePreparePublicationAction,
-  usePublishCaseAction,
-  useReopenReviewAction,
-  useReturnClaimForEditAction,
-  useSendClaimToReviewAction,
-} from "../hooks/useWorkflowActions";
-
-export function MutationPlaygroundPage() {
-  const [claimId, setClaimId] = useState("");
-  const [caseId, setCaseId] = useState("");
-  const [contradictionId, setContradictionId] = useState("");
-  const [reviewId, setReviewId] = useState("");
-
-  const sendClaim = useSendClaimToReviewAction();
-  const returnClaim = useReturnClaimForEditAction();
-  const escalate = useEscalateContradictionAction();
-  const reopen = useReopenReviewAction();
-  const prepare = usePreparePublicationAction();
-  const publish = usePublishCaseAction();
-  const hold = useHoldCaseAction();
-
-  return (
-    <div style={{ fontFamily: "Arial, sans-serif", padding: 24 }}>
-      <h1 style={{ marginTop: 0 }}>Mutation Playground</h1>
-      <p style={{ color: "#555" }}>
-        Playground for exercising review and publication workflow mutations from the frontend.
-      </p>
-
-      <div style={gridStyle}>
-        <label style={labelStyle}>
-          Claim Id
-          <input value={claimId} onChange={(e) => setClaimId(e.target.value)} style={inputStyle} />
-        </label>
-        <label style={labelStyle}>
-          Case Id
-          <input value={caseId} onChange={(e) => setCaseId(e.target.value)} style={inputStyle} />
-        </label>
-        <label style={labelStyle}>
-          Contradiction Id
-          <input value={contradictionId} onChange={(e) => setContradictionId(e.target.value)} style={inputStyle} />
-        </label>
-        <label style={labelStyle}>
-          Review Id
-          <input value={reviewId} onChange={(e) => setReviewId(e.target.value)} style={inputStyle} />
-        </label>
-      </div>
-
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginTop: 20 }}>
-        <ActionButtonsPanel
-          title="Review Routing Mutations"
-          items={[
-            { label: "Send Claim To Review", onClick: () => sendClaim.mutate(claimId), disabled: !claimId },
-            { label: "Return Claim For Edit", onClick: () => returnClaim.mutate(claimId), disabled: !claimId },
-            { label: "Escalate Contradiction", onClick: () => escalate.mutate(contradictionId), disabled: !contradictionId },
-            { label: "Reopen Review", onClick: () => reopen.mutate(reviewId), disabled: !reviewId },
-          ]}
-          message={sendClaim.data?.status || returnClaim.data?.status || escalate.data?.status || reopen.data?.status}
-        />
-
-        <ActionButtonsPanel
-          title="Publication Mutations"
-          items={[
-            { label: "Prepare Publication", onClick: () => prepare.mutate(caseId), disabled: !caseId },
-            { label: "Publish Case", onClick: () => publish.mutate(caseId), disabled: !caseId },
-            { label: "Hold Case", onClick: () => hold.mutate(caseId), disabled: !caseId },
-          ]}
-          message={prepare.data?.status || publish.data?.status || hold.data?.status}
-        />
-      </div>
-    </div>
-  );
-}
-
-const gridStyle: React.CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "1fr 1fr",
-  gap: 12,
-};
-
-const labelStyle: React.CSSProperties = {
-  display: "grid",
-  gap: 6,
-};
-
-const inputStyle: React.CSSProperties = {
-  border: "1px solid #ccc",
-  borderRadius: 10,
-  padding: "10px 12px",
-  font: "inherit",
-};
-'@
-
-Write-File (Join-Path $web "pages\Phase7CloseoutPage.tsx") @'
-export function Phase7CloseoutPage() {
-  const items = [
-    "Smoke and workflow diagnostics added",
-    "Write action endpoints added",
-    "Review workflow endpoints added",
-    "Publication workflow endpoints added",
-    "Frontend action and workflow mutation wiring added",
-    "Workflow console and mutation playground added",
-    "Phase 7 ready to hand off into deeper persistence and business logic"
-  ];
-
-  return (
-    <div style={{ fontFamily: "Arial, sans-serif", padding: 24 }}>
-      <h1 style={{ marginTop: 0 }}>Phase 7 Closeout</h1>
-      <p style={{ color: "#555" }}>
-        Closeout summary for the entire Phase 7 depth track.
-      </p>
-
-      <div style={panelStyle}>
-        <ul style={{ marginBottom: 0 }}>
-          {items.map((item) => (
-            <li key={item}>{item}</li>
-          ))}
-        </ul>
-      </div>
-    </div>
-  );
-}
-
-const panelStyle: React.CSSProperties = {
-  border: "1px solid #ddd",
-  borderRadius: 14,
-  padding: 16,
-};
-'@
-
 $main = Join-Path $web "main.tsx"
 $content = Get-Content $main -Raw
 
-if ($content -notmatch 'import \{ WorkflowDiagnosticsPage \} from "\./pages/WorkflowDiagnosticsPage";') {
+if ($content -notmatch 'import \{ LifecycleSeedPage \} from "\./pages/LifecycleSeedPage";') {
     $content = $content -replace 'import \{ DashboardPage \} from "\./pages/DashboardPage";', @'
 import { DashboardPage } from "./pages/DashboardPage";
-import { WorkflowDiagnosticsPage } from "./pages/WorkflowDiagnosticsPage";
-import { MutationPlaygroundPage } from "./pages/MutationPlaygroundPage";
-import { Phase7CloseoutPage } from "./pages/Phase7CloseoutPage";
+import { LifecycleSeedPage } from "./pages/LifecycleSeedPage";
 '@
 }
 
-$content = Ensure-RouteBlock -Content $content -AnchorRoute '{ path: "/dashboard", element: <DashboardPage /> },' -RouteBlock '{ path: "/workflow-diagnostics", element: <WorkflowDiagnosticsPage /> },
-  { path: "/mutation-playground", element: <MutationPlaygroundPage /> },
-  { path: "/phase-7-closeout", element: <Phase7CloseoutPage /> },' -PresencePattern 'path: "/workflow-diagnostics"'
-
-$content = Ensure-NavBlock -Content $content -Anchor '<Link to="/workflow-console">Workflow Console</Link>' -NavBlock '<Link to="/workflow-diagnostics">Workflow Diagnostics</Link>
-          <Link to="/mutation-playground">Mutation Playground</Link>
-          <Link to="/phase-7-closeout">Phase 7 Closeout</Link>' -PresencePattern 'to="/workflow-diagnostics"'
-
+$content = Ensure-RouteBlock -Content $content -AnchorRoute '{ path: "/dashboard", element: <DashboardPage /> },' -RouteBlock '{ path: "/lifecycle-seed", element: <LifecycleSeedPage /> },' -PresencePattern 'path: "/lifecycle-seed"'
+$content = Ensure-NavBlock -Content $content -Anchor '<Link to="/workflow-diagnostics">Workflow Diagnostics</Link>' -NavBlock '<Link to="/lifecycle-seed">Lifecycle Seed</Link>' -PresencePattern 'to="/lifecycle-seed"'
 Write-File $main $content
 
-Write-File (Join-Path $diag "phase-7-final-bundle-summary.md") @'
-# Phase 7 Final Bundle Summary
+Write-File (Join-Path $diag "phase-8-0-summary.md") @'
+# Phase 8.0 Summary
 
-## Included
-- workflow diagnostics backend endpoints
-- workflow smoke runner
-- workflow diagnostics frontend API and hooks
-- query invalidation for workflow mutations
-- workflow diagnostics page
-- mutation playground page
-- phase 7 closeout page
+## Added
+- persisted workflow transition service
+- actions controller wired to persistence
+- review workflow controller wired to persistence
+- publication workflow controller wired to persistence
+- lifecycle seed endpoint
+- frontend seed page and hook
 
-## Outcome
-Phase 7 now includes:
-- backend smoke tooling
-- write actions foundation
-- review workflow action layer
-- publication workflow action layer
-- frontend mutation wiring
-- diagnostics and closeout surfaces
+## Goal
+Convert workflow actions from stubbed responses into persisted database state transitions and provide a repeatable seeded scenario.
 
-## Next recommended phase
-- connect controllers to real application services
-- persist workflow transitions
-- validate business rules
-- add seeded integration tests
-- add auth and role-based control over actions
+## Next
+- verify enum names against real domain if needed
+- add business rule validation
+- add authorization
+- add integration tests against seeded scenario
 '@
 
 Write-Host "Building..." -ForegroundColor Cyan
 Build-All -RootDir $RootDir
 
-Write-Host "Final Phase 7 bundle DONE" -ForegroundColor Green
+Write-Host "Phase 8.0 DONE" -ForegroundColor Green
