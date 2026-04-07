@@ -1,4 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
+using VeritasAtlas.Api.Contracts.Workflow;
+using VeritasAtlas.Infrastructure.Services;
 
 namespace VeritasAtlas.Api.Controllers;
 
@@ -6,27 +8,38 @@ namespace VeritasAtlas.Api.Controllers;
 [Route("api/v1/review-workflow")]
 public class ReviewWorkflowController : ControllerBase
 {
-    [HttpPost("claims/{claimId}/send-to-review")]
-    public IActionResult SendClaimToReview(Guid claimId)
+    private readonly WorkflowTransitionService _workflowTransitionService;
+
+    public ReviewWorkflowController(WorkflowTransitionService workflowTransitionService)
     {
-        return Ok(new { ClaimId = claimId, Status = "InReview", Timestamp = DateTime.UtcNow });
+        _workflowTransitionService = workflowTransitionService;
+    }
+
+    [HttpPost("claims/{claimId}/send-to-review")]
+    public async Task<ActionResult<WorkflowTransitionResponse>> SendClaimToReview(Guid claimId, CancellationToken cancellationToken)
+    {
+        var result = await _workflowTransitionService.SendClaimToReviewAsync(claimId, cancellationToken);
+        return Ok(new WorkflowTransitionResponse("Claim", result.Id, result.Status, DateTime.UtcNow, "Claim sent to review."));
     }
 
     [HttpPost("claims/{claimId}/return-for-edit")]
-    public IActionResult ReturnClaimForEdit(Guid claimId)
+    public async Task<ActionResult<WorkflowTransitionResponse>> ReturnClaimForEdit(Guid claimId, CancellationToken cancellationToken)
     {
-        return Ok(new { ClaimId = claimId, Status = "NeedsEdit", Timestamp = DateTime.UtcNow });
+        var result = await _workflowTransitionService.ReturnClaimForEditAsync(claimId, cancellationToken);
+        return Ok(new WorkflowTransitionResponse("Claim", result.Id, result.Status, DateTime.UtcNow, "Claim returned for edit."));
     }
 
     [HttpPost("contradictions/{id}/escalate")]
-    public IActionResult EscalateContradiction(Guid id)
+    public async Task<ActionResult<WorkflowTransitionResponse>> EscalateContradiction(Guid id, CancellationToken cancellationToken)
     {
-        return Ok(new { ContradictionId = id, Status = "Escalated", Timestamp = DateTime.UtcNow });
+        var result = await _workflowTransitionService.EscalateContradictionAsync(id, cancellationToken);
+        return Ok(new WorkflowTransitionResponse("Contradiction", result.Id, result.Status, DateTime.UtcNow, "Contradiction escalated."));
     }
 
     [HttpPost("reviews/{id}/reopen")]
-    public IActionResult ReopenReview(Guid id)
+    public async Task<ActionResult<WorkflowTransitionResponse>> ReopenReview(Guid id, CancellationToken cancellationToken)
     {
-        return Ok(new { ReviewId = id, Status = "Reopened", Timestamp = DateTime.UtcNow });
+        var result = await _workflowTransitionService.ReopenReviewAsync(id, cancellationToken);
+        return Ok(new WorkflowTransitionResponse("Review", result.Id, result.Status, DateTime.UtcNow, "Review reopened."));
     }
 }

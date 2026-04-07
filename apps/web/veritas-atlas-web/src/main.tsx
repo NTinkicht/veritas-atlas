@@ -45,6 +45,7 @@ import { PublicationDeskPage } from "./pages/PublicationDeskPage";
 import { CaseDetailPage } from "./pages/CaseDetailPage";
 import { ReviewsPage } from "./pages/ReviewsPage";
 import { DashboardPage } from "./pages/DashboardPage";
+import { LifecycleSeedPage } from "./pages/LifecycleSeedPage";
 import { WorkflowDiagnosticsPage } from "./pages/WorkflowDiagnosticsPage";
 import { MutationPlaygroundPage } from "./pages/MutationPlaygroundPage";
 import { Phase7CloseoutPage } from "./pages/Phase7CloseoutPage";
@@ -111,6 +112,7 @@ function Layout({ children }: { children: React.ReactNode }) {
 <Link to="/operational-actions">Operational Actions</Link>
 <Link to="/workflow-console">Workflow Console</Link>
 <Link to="/workflow-diagnostics">Workflow Diagnostics</Link>
+<Link to="/lifecycle-seed">Lifecycle Seed</Link>
           <Link to="/mutation-playground">Mutation Playground</Link>
           <Link to="/phase-7-closeout">Phase 7 Closeout</Link>
 <Link to="/knowledge-graph-hub">Knowledge Graph Hub</Link>
@@ -275,6 +277,7 @@ const router = createBrowserRouter([
   { path: "/admin", element: <AdminControlTowerPage /> },
   { path: "/", element: <HomePage /> },
   { path: "/dashboard", element: <DashboardPage /> },
+{ path: "/lifecycle-seed", element: <LifecycleSeedPage /> },
 { path: "/workflow-diagnostics", element: <WorkflowDiagnosticsPage /> },
   { path: "/mutation-playground", element: <MutationPlaygroundPage /> },
   { path: "/phase-7-closeout", element: <Phase7CloseoutPage /> },

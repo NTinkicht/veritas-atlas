@@ -1,0 +1,224 @@
+using Microsoft.EntityFrameworkCore;
+using VeritasAtlas.Domain.Entities;
+using VeritasAtlas.Domain.Enums;
+using VeritasAtlas.Infrastructure.Persistence;
+
+namespace VeritasAtlas.Infrastructure.Services;
+
+public sealed class WorkflowTransitionService
+{
+    private readonly VeritasAtlasDbContext _dbContext;
+
+    public WorkflowTransitionService(VeritasAtlasDbContext dbContext)
+    {
+        _dbContext = dbContext;
+    }
+
+    public async Task<(Guid Id, string Status)> SubmitCaseAsync(Guid caseId, CancellationToken cancellationToken = default)
+    {
+        var entity = await _dbContext.Cases.FirstOrDefaultAsync(x => x.Id == caseId, cancellationToken)
+            ?? throw new InvalidOperationException($"Case '{caseId}' was not found.");
+
+        entity.Status = ParseCaseStatus("InReview", entity.Status);
+        Touch(entity);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        return (entity.Id, entity.Status.ToString());
+    }
+
+    public async Task<(Guid Id, string Status)> ApproveCaseAsync(Guid caseId, CancellationToken cancellationToken = default)
+    {
+        var entity = await _dbContext.Cases.FirstOrDefaultAsync(x => x.Id == caseId, cancellationToken)
+            ?? throw new InvalidOperationException($"Case '{caseId}' was not found.");
+
+        entity.Status = ParseCaseStatus("Approved", entity.Status);
+        Touch(entity);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        return (entity.Id, entity.Status.ToString());
+    }
+
+    public async Task<(Guid Id, string Status)> RejectCaseAsync(Guid caseId, CancellationToken cancellationToken = default)
+    {
+        var entity = await _dbContext.Cases.FirstOrDefaultAsync(x => x.Id == caseId, cancellationToken)
+            ?? throw new InvalidOperationException($"Case '{caseId}' was not found.");
+
+        entity.Status = ParseCaseStatus("Rejected", entity.Status);
+        Touch(entity);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        return (entity.Id, entity.Status.ToString());
+    }
+
+    public async Task<(Guid Id, string Status)> PreparePublicationAsync(Guid caseId, CancellationToken cancellationToken = default)
+    {
+        var entity = await _dbContext.Cases.FirstOrDefaultAsync(x => x.Id == caseId, cancellationToken)
+            ?? throw new InvalidOperationException($"Case '{caseId}' was not found.");
+
+        entity.Status = ParseCaseStatus("ReadyForPublication", entity.Status);
+        Touch(entity);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        return (entity.Id, entity.Status.ToString());
+    }
+
+    public async Task<(Guid Id, string Status)> PublishCaseAsync(Guid caseId, CancellationToken cancellationToken = default)
+    {
+        var entity = await _dbContext.Cases.FirstOrDefaultAsync(x => x.Id == caseId, cancellationToken)
+            ?? throw new InvalidOperationException($"Case '{caseId}' was not found.");
+
+        entity.Status = ParseCaseStatus("Published", entity.Status);
+        Touch(entity);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        return (entity.Id, entity.Status.ToString());
+    }
+
+    public async Task<(Guid Id, string Status)> HoldCaseAsync(Guid caseId, CancellationToken cancellationToken = default)
+    {
+        var entity = await _dbContext.Cases.FirstOrDefaultAsync(x => x.Id == caseId, cancellationToken)
+            ?? throw new InvalidOperationException($"Case '{caseId}' was not found.");
+
+        entity.Status = ParseCaseStatus("OnHold", entity.Status);
+        Touch(entity);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        return (entity.Id, entity.Status.ToString());
+    }
+
+    public async Task<(Guid Id, string Status)> ResolveContradictionAsync(Guid contradictionId, CancellationToken cancellationToken = default)
+    {
+        var entity = await _dbContext.Contradictions.FirstOrDefaultAsync(x => x.Id == contradictionId, cancellationToken)
+            ?? throw new InvalidOperationException($"Contradiction '{contradictionId}' was not found.");
+
+        entity.Status = ContradictionStatus.Resolved;
+        Touch(entity);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        return (entity.Id, entity.Status.ToString());
+    }
+
+    public async Task<(Guid Id, string Status)> EscalateContradictionAsync(Guid contradictionId, CancellationToken cancellationToken = default)
+    {
+        var entity = await _dbContext.Contradictions.FirstOrDefaultAsync(x => x.Id == contradictionId, cancellationToken)
+            ?? throw new InvalidOperationException($"Contradiction '{contradictionId}' was not found.");
+
+        entity.Status = ParseContradictionStatus("UnderReview", entity.Status);
+        Touch(entity);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        return (entity.Id, entity.Status.ToString());
+    }
+
+    public async Task<(Guid Id, string Status)> SendClaimToReviewAsync(Guid claimId, CancellationToken cancellationToken = default)
+    {
+        var entity = await _dbContext.Claims.FirstOrDefaultAsync(x => x.Id == claimId, cancellationToken)
+            ?? throw new InvalidOperationException($"Claim '{claimId}' was not found.");
+
+        entity.Status = ParseClaimStatus("InReview", entity.Status);
+        Touch(entity);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        return (entity.Id, entity.Status.ToString());
+    }
+
+    public async Task<(Guid Id, string Status)> ReturnClaimForEditAsync(Guid claimId, CancellationToken cancellationToken = default)
+    {
+        var entity = await _dbContext.Claims.FirstOrDefaultAsync(x => x.Id == claimId, cancellationToken)
+            ?? throw new InvalidOperationException($"Claim '{claimId}' was not found.");
+
+        entity.Status = ParseClaimStatus("Draft", entity.Status);
+        Touch(entity);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        return (entity.Id, entity.Status.ToString());
+    }
+
+    public async Task<(Guid Id, string Status)> CompleteReviewAsync(Guid reviewId, CancellationToken cancellationToken = default)
+    {
+        var entity = await _dbContext.Reviews.FirstOrDefaultAsync(x => x.Id == reviewId, cancellationToken)
+            ?? throw new InvalidOperationException($"Review '{reviewId}' was not found.");
+
+        entity.Status = ParseReviewStatus("Completed", entity.Status);
+        Touch(entity);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        return (entity.Id, entity.Status.ToString());
+    }
+
+    public async Task<(Guid Id, string Status)> ReopenReviewAsync(Guid reviewId, CancellationToken cancellationToken = default)
+    {
+        var entity = await _dbContext.Reviews.FirstOrDefaultAsync(x => x.Id == reviewId, cancellationToken)
+            ?? throw new InvalidOperationException($"Review '{reviewId}' was not found.");
+
+        entity.Status = ParseReviewStatus("Open", entity.Status);
+        Touch(entity);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        return (entity.Id, entity.Status.ToString());
+    }
+
+    public async Task<(Guid CaseId, Guid ClaimAId, Guid ClaimBId, Guid ContradictionId, string CaseStatus, string ContradictionStatus)> SeedLifecycleAsync(CancellationToken cancellationToken = default)
+    {
+        var @case = new Case
+        {
+            Title = "Phase 8 Seed Case",
+            Status = ParseCaseStatus("Draft", default)
+        };
+
+        Touch(@case);
+
+        var claimA = new Claim
+        {
+            CaseId = @case.Id,
+            Topic = "Seed Claim A",
+            NormalizedText = "Seed claim A normalized text",
+            Status = ParseClaimStatus("Draft", default)
+        };
+
+        Touch(claimA);
+
+        var claimB = new Claim
+        {
+            CaseId = @case.Id,
+            Topic = "Seed Claim B",
+            NormalizedText = "Seed claim B normalized text",
+            Status = ParseClaimStatus("Draft", default)
+        };
+
+        Touch(claimB);
+
+        var contradiction = new Contradiction
+        {
+            CaseId = @case.Id,
+            LeftClaimId = claimA.Id,
+            RightClaimId = claimB.Id,
+            Type = ContradictionType.Direct,
+            Severity = ContradictionSeverity.Medium,
+            Status = ContradictionStatus.Draft,
+            Summary = "Seed contradiction"
+        };
+
+        Touch(contradiction);
+
+        _dbContext.Cases.Add(@case);
+        _dbContext.Claims.Add(claimA);
+        _dbContext.Claims.Add(claimB);
+        _dbContext.Contradictions.Add(contradiction);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+
+        return (@case.Id, claimA.Id, claimB.Id, contradiction.Id, @case.Status.ToString(), contradiction.Status.ToString());
+    }
+
+    private static void Touch(object entity)
+    {
+        var updatedAt = entity.GetType().GetProperty("UpdatedAtUtc");
+        if (updatedAt is not null && updatedAt.CanWrite)
+        {
+            updatedAt.SetValue(entity, DateTime.UtcNow);
+        }
+    }
+
+    private static TEnum ParseEnum<TEnum>(string desired, TEnum fallback) where TEnum : struct, Enum
+    {
+        if (Enum.TryParse<TEnum>(desired, true, out var parsed))
+        {
+            return parsed;
+        }
+
+        return fallback;
+    }
+
+    private static dynamic ParseCaseStatus(string desired, dynamic fallback) => ParseEnum(desired, fallback);
+    private static dynamic ParseClaimStatus(string desired, dynamic fallback) => ParseEnum(desired, fallback);
+    private static dynamic ParseReviewStatus(string desired, dynamic fallback) => ParseEnum(desired, fallback);
+    private static ContradictionStatus ParseContradictionStatus(string desired, ContradictionStatus fallback) => ParseEnum(desired, fallback);
+}
