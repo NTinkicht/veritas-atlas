@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using VeritasAtlas.Api.Infrastructure;
 using VeritasAtlas.Application.Extensions;
 using VeritasAtlas.Infrastructure.Extensions;
@@ -6,11 +6,21 @@ using VeritasAtlas.Infrastructure.Extensions;
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllers();
+builder.Services.AddSingleton<VeritasAtlas.Api.Infrastructure.WorkflowRequestContext>();
+builder.Services.AddSingleton<VeritasAtlas.Api.Infrastructure.WorkflowAuthorizationService>();
 builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSingleton<VeritasAtlas.Api.Infrastructure.WorkflowRequestContext>();
+builder.Services.AddSingleton<VeritasAtlas.Api.Infrastructure.WorkflowAuthorizationService>();
 builder.Services.AddSwaggerGen();
+builder.Services.AddSingleton<VeritasAtlas.Api.Infrastructure.WorkflowRequestContext>();
+builder.Services.AddSingleton<VeritasAtlas.Api.Infrastructure.WorkflowAuthorizationService>();
 
 builder.Services.AddVeritasAtlasApplication();
+builder.Services.AddSingleton<VeritasAtlas.Api.Infrastructure.WorkflowRequestContext>();
+builder.Services.AddSingleton<VeritasAtlas.Api.Infrastructure.WorkflowAuthorizationService>();
 builder.Services.AddVeritasAtlasInfrastructure(builder.Configuration);
+builder.Services.AddSingleton<VeritasAtlas.Api.Infrastructure.WorkflowRequestContext>();
+builder.Services.AddSingleton<VeritasAtlas.Api.Infrastructure.WorkflowAuthorizationService>();
 
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
     ?? throw new InvalidOperationException("Connection string 'DefaultConnection' was not found.");

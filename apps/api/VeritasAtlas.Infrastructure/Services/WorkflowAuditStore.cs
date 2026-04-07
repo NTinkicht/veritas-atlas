@@ -1,26 +1,27 @@
-using System.Collections.Concurrent;
-
 namespace VeritasAtlas.Infrastructure.Services;
 
 public sealed class WorkflowAuditStore
 {
-    private static readonly ConcurrentQueue<WorkflowAuditRecord> _records = new();
+    private readonly PersistentWorkflowAuditService _persistentWorkflowAuditService;
 
-    public void Add(WorkflowAuditRecord record)
+    public WorkflowAuditStore(PersistentWorkflowAuditService persistentWorkflowAuditService)
     {
-        _records.Enqueue(record);
+        _persistentWorkflowAuditService = persistentWorkflowAuditService;
     }
 
-    public IReadOnlyList<WorkflowAuditRecord> GetAll()
+    public async Task AddAsync(WorkflowAuditRecord record, CancellationToken cancellationToken = default)
     {
-        return _records.ToArray()
-            .OrderByDescending(x => x.TimestampUtc)
-            .ToList();
+        await _persistentWorkflowAuditService.AppendAsync(record, cancellationToken);
     }
 
-    public void Clear()
+    public async Task<IReadOnlyList<WorkflowAuditRecord>> GetAllAsync(CancellationToken cancellationToken = default)
     {
-        while (_records.TryDequeue(out _)) { }
+        return await _persistentWorkflowAuditService.GetAllAsync(cancellationToken);
+    }
+
+    public async Task ClearAsync(CancellationToken cancellationToken = default)
+    {
+        await _persistentWorkflowAuditService.ClearAsync(cancellationToken);
     }
 }
 

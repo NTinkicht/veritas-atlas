@@ -20,9 +20,9 @@ public class WorkflowAuditController : ControllerBase
     }
 
     [HttpGet("entries")]
-    public ActionResult<IReadOnlyList<WorkflowAuditEntryResponse>> GetEntries()
+    public async Task<ActionResult<IReadOnlyList<WorkflowAuditEntryResponse>>> GetEntries(CancellationToken cancellationToken)
     {
-        var entries = _workflowAuditStore.GetAll()
+        var entries = (await _workflowAuditStore.GetAllAsync(cancellationToken))
             .Select(x => new WorkflowAuditEntryResponse(
                 x.Id,
                 x.EntityType,
@@ -40,9 +40,9 @@ public class WorkflowAuditController : ControllerBase
     }
 
     [HttpPost("clear")]
-    public IActionResult Clear()
+    public async Task<IActionResult> Clear(CancellationToken cancellationToken)
     {
-        _workflowAuditStore.Clear();
+        await _workflowAuditStore.ClearAsync(cancellationToken);
         return Ok(new { Cleared = true, TimestampUtc = DateTime.UtcNow });
     }
 
