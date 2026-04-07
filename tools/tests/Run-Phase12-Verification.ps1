@@ -1,7 +1,7 @@
 param(
     [Parameter(Mandatory = $true)]
     [string]$RootDir,
-    [string]$BaseUrl = "http://localhost:5209"
+    [string]$BaseUrl = "http://localhost:5091"
 )
 
 $ErrorActionPreference = "Stop"
@@ -70,6 +70,7 @@ $stderrLog = Join-Path $diag "api-stderr.log"
 
 Set-Content -Path $report -Value "# Phase 12 Verification Report`r`n" -Encoding UTF8
 Add-Content -Path $report -Value ("Generated: " + (Get-Date -Format "yyyy-MM-dd HH:mm:ss"))
+Add-Content -Path $report -Value ("BaseUrl: " + $BaseUrl)
 Add-Content -Path $report -Value ""
 
 $apiProcess = $null
@@ -77,6 +78,7 @@ $failed = $false
 
 Push-Location (Join-Path $RootDir "apps\api\VeritasAtlas.Api")
 try {
+    $env:ASPNETCORE_URLS = $BaseUrl
     $apiProcess = Start-Process "dotnet" -ArgumentList "run" -RedirectStandardOutput $stdoutLog -RedirectStandardError $stderrLog -PassThru
     Start-Sleep -Seconds 8
 
@@ -85,6 +87,10 @@ try {
     if (-not $login.Success) { $failed = $true; throw "Login failed." }
 
     $headers = @{ Authorization = "Bearer $($login.Data.accessToken)" }
+
+    $me = Invoke-Api -Url "$BaseUrl/api/v1/auth/me" -Method GET -Headers $headers
+    Add-Result -ReportPath $report -Name "Auth me works" -Passed $me.Success -Detail $(if ($me.Success) { "$($me.Data.username) / $($me.Data.role)" } else { $me.Message })
+    if (-not $me.Success) { $failed = $true; throw "Auth me failed." }
 
     $seed = Invoke-Api -Url "$BaseUrl/api/v1/actions/seed/lifecycle" -Method POST -Headers $headers
     Add-Result -ReportPath $report -Name "Seed lifecycle works" -Passed $seed.Success -Detail $seed.Message

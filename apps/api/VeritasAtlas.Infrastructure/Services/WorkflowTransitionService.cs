@@ -143,21 +143,37 @@ public sealed class WorkflowTransitionService
         _dbContext.Cases.Add(@case);
         await _dbContext.SaveChangesAsync(cancellationToken);
 
+        var statementId = await _dbContext.Statements
+            .OrderByDescending(x => x.CreatedAtUtc)
+            .Select(x => x.Id)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (statementId == Guid.Empty)
+        {
+            throw new InvalidOperationException("SeedLifecycleAsync requires at least one existing statement. Create one first through /api/v1/statements.");
+        }
+
         var claimA = new Claim
         {
+            StatementId = statementId,
             CaseId = @case.Id,
             Topic = "Seed Claim A",
             NormalizedText = "Seed claim A normalized text",
-            Status = claimStatus
+            Status = claimStatus,
+            Type = ClaimType.Factual,
+            IsMaterial = true
         };
         Touch(claimA);
 
         var claimB = new Claim
         {
+            StatementId = statementId,
             CaseId = @case.Id,
             Topic = "Seed Claim B",
             NormalizedText = "Seed claim B normalized text",
-            Status = claimStatus
+            Status = claimStatus,
+            Type = ClaimType.Factual,
+            IsMaterial = true
         };
         Touch(claimB);
 
@@ -262,8 +278,8 @@ public sealed class WorkflowTransitionService
         return fallback;
     }
 
-    private static dynamic ParseCaseStatus(string desired, dynamic fallback) => ParseEnum(desired, fallback);
-    private static dynamic ParseClaimStatus(string desired, dynamic fallback) => ParseEnum(desired, fallback);
-    private static dynamic ParseReviewStatus(string desired, dynamic fallback) => ParseEnum(desired, fallback);
+    private static VeritasAtlas.Domain.Enums.CaseStatus ParseCaseStatus(string desired, VeritasAtlas.Domain.Enums.CaseStatus fallback) => ParseEnum(desired, fallback);
+    private static VeritasAtlas.Domain.Enums.ClaimStatus ParseClaimStatus(string desired, VeritasAtlas.Domain.Enums.ClaimStatus fallback) => ParseEnum(desired, fallback);
+    private static VeritasAtlas.Domain.Enums.ReviewStatus ParseReviewStatus(string desired, VeritasAtlas.Domain.Enums.ReviewStatus fallback) => ParseEnum(desired, fallback);
     private static ContradictionStatus ParseContradictionStatus(string desired, ContradictionStatus fallback) => ParseEnum(desired, fallback);
 }

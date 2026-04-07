@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using VeritasAtlas.Api.Contracts.Workflow;
+using VeritasAtlas.Api.Infrastructure.Auth;
 using VeritasAtlas.Infrastructure.Services;
 
 namespace VeritasAtlas.Api.Controllers;
@@ -11,10 +12,14 @@ namespace VeritasAtlas.Api.Controllers;
 public class PublicationWorkflowController : ControllerBase
 {
     private readonly WorkflowOrchestratorService _workflowOrchestratorService;
+    private readonly AuthRequestContext _authRequestContext;
 
-    public PublicationWorkflowController(WorkflowOrchestratorService workflowOrchestratorService)
+    public PublicationWorkflowController(
+        WorkflowOrchestratorService workflowOrchestratorService,
+        AuthRequestContext authRequestContext)
     {
         _workflowOrchestratorService = workflowOrchestratorService;
+        _authRequestContext = authRequestContext;
     }
 
     [HttpPost("cases/{caseId}/prepare")]
@@ -23,7 +28,7 @@ public class PublicationWorkflowController : ControllerBase
         return await ExecuteTransition(
             "Case",
             caseId,
-            () => _workflowOrchestratorService.PreparePublicationAsync(caseId, Request.Headers["X-Role"], cancellationToken),
+            () => _workflowOrchestratorService.PreparePublicationAsync(caseId, _authRequestContext.GetRole(HttpContext), cancellationToken),
             "Case prepared for publication.");
     }
 
@@ -33,7 +38,7 @@ public class PublicationWorkflowController : ControllerBase
         return await ExecuteTransition(
             "Case",
             caseId,
-            () => _workflowOrchestratorService.PublishCaseAsync(caseId, Request.Headers["X-Role"], cancellationToken),
+            () => _workflowOrchestratorService.PublishCaseAsync(caseId, _authRequestContext.GetRole(HttpContext), cancellationToken),
             "Case published.");
     }
 
@@ -43,7 +48,7 @@ public class PublicationWorkflowController : ControllerBase
         return await ExecuteTransition(
             "Case",
             caseId,
-            () => _workflowOrchestratorService.HoldCaseAsync(caseId, Request.Headers["X-Role"], cancellationToken),
+            () => _workflowOrchestratorService.HoldCaseAsync(caseId, _authRequestContext.GetRole(HttpContext), cancellationToken),
             "Case put on hold.");
     }
 

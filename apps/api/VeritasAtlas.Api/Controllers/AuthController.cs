@@ -30,22 +30,32 @@ public class AuthController : ControllerBase
         var user = _devUserStore.Validate(request.Username, request.Password);
         if (user is null)
         {
-            return Unauthorized(new AuthErrorResponse("invalid_credentials", "The supplied username or password is invalid.", DateTime.UtcNow));
+            return Unauthorized(new AuthErrorResponse(
+                "invalid_credentials",
+                "The supplied username or password is invalid.",
+                DateTime.UtcNow));
         }
 
         var token = _jwtTokenService.CreateToken(user.Username, user.Role);
 
-        return Ok(new LoginResponse(token.Token, "Bearer", token.ExpiresAtUtc, user.Username, user.Role));
+        return Ok(new LoginResponse(
+            token.Token,
+            "Bearer",
+            token.ExpiresAtUtc,
+            user.Username,
+            user.Role));
     }
 
     [HttpGet("me")]
     [Authorize]
-    public ActionResult<CurrentUserResponse> Me()
+    public IActionResult Me()
     {
-        return Ok(new CurrentUserResponse(
-            _authRequestContext.GetUsername(HttpContext),
-            _authRequestContext.GetRole(HttpContext),
-            _authRequestContext.IsAuthenticated(HttpContext),
-            DateTime.UtcNow));
+        return Ok(new
+        {
+            user = User.Identity?.Name,
+            role = _authRequestContext.GetRole(HttpContext),
+            isAuthenticated = User.Identity?.IsAuthenticated == true,
+            claims = User.Claims.Select(c => new { c.Type, c.Value }).ToList()
+        });
     }
 }

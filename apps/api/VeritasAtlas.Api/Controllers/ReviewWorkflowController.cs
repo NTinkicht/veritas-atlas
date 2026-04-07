@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using VeritasAtlas.Api.Contracts.Workflow;
+using VeritasAtlas.Api.Infrastructure.Auth;
 using VeritasAtlas.Infrastructure.Services;
 
 namespace VeritasAtlas.Api.Controllers;
@@ -11,10 +12,14 @@ namespace VeritasAtlas.Api.Controllers;
 public class ReviewWorkflowController : ControllerBase
 {
     private readonly WorkflowOrchestratorService _workflowOrchestratorService;
+    private readonly AuthRequestContext _authRequestContext;
 
-    public ReviewWorkflowController(WorkflowOrchestratorService workflowOrchestratorService)
+    public ReviewWorkflowController(
+        WorkflowOrchestratorService workflowOrchestratorService,
+        AuthRequestContext authRequestContext)
     {
         _workflowOrchestratorService = workflowOrchestratorService;
+        _authRequestContext = authRequestContext;
     }
 
     [HttpPost("claims/{claimId}/send-to-review")]
@@ -23,7 +28,7 @@ public class ReviewWorkflowController : ControllerBase
         return await ExecuteTransition(
             "Claim",
             claimId,
-            () => _workflowOrchestratorService.SendClaimToReviewAsync(claimId, Request.Headers["X-Role"], cancellationToken),
+            () => _workflowOrchestratorService.SendClaimToReviewAsync(claimId, _authRequestContext.GetRole(HttpContext), cancellationToken),
             "Claim sent to review.");
     }
 
@@ -33,7 +38,7 @@ public class ReviewWorkflowController : ControllerBase
         return await ExecuteTransition(
             "Claim",
             claimId,
-            () => _workflowOrchestratorService.ReturnClaimForEditAsync(claimId, Request.Headers["X-Role"], cancellationToken),
+            () => _workflowOrchestratorService.ReturnClaimForEditAsync(claimId, _authRequestContext.GetRole(HttpContext), cancellationToken),
             "Claim returned for edit.");
     }
 
@@ -43,7 +48,7 @@ public class ReviewWorkflowController : ControllerBase
         return await ExecuteTransition(
             "Contradiction",
             id,
-            () => _workflowOrchestratorService.EscalateContradictionAsync(id, Request.Headers["X-Role"], cancellationToken),
+            () => _workflowOrchestratorService.EscalateContradictionAsync(id, _authRequestContext.GetRole(HttpContext), cancellationToken),
             "Contradiction escalated.");
     }
 
@@ -53,7 +58,7 @@ public class ReviewWorkflowController : ControllerBase
         return await ExecuteTransition(
             "Review",
             id,
-            () => _workflowOrchestratorService.ReopenReviewAsync(id, Request.Headers["X-Role"], cancellationToken),
+            () => _workflowOrchestratorService.ReopenReviewAsync(id, _authRequestContext.GetRole(HttpContext), cancellationToken),
             "Review reopened.");
     }
 

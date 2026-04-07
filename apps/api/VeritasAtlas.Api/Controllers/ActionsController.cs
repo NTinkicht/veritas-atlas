@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using VeritasAtlas.Api.Contracts.Workflow;
+using VeritasAtlas.Api.Infrastructure.Auth;
 using VeritasAtlas.Infrastructure.Services;
 
 namespace VeritasAtlas.Api.Controllers;
@@ -11,10 +12,14 @@ namespace VeritasAtlas.Api.Controllers;
 public class ActionsController : ControllerBase
 {
     private readonly WorkflowOrchestratorService _workflowOrchestratorService;
+    private readonly AuthRequestContext _authRequestContext;
 
-    public ActionsController(WorkflowOrchestratorService workflowOrchestratorService)
+    public ActionsController(
+        WorkflowOrchestratorService workflowOrchestratorService,
+        AuthRequestContext authRequestContext)
     {
         _workflowOrchestratorService = workflowOrchestratorService;
+        _authRequestContext = authRequestContext;
     }
 
     [HttpPost("cases/{caseId}/submit")]
@@ -23,7 +28,7 @@ public class ActionsController : ControllerBase
         return await ExecuteTransition(
             "Case",
             caseId,
-            () => _workflowOrchestratorService.SubmitCaseAsync(caseId, Request.Headers["X-Role"], cancellationToken),
+            () => _workflowOrchestratorService.SubmitCaseAsync(caseId, _authRequestContext.GetRole(HttpContext), cancellationToken),
             "Case submitted.");
     }
 
@@ -33,7 +38,7 @@ public class ActionsController : ControllerBase
         return await ExecuteTransition(
             "Case",
             caseId,
-            () => _workflowOrchestratorService.ApproveCaseAsync(caseId, Request.Headers["X-Role"], cancellationToken),
+            () => _workflowOrchestratorService.ApproveCaseAsync(caseId, _authRequestContext.GetRole(HttpContext), cancellationToken),
             "Case approved.");
     }
 
@@ -43,7 +48,7 @@ public class ActionsController : ControllerBase
         return await ExecuteTransition(
             "Case",
             caseId,
-            () => _workflowOrchestratorService.RejectCaseAsync(caseId, Request.Headers["X-Role"], cancellationToken),
+            () => _workflowOrchestratorService.RejectCaseAsync(caseId, _authRequestContext.GetRole(HttpContext), cancellationToken),
             "Case rejected.");
     }
 
@@ -53,7 +58,7 @@ public class ActionsController : ControllerBase
         return await ExecuteTransition(
             "Contradiction",
             id,
-            () => _workflowOrchestratorService.ResolveContradictionAsync(id, Request.Headers["X-Role"], cancellationToken),
+            () => _workflowOrchestratorService.ResolveContradictionAsync(id, _authRequestContext.GetRole(HttpContext), cancellationToken),
             "Contradiction resolved.");
     }
 
@@ -63,7 +68,7 @@ public class ActionsController : ControllerBase
         return await ExecuteTransition(
             "Review",
             id,
-            () => _workflowOrchestratorService.CompleteReviewAsync(id, Request.Headers["X-Role"], cancellationToken),
+            () => _workflowOrchestratorService.CompleteReviewAsync(id, _authRequestContext.GetRole(HttpContext), cancellationToken),
             "Review completed.");
     }
 
@@ -72,7 +77,9 @@ public class ActionsController : ControllerBase
     {
         try
         {
-            var result = await _workflowOrchestratorService.SeedLifecycleAsync(Request.Headers["X-Role"], cancellationToken);
+            var result = await _workflowOrchestratorService.SeedLifecycleAsync(
+                _authRequestContext.GetRole(HttpContext),
+                cancellationToken);
 
             return Ok(new WorkflowSeedResponse(
                 result.CaseId,

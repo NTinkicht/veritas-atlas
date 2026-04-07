@@ -45,6 +45,7 @@ import { PublicationDeskPage } from "./pages/PublicationDeskPage";
 import { CaseDetailPage } from "./pages/CaseDetailPage";
 import { ReviewsPage } from "./pages/ReviewsPage";
 import { DashboardPage } from "./pages/DashboardPage";
+import { AuthDiagnosticsPage } from "./pages/AuthDiagnosticsPage";
 import { PersistenceConsolePage } from "./pages/PersistenceConsolePage";
 import { Phase12DataCenterPage } from "./pages/Phase12DataCenterPage";
 import { LoginPage } from "./pages/LoginPage";
@@ -129,6 +130,7 @@ function Layout({ children }: { children: React.ReactNode }) {
 <Link to="/persistence-console">Persistence Console</Link>
           <Link to="/phase-12-data-center">Phase 12 Data</Link>
 <Link to="/login">Login</Link>
+<Link to="/auth-diagnostics">Auth Diagnostics</Link>
           <Link to="/auth-me">Current User</Link>
           <Link to="/phase-11-auth-center">Phase 11 Auth</Link>
 <Link to="/role-policy">Role Policy</Link>
@@ -303,6 +305,7 @@ const router = createBrowserRouter([
   { path: "/admin", element: <AdminControlTowerPage /> },
   { path: "/", element: <HomePage /> },
   { path: "/dashboard", element: <DashboardPage /> },
+{ path: "/auth-diagnostics", element: <AuthDiagnosticsPage /> },
 { path: "/persistence-console", element: <PersistenceConsolePage /> },
   { path: "/phase-12-data-center", element: <Phase12DataCenterPage /> },
 { path: "/login", element: <LoginPage /> },

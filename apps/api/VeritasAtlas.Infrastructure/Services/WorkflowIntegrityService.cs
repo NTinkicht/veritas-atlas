@@ -8,6 +8,7 @@ public sealed class WorkflowIntegrityService
             ["Case"] = new(StringComparer.OrdinalIgnoreCase)
             {
                 ["Draft"] = new[] { "InReview" },
+				["Open"] = new[] { "ReadyForPublication", "OnHold" },
                 ["InReview"] = new[] { "Approved", "Rejected", "ReadyForPublication", "OnHold" },
                 ["Approved"] = new[] { "ReadyForPublication", "OnHold" },
                 ["Rejected"] = new[] { "InReview" },
