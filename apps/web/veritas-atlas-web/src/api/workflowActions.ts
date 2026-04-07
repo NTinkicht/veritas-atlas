@@ -1,53 +1,26 @@
-import { getAuthHeaders } from "./httpAuth";
+import type { WorkflowSeedResponse, WorkflowTransitionResponse } from "./contracts";
+import { apiPost } from "./http";
 
-export type WorkflowActionResponse = {
-  claimId?: string;
-  contradictionId?: string;
-  reviewId?: string;
-  caseId?: string;
-  status: string;
-  timestampUtc?: string;
-  timestamp?: string;
-};
-
-async function postAction(url: string): Promise<WorkflowActionResponse> {
-  const response = await fetch(url, {
-    method: "POST",
-    headers: getAuthHeaders(),
-  });
-
-  if (!response.ok) {
-    const text = await response.text();
-    throw new Error(text || `HTTP ${response.status}`);
-  }
-
-  return response.json() as Promise<WorkflowActionResponse>;
+export async function seedLifecycle(): Promise<WorkflowSeedResponse> {
+  return apiPost<WorkflowSeedResponse>("/api/v1/actions/seed/lifecycle");
 }
 
-export function sendClaimToReview(claimId: string) {
-  return postAction(`/api/v1/review-workflow/claims/${claimId}/send-to-review`);
+export async function submitCase(caseId: string): Promise<WorkflowTransitionResponse> {
+  return apiPost<WorkflowTransitionResponse>(`/api/v1/actions/cases/${caseId}/submit`);
 }
 
-export function returnClaimForEdit(claimId: string) {
-  return postAction(`/api/v1/review-workflow/claims/${claimId}/return-for-edit`);
+export async function approveCase(caseId: string): Promise<WorkflowTransitionResponse> {
+  return apiPost<WorkflowTransitionResponse>(`/api/v1/actions/cases/${caseId}/approve`);
 }
 
-export function escalateContradiction(contradictionId: string) {
-  return postAction(`/api/v1/review-workflow/contradictions/${contradictionId}/escalate`);
+export async function rejectCase(caseId: string): Promise<WorkflowTransitionResponse> {
+  return apiPost<WorkflowTransitionResponse>(`/api/v1/actions/cases/${caseId}/reject`);
 }
 
-export function reopenReview(reviewId: string) {
-  return postAction(`/api/v1/review-workflow/reviews/${reviewId}/reopen`);
+export async function resolveContradiction(contradictionId: string): Promise<WorkflowTransitionResponse> {
+  return apiPost<WorkflowTransitionResponse>(`/api/v1/actions/contradictions/${contradictionId}/resolve`);
 }
 
-export function preparePublication(caseId: string) {
-  return postAction(`/api/v1/publication-workflow/cases/${caseId}/prepare`);
-}
-
-export function publishCase(caseId: string) {
-  return postAction(`/api/v1/publication-workflow/cases/${caseId}/publish`);
-}
-
-export function holdCase(caseId: string) {
-  return postAction(`/api/v1/publication-workflow/cases/${caseId}/hold`);
+export async function completeReview(reviewId: string): Promise<WorkflowTransitionResponse> {
+  return apiPost<WorkflowTransitionResponse>(`/api/v1/actions/reviews/${reviewId}/complete`);
 }

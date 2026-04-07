@@ -1,21 +1,15 @@
-﻿import { apiGet } from "./client";
+import type { CaseItem, GetCasesResponse } from "./contracts";
+import { apiGet } from "./http";
 
-export type CasesListItem = {
-  id: string;
-  title: string;
-  status: string;
-  createdAtUtc: string;
-  updatedAtUtc: string;
-};
+export async function getCases(page = 1, pageSize = 20): Promise<GetCasesResponse> {
+  const params = new URLSearchParams({
+    page: String(page),
+    pageSize: String(pageSize),
+  });
 
-export type CasesResponse = {
-  items: CasesListItem[];
-  page: number;
-  pageSize: number;
-  totalCount: number;
-  totalPages: number;
-};
+  return apiGet<GetCasesResponse>(`/api/v1/cases?${params.toString()}`);
+}
 
-export async function getCases(): Promise<CasesResponse> {
-  return apiGet<CasesResponse>("/api/v1/cases?page=1&pageSize=20");
+export async function getCaseById(id: string): Promise<CaseItem> {
+  return apiGet<CaseItem>(`/api/v1/cases/${id}`);
 }
