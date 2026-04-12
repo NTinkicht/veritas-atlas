@@ -1,16 +1,14 @@
-import { ActivityTimelinePanel } from "../components/ActivityTimelinePanel";
+import { AppSurface } from "../components/AppSurface";
+import { useFrontendNav } from "../hooks/useFrontendNav";
 
 export function ObservabilityDashboardPage() {
-  const activity = [
-    { id: "1", text: "Claim created" },
-    { id: "2", text: "Contradiction detected" },
-    { id: "3", text: "Review submitted" },
-  ];
+  const links = useFrontendNav();
 
   return (
-    <div style={{ padding: 24 }}>
-      <h1>Observability Dashboard</h1>
-      <ActivityTimelinePanel items={activity} />
-    </div>
+    <AppSurface
+      title="O bs er va bi li ty Da sh bo ar d"
+      subtitle="Stable production shell."
+      links={links}
+    />
   );
 }

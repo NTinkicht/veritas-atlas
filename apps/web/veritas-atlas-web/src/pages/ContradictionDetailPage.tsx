@@ -1,64 +1,71 @@
+import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { useContradictionDetail } from "../hooks/useContradictionDetail";
-import { ContradictionSignalPanel } from "../components/ContradictionSignalPanel";
+import { getContradictionById } from "../api/contradictions";
+import type { ContradictionItem } from "../api/contracts";
+import { AppSurface } from "../components/AppSurface";
 
 export function ContradictionDetailPage() {
-  const { id } = useParams();
-  const query = useContradictionDetail(id);
+  const { id = "" } = useParams();
+  const [item, setItem] = useState<ContradictionItem | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  if (query.isLoading) {
-    return <div style={{ fontFamily: "Arial, sans-serif", padding: "24px" }}>Loading contradiction...</div>;
-  }
+  useEffect(() => {
+    async function load() {
+      setLoading(true);
+      setError(null);
 
-  if (query.isError) {
-    return <div style={{ fontFamily: "Arial, sans-serif", padding: "24px", color: "crimson" }}>Failed to load contradiction: {(query.error as Error).message}</div>;
-  }
+      try {
+        const result = await getContradictionById(id);
+        setItem(result);
+      } catch (err) {
+        const message =
+          typeof err === "object" && err && "message" in err
+            ? String((err as { message?: unknown }).message ?? "Failed to load contradiction.")
+            : "Failed to load contradiction.";
+        setError(message);
+      } finally {
+        setLoading(false);
+      }
+    }
 
-  if (!query.data) {
-    return <div style={{ fontFamily: "Arial, sans-serif", padding: "24px" }}>Contradiction not found.</div>;
-  }
-
-  const item = query.data;
+    if (id) {
+      void load();
+    }
+  }, [id]);
 
   return (
-    <div style={{ fontFamily: "Arial, sans-serif", padding: "24px" }}>
-      <nav style={{ display: "flex", gap: "16px", marginBottom: "20px", flexWrap: "wrap" }}>
-        <Link to="/contradictions">Back to Contradictions</Link>
-        <Link to={`/claims/${item.primaryClaimId}`}>Primary Claim</Link>
-        <Link to={`/claims/${item.secondaryClaimId}`}>Secondary Claim</Link>
-      </nav>
-
-      <h1 style={{ marginTop: 0 }}>Contradiction</h1>
-
-      <div style={cardStyle}>
-        <Row label="Id" value={item.id} />
-        <Row label="Topic" value={item.topic} />
-        <Row label="Summary" value={item.summary} />
-        <Row label="Type" value={item.contradictionType} />
-        <Row label="Severity" value={item.severity} />
-        <Row label="Status" value={item.status} />
-        <Row label="Primary Claim" value={item.primaryClaimId} />
-        <Row label="Secondary Claim" value={item.secondaryClaimId} />
-        <Row label="Case Id" value={item.caseId ?? "N/A"} />
+    <AppSurface
+      title="Contradiction Detail"
+      subtitle="Detailed view of a single contradiction record."
+    >
+      <div className="action-row">
+        <Link to="/contradictions"><button>Back to Contradictions</button></Link>
       </div>
 
-      <ContradictionSignalPanel />
-    </div>
+      {error ? <div className="notice-card notice-danger">{error}</div> : null}
+      {loading ? <div className="notice-card">Loading contradiction...</div> : null}
+
+      {!loading && item ? (
+        <section className="panel">
+          <div className="panel-header">
+            <h2 className="panel-title">{item.summary}</h2>
+            <span className="tag">{item.status}</span>
+          </div>
+
+          <div className="kv-grid">
+            <div className="kv-row"><div className="kv-label">Id</div><div className="kv-value">{item.id}</div></div>
+            <div className="kv-row"><div className="kv-label">Summary</div><div className="kv-value">{item.summary}</div></div>
+            <div className="kv-row"><div className="kv-label">Type</div><div className="kv-value">{item.type}</div></div>
+            <div className="kv-row"><div className="kv-label">Severity</div><div className="kv-value">{item.severity}</div></div>
+            <div className="kv-row"><div className="kv-label">Status</div><div className="kv-value">{item.status}</div></div>
+            <div className="kv-row"><div className="kv-label">Case Id</div><div className="kv-value">{item.caseId}</div></div>
+            <div className="kv-row"><div className="kv-label">Left Claim Id</div><div className="kv-value">{item.leftClaimId}</div></div>
+            <div className="kv-row"><div className="kv-label">Right Claim Id</div><div className="kv-value">{item.rightClaimId}</div></div>
+            <div className="kv-row"><div className="kv-label">Rationale</div><div className="kv-value">{item.rationale ?? "N/A"}</div></div>
+          </div>
+        </section>
+      ) : null}
+    </AppSurface>
   );
 }
-
-function Row({ label, value }: { label: string; value: string }) {
-  return (
-    <div style={{ display: "grid", gridTemplateColumns: "180px 1fr", gap: "12px", padding: "6px 0" }}>
-      <strong>{label}</strong>
-      <span>{value}</span>
-    </div>
-  );
-}
-
-const cardStyle: React.CSSProperties = {
-  border: "1px solid #ddd",
-  borderRadius: "12px",
-  padding: "16px",
-  marginBottom: "16px",
-};

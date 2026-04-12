@@ -1,51 +1,120 @@
-import { useClearWorkflowAudit, useWorkflowAuditEntries } from "../hooks/useWorkflowAudit";
+import { useEffect, useState } from "react";
+import { getWorkflowAuditEntries } from "../api/workflowAudit";
+import type { WorkflowAuditEntry } from "../api/contracts";
+import { AppSurface } from "../components/AppSurface";
+import { LoadingState } from "../components/LoadingState";
+import { ErrorState } from "../components/ErrorState";
+import { EmptyState } from "../components/EmptyState";
+import { ProtectedNotice } from "../components/ProtectedNotice";
 
-export function WorkflowAuditPage() {
-  const entriesQuery = useWorkflowAuditEntries();
-  const clearMutation = useClearWorkflowAudit();
-
-  if (entriesQuery.isLoading) {
-    return <div style={{ fontFamily: "Arial, sans-serif", padding: 24 }}>Loading workflow audit...</div>;
-  }
-
-  if (entriesQuery.isError) {
-    return <div style={{ fontFamily: "Arial, sans-serif", padding: 24, color: "crimson" }}>Failed to load workflow audit.</div>;
-  }
-
-  const entries = entriesQuery.data ?? [];
-
-  return (
-    <div style={{ fontFamily: "Arial, sans-serif", padding: 24 }}>
-      <h1 style={{ marginTop: 0 }}>Workflow Audit</h1>
-      <button onClick={() => clearMutation.mutate()} style={buttonStyle}>Clear Audit</button>
-
-      <div style={{ ...panelStyle, marginTop: 16 }}>
-        {entries.length === 0 && <p>No audit entries.</p>}
-        {entries.length > 0 && (
-          <ul style={{ marginBottom: 0 }}>
-            {entries.map((entry) => (
-              <li key={entry.id}>
-                [{entry.timestampUtc}] {entry.entityType} {entry.entityId} - {entry.actionName} - {entry.previousStatus ?? "N/A"} â†’ {entry.nextStatus} - {entry.role} - {entry.success ? "OK" : "FAIL"}
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
-    </div>
-  );
+function statusTag(value: string | null) {
+  return <span className="tag">{value ?? "N/A"}</span>;
 }
 
-const panelStyle: React.CSSProperties = {
-  border: "1px solid #ddd",
-  borderRadius: 14,
-  padding: 16,
-};
+function normalizeAuditItems(value: unknown): WorkflowAuditEntry[] {
+  if (Array.isArray(value)) {
+    return value as WorkflowAuditEntry[];
+  }
 
-const buttonStyle: React.CSSProperties = {
-  border: "1px solid #bbb",
-  borderRadius: 10,
-  padding: "10px 14px",
-  background: "white",
-  cursor: "pointer",
-  font: "inherit",
-};
+  if (value && typeof value === "object") {
+    const record = value as Record<string, unknown>;
+    if (Array.isArray(record.items)) {
+      return record.items as WorkflowAuditEntry[];
+    }
+  }
+
+  return [];
+}
+
+export function WorkflowAuditPage() {
+  const [items, setItems] = useState<WorkflowAuditEntry[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [authWarning, setAuthWarning] = useState<string | null>(null);
+
+  async function load() {
+    setLoading(true);
+    setError(null);
+    setAuthWarning(null);
+
+    try {
+      const result = await getWorkflowAuditEntries();
+      setItems(normalizeAuditItems(result));
+    } catch (err) {
+      const message =
+        typeof err === "object" && err && "message" in err
+          ? String((err as { message?: unknown }).message ?? "Failed to load audit entries.")
+          : "Failed to load audit entries.";
+
+      if (message.includes("401") || message.toLowerCase().includes("unauthorized")) {
+        setAuthWarning("This page requires a fresh login.");
+        setItems([]);
+      } else {
+        setError(message);
+      }
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    void load();
+  }, []);
+
+  return (
+    <AppSurface
+      title="Workflow Audit"
+      subtitle="A readable, trustworthy timeline of workflow transitions and decisions."
+    >
+      <div className="action-row">
+        <button onClick={() => void load()} disabled={loading}>Refresh</button>
+      </div>
+
+      {error ? <ErrorState message={error} /> : null}
+      {authWarning ? <ProtectedNotice message={authWarning} /> : null}
+      {loading ? <LoadingState message="Loading workflow audit..." /> : null}
+
+      {!loading ? (
+        <section className="panel">
+          <div className="panel-header">
+            <h2 className="panel-title">Audit Timeline</h2>
+            <span className="tag">{items.length} entries</span>
+          </div>
+
+          {items.length === 0 ? (
+            <EmptyState message="No workflow audit entries available." />
+          ) : (
+            <div className="table-wrap">
+              <table className="table-card">
+                <thead>
+                  <tr>
+                    <th>Action</th>
+                    <th>Entity</th>
+                    <th>Previous</th>
+                    <th>Next</th>
+                    <th>Role</th>
+                    <th>Succeeded</th>
+                    <th>Time</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {items.map((entry) => (
+                    <tr key={entry.id}>
+                      <td>{entry.actionName}</td>
+                      <td>{entry.entityType}</td>
+                      <td>{statusTag(entry.previousStatus)}</td>
+                      <td>{statusTag(entry.nextStatus)}</td>
+                      <td>{entry.role}</td>
+                      <td>{entry.succeeded ? "Yes" : "No"}</td>
+                      <td>{new Date(entry.timestampUtc).toLocaleString()}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+      ) : null}
+    </AppSurface>
+  );
+}

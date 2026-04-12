@@ -1,37 +1,14 @@
-import { WorkflowDiagnosticsPanel } from "../components/WorkflowDiagnosticsPanel";
-import {
-  useWorkflowDiagnosticsRoutes,
-  useWorkflowDiagnosticsSummary,
-} from "../hooks/useWorkflowDiagnostics";
+import { AppSurface } from "../components/AppSurface";
+import { useFrontendNav } from "../hooks/useFrontendNav";
 
 export function WorkflowDiagnosticsPage() {
-  const summaryQuery = useWorkflowDiagnosticsSummary();
-  const routesQuery = useWorkflowDiagnosticsRoutes();
-
-  if (summaryQuery.isLoading || routesQuery.isLoading) {
-    return <div style={{ fontFamily: "Arial, sans-serif", padding: 24 }}>Loading workflow diagnostics...</div>;
-  }
-
-  if (summaryQuery.isError || routesQuery.isError) {
-    return <div style={{ fontFamily: "Arial, sans-serif", padding: 24, color: "crimson" }}>Failed to load workflow diagnostics.</div>;
-  }
-
-  if (!summaryQuery.data || !routesQuery.data) {
-    return <div style={{ fontFamily: "Arial, sans-serif", padding: 24 }}>Workflow diagnostics unavailable.</div>;
-  }
+  const links = useFrontendNav();
 
   return (
-    <div style={{ fontFamily: "Arial, sans-serif", padding: 24 }}>
-      <h1 style={{ marginTop: 0 }}>Workflow Diagnostics</h1>
-      <p style={{ color: "#555" }}>
-        Diagnostics surface for the write-action workflow layer added during Phase 7.
-      </p>
-
-      <WorkflowDiagnosticsPanel
-        stage={summaryQuery.data.stage}
-        actions={summaryQuery.data.actions}
-        routes={routesQuery.data}
-      />
-    </div>
+    <AppSurface
+      title="W or kf lo wD ia gn os ti cs"
+      subtitle="Stable production shell."
+      links={links}
+    />
   );
 }

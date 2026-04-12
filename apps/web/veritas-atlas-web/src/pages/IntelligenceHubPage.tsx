@@ -1,10 +1,14 @@
-import { AIInsightsPanel } from "../components/AIInsightsPanel";
+import { AppSurface } from "../components/AppSurface";
+import { useFrontendNav } from "../hooks/useFrontendNav";
 
 export function IntelligenceHubPage() {
+  const links = useFrontendNav();
+
   return (
-    <div style={{ padding: 24 }}>
-      <h1>Intelligence Hub</h1>
-      <AIInsightsPanel />
-    </div>
+    <AppSurface
+      title="I nt el li ge nc eH ub"
+      subtitle="Stable production shell."
+      links={links}
+    />
   );
 }

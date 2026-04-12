@@ -1,0 +1,10 @@
+﻿{
+    "Name":  "Fatal Error",
+    "Status":  "FAIL",
+    "Method":  "",
+    "Url":  "",
+    "HttpStatus":  -1,
+    "Note":  "",
+    "Body":  "Impossible de trouver un paramètre correspondant au nom « SkipHttpErrorCheck ».",
+    "TimeUtc":  "2026-04-11T23:45:48.7250919Z"
+}

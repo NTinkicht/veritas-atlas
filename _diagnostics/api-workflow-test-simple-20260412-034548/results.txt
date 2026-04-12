@@ -1,0 +1,14 @@
+﻿Full API Workflow Test
+
+BaseUrl: http://localhost:5091
+Username: admin1
+Run time: 2026-04-12 03:45:48Z
+
+==== Fatal Error ====
+Status: FAIL
+Method: 
+Url: 
+HttpStatus: -1
+Body:
+"Impossible de trouver un paramètre correspondant au nom « SkipHttpErrorCheck »."
+

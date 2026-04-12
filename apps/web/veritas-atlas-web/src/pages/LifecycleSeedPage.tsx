@@ -1,32 +1,14 @@
-import { RoleSelectorPanel } from "../components/RoleSelectorPanel";
-import { SeedScenarioPanel } from "../components/SeedScenarioPanel";
-import { useWorkflowSeed } from "../hooks/useWorkflowSeed";
+import { AppSurface } from "../components/AppSurface";
+import { useFrontendNav } from "../hooks/useFrontendNav";
 
 export function LifecycleSeedPage() {
-  const seedMutation = useWorkflowSeed();
-
-  const message = seedMutation.data
-    ? `Case ${seedMutation.data.caseId} seeded with contradiction ${seedMutation.data.contradictionId}.`
-    : undefined;
-
-  const error = (seedMutation.error as Error | null)?.message;
+  const links = useFrontendNav();
 
   return (
-    <div style={{ fontFamily: "Arial, sans-serif", padding: 24 }}>
-      <h1 style={{ marginTop: 0 }}>Lifecycle Seed</h1>
-      <p style={{ color: "#555" }}>
-        Seed a minimal end-to-end workflow scenario for validation and UI interaction.
-      </p>
-
-      <RoleSelectorPanel />
-
-      <div style={{ marginTop: 16 }}>
-        <SeedScenarioPanel
-          onSeed={() => seedMutation.mutate()}
-          isPending={seedMutation.isPending}
-          message={message || error}
-        />
-      </div>
-    </div>
+    <AppSurface
+      title="L if ec yc le Se ed"
+      subtitle="Stable production shell."
+      links={links}
+    />
   );
 }

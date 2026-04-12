@@ -1,77 +1,69 @@
-﻿import { Link, useParams } from "react-router-dom";
-import { useClaimDetail } from "../hooks/useClaimDetail";
+import { useEffect, useState } from "react";
+import { Link, useParams } from "react-router-dom";
+import { getClaimById } from "../api/claims";
+import type { ClaimItem } from "../api/contracts";
+import { AppSurface } from "../components/AppSurface";
 
 export function ClaimDetailPage() {
-  const { id } = useParams();
-  const query = useClaimDetail(id);
+  const { id = "" } = useParams();
+  const [item, setItem] = useState<ClaimItem | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  if (query.isLoading) {
-    return <div style={{ fontFamily: "Arial, sans-serif", padding: "24px" }}>Loading claim...</div>;
-  }
+  useEffect(() => {
+    async function load() {
+      setLoading(true);
+      setError(null);
 
-  if (query.isError) {
-    return <div style={{ fontFamily: "Arial, sans-serif", padding: "24px", color: "crimson" }}>Failed to load claim: {(query.error as Error).message}</div>;
-  }
+      try {
+        const result = await getClaimById(id);
+        setItem(result);
+      } catch (err) {
+        const message =
+          typeof err === "object" && err && "message" in err
+            ? String((err as { message?: unknown }).message ?? "Failed to load claim.")
+            : "Failed to load claim.";
+        setError(message);
+      } finally {
+        setLoading(false);
+      }
+    }
 
-  if (!query.data) {
-    return <div style={{ fontFamily: "Arial, sans-serif", padding: "24px" }}>Claim not found.</div>;
-  }
-
-  const item = query.data;
+    if (id) {
+      void load();
+    }
+  }, [id]);
 
   return (
-    <div style={{ fontFamily: "Arial, sans-serif", padding: "24px" }}>
-      <nav style={{ display: "flex", gap: "16px", marginBottom: "20px", flexWrap: "wrap" }}>
-        <Link to="/claims">Back to Claims</Link>
-        <Link to={`/statements/${item.statementId}`}>Statement</Link>
-        {item.caseId && <Link to={`/cases/${item.caseId}`}>Case</Link>}
-        <Link to={`/contradictions/workspace?claimId=${item.id}&statementId=${item.statementId}`}>Contradictions Workspace</Link>
-      </nav>
-
-      <h1 style={{ marginTop: 0 }}>Claim</h1>
-
-      <div style={cardStyle}>
-        <Row label="Id" value={item.id} />
-        <Row label="Statement Id" value={item.statementId} />
-        <Row label="Topic" value={item.topic} />
-        <Row label="Normalized Text" value={item.normalizedText} />
-        <Row label="Type" value={item.type} />
-        <Row label="Status" value={item.status} />
-        <Row label="Material" value={item.isMaterial ? "Yes" : "No"} />
-        <Row label="Person Id" value={item.personId ?? "N/A"} />
-        <Row label="Case Id" value={item.caseId ?? "N/A"} />
-        <Row label="Created" value={new Date(item.createdAtUtc).toLocaleString()} />
+    <AppSurface
+      title="Claim Detail"
+      subtitle="Detailed view of a single claim record."
+    >
+      <div className="action-row">
+        <Link to="/claims"><button>Back to Claims</button></Link>
       </div>
 
-      <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
-        <Link to={`/statements/${item.statementId}`} style={actionLinkStyle}>Open Statement</Link>
-        <Link to={`/claims?statementId=${item.statementId}`} style={actionLinkStyle}>More Claims for Statement</Link>
-        <Link to={`/contradictions/workspace?claimId=${item.id}&statementId=${item.statementId}`} style={actionLinkStyle}>Open Contradictions Workspace</Link>
-      </div>
-    </div>
+      {error ? <div className="notice-card notice-danger">{error}</div> : null}
+      {loading ? <div className="notice-card">Loading claim...</div> : null}
+
+      {!loading && item ? (
+        <section className="panel">
+          <div className="panel-header">
+            <h2 className="panel-title">{item.topic}</h2>
+            <span className="tag">{item.status}</span>
+          </div>
+
+          <div className="kv-grid">
+            <div className="kv-row"><div className="kv-label">Id</div><div className="kv-value">{item.id}</div></div>
+            <div className="kv-row"><div className="kv-label">Topic</div><div className="kv-value">{item.topic}</div></div>
+            <div className="kv-row"><div className="kv-label">Type</div><div className="kv-value">{item.type}</div></div>
+            <div className="kv-row"><div className="kv-label">Status</div><div className="kv-value">{item.status}</div></div>
+            <div className="kv-row"><div className="kv-label">Statement Id</div><div className="kv-value">{item.statementId}</div></div>
+            <div className="kv-row"><div className="kv-label">Case Id</div><div className="kv-value">{item.caseId ?? "N/A"}</div></div>
+            <div className="kv-row"><div className="kv-label">Person Id</div><div className="kv-value">{item.personId ?? "N/A"}</div></div>
+          </div>
+        </section>
+      ) : null}
+    </AppSurface>
   );
 }
-
-function Row({ label, value }: { label: string; value: string }) {
-  return (
-    <div style={{ display: "grid", gridTemplateColumns: "180px 1fr", gap: "12px", padding: "6px 0" }}>
-      <strong>{label}</strong>
-      <span>{value}</span>
-    </div>
-  );
-}
-
-const cardStyle: React.CSSProperties = {
-  border: "1px solid #ddd",
-  borderRadius: "12px",
-  padding: "16px",
-  marginBottom: "16px",
-};
-
-const actionLinkStyle: React.CSSProperties = {
-  padding: "10px 16px",
-  borderRadius: "8px",
-  border: "1px solid #1976d2",
-  textDecoration: "none",
-  color: "inherit",
-};

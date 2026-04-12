@@ -1,53 +1,70 @@
-﻿import { getHealth, getDatabaseHealth } from "./health";
-import { getCases, type CasesResponse } from "./cases";
-import { getReviews, type ReviewsResponse } from "./reviews";
-import { apiGet } from "./client";
+import { getCases } from "./cases";
+import { getClaims } from "./claims";
+import { getContradictions } from "./contradictions";
+import { getWorkflowAuditEntries } from "./workflowAudit";
+import { getScenarioSnapshot } from "./persistence";
+import type {
+  CaseItem,
+  ClaimItem,
+  ContradictionItem,
+  PagedResponse,
+  WorkflowAuditEntry,
+  ScenarioSnapshotResponse,
+} from "./contracts";
 
-export type AgentRunsListItem = {
-  id: string;
-  caseId: string | null;
-  agentName: string;
-  agentType: string;
-  status: string;
-  startedAtUtc: string;
-  completedAtUtc: string | null;
-  createdAtUtc: string;
-};
-
-export type AgentRunsResponse = {
-  items: AgentRunsListItem[];
-  page: number;
-  pageSize: number;
-  totalCount: number;
-  totalPages: number;
-};
+export type CasesResponse = PagedResponse<CaseItem>;
+export type ClaimsResponse = PagedResponse<ClaimItem>;
+export type ContradictionsResponse = PagedResponse<ContradictionItem>;
 
 export type DashboardData = {
-  health: unknown;
-  dbHealth: unknown;
   cases: CasesResponse;
-  reviews: ReviewsResponse;
-  agentRuns: AgentRunsResponse;
+  claims: ClaimsResponse;
+  contradictions: ContradictionsResponse;
+  audit: WorkflowAuditEntry[];
+  snapshot: ScenarioSnapshotResponse | null;
 };
 
-export async function getAgentRuns(): Promise<AgentRunsResponse> {
-  return apiGet<AgentRunsResponse>("/api/v1/agent-runs?page=1&pageSize=20");
+export async function getDashboardCases(page = 1, pageSize = 5): Promise<CasesResponse> {
+  return getCases(page, pageSize);
+}
+
+export async function getDashboardClaims(page = 1, pageSize = 5): Promise<ClaimsResponse> {
+  return getClaims(page, pageSize);
+}
+
+export async function getDashboardContradictions(page = 1, pageSize = 5): Promise<ContradictionsResponse> {
+  return getContradictions(page, pageSize);
+}
+
+function normalizeAuditItems(value: unknown): WorkflowAuditEntry[] {
+  if (Array.isArray(value)) {
+    return value as WorkflowAuditEntry[];
+  }
+
+  if (value && typeof value === "object") {
+    const record = value as Record<string, unknown>;
+    if (Array.isArray(record.items)) {
+      return record.items as WorkflowAuditEntry[];
+    }
+  }
+
+  return [];
 }
 
 export async function getDashboardData(): Promise<DashboardData> {
-  const [health, dbHealth, cases, reviews, agentRuns] = await Promise.all([
-    getHealth(),
-    getDatabaseHealth(),
-    getCases(),
-    getReviews(),
-    getAgentRuns(),
+  const [cases, claims, contradictions, auditResult, snapshot] = await Promise.all([
+    getDashboardCases(1, 5),
+    getDashboardClaims(1, 5),
+    getDashboardContradictions(1, 5),
+    getWorkflowAuditEntries(),
+    getScenarioSnapshot().catch(() => null),
   ]);
 
   return {
-    health,
-    dbHealth,
     cases,
-    reviews,
-    agentRuns,
+    claims,
+    contradictions,
+    audit: normalizeAuditItems(auditResult),
+    snapshot,
   };
 }

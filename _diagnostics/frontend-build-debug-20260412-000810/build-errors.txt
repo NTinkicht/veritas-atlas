@@ -1,0 +1,4 @@
+﻿Paste the exact output of:
+1. npm run build
+2. dotnet build (if relevant)
+3. Any browser console workflow errors

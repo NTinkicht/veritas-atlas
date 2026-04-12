@@ -1,28 +1,14 @@
-import { useWorkflowAuditEntries } from "../hooks/useWorkflowAudit";
+import { AppSurface } from "../components/AppSurface";
+import { useFrontendNav } from "../hooks/useFrontendNav";
 
 export function AuditPersistencePage() {
-  const query = useWorkflowAuditEntries();
-
-  if (query.isLoading) {
-    return <div style={{ fontFamily: "Arial, sans-serif", padding: 24 }}>Loading persisted audit...</div>;
-  }
-
-  if (query.isError) {
-    return <div style={{ fontFamily: "Arial, sans-serif", padding: 24, color: "crimson" }}>Failed to load persisted audit.</div>;
-  }
+  const links = useFrontendNav();
 
   return (
-    <div style={{ fontFamily: "Arial, sans-serif", padding: 24 }}>
-      <h1 style={{ marginTop: 0 }}>Audit Persistence</h1>
-      <div style={panelStyle}>
-        <p>Persisted entries: {query.data?.length ?? 0}</p>
-      </div>
-    </div>
+    <AppSurface
+      title="A ud it Pe rs is te nc e"
+      subtitle="Stable production shell."
+      links={links}
+    />
   );
 }
-
-const panelStyle: React.CSSProperties = {
-  border: "1px solid #ddd",
-  borderRadius: 14,
-  padding: 16,
-};

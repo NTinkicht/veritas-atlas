@@ -1,12 +1,14 @@
+import { AppSurface } from "../components/AppSurface";
+import { useFrontendNav } from "../hooks/useFrontendNav";
+
 export function AgentRunsMonitorPage() {
+  const links = useFrontendNav();
+
   return (
-    <div style={{ padding: 24 }}>
-      <h1>Agent Runs Monitor</h1>
-      <ul>
-        <li>Extraction Agent: running</li>
-        <li>Contradiction Agent: idle</li>
-        <li>Review Agent: pending</li>
-      </ul>
-    </div>
+    <AppSurface
+      title="A ge nt Ru ns Mo ni to r"
+      subtitle="Stable production shell."
+      links={links}
+    />
   );
 }

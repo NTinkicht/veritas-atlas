@@ -9,7 +9,7 @@ export function PublicationChecklistPanel({
       <ul style={{ marginBottom: 0 }}>
         {items.map((item) => (
           <li key={item.label}>
-            {item.done ? "âœ“" : "â€¢"} {item.label}
+            {item.done ? "Ã¢Å“â€œ" : "Ã¢â‚¬Â¢"} {item.label}
           </li>
         ))}
       </ul>

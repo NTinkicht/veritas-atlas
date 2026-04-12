@@ -1,15 +1,24 @@
-import type { ContradictionItem, GetContradictionsResponse } from "./contracts";
-import { apiGet } from "./http";
+import { apiGet, apiPost } from "./http";
+import type { ContradictionItem, PagedResponse } from "./contracts";
 
-export async function getContradictions(page = 1, pageSize = 20): Promise<GetContradictionsResponse> {
-  const params = new URLSearchParams({
-    page: String(page),
-    pageSize: String(pageSize),
-  });
+export type CreateContradictionRequest = {
+  caseId: string;
+  leftClaimId: string;
+  rightClaimId: string;
+  type: string;
+  severity: string;
+  summary: string;
+  rationale?: string;
+};
 
-  return apiGet<GetContradictionsResponse>(`/api/v1/contradictions?${params.toString()}`);
+export async function getContradictions(page = 1, pageSize = 20): Promise<PagedResponse<ContradictionItem>> {
+  return apiGet<PagedResponse<ContradictionItem>>(`/api/v1/contradictions?page=${page}&pageSize=${pageSize}`, false);
 }
 
 export async function getContradictionById(id: string): Promise<ContradictionItem> {
-  return apiGet<ContradictionItem>(`/api/v1/contradictions/${id}`);
+  return apiGet<ContradictionItem>(`/api/v1/contradictions/${id}`, false);
+}
+
+export async function createContradiction(request: CreateContradictionRequest): Promise<ContradictionItem> {
+  return apiPost<ContradictionItem>("/api/v1/contradictions", request, true);
 }

@@ -1,60 +1,103 @@
-import { ScenarioSnapshotPanel } from "../components/ScenarioSnapshotPanel";
-import { useResetScenarioState, useScenarioSnapshot } from "../hooks/usePersistence";
+import { useEffect, useState } from "react";
+import { getScenarioSnapshot, resetScenarioState } from "../api/persistence";
+import type { ScenarioSnapshotResponse } from "../api/contracts";
+import { AppSurface } from "../components/AppSurface";
+import { LoadingState } from "../components/LoadingState";
+import { ErrorState } from "../components/ErrorState";
+import { EmptyState } from "../components/EmptyState";
+import { ProtectedNotice } from "../components/ProtectedNotice";
 
 export function PersistenceConsolePage() {
-  const snapshotQuery = useScenarioSnapshot();
-  const resetMutation = useResetScenarioState();
+  const [snapshot, setSnapshot] = useState<ScenarioSnapshotResponse | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [authWarning, setAuthWarning] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
 
-  if (snapshotQuery.isLoading) {
-    return <div style={{ fontFamily: "Arial, sans-serif", padding: 24 }}>Loading persistence console...</div>;
+  async function load() {
+    setLoading(true);
+    setError(null);
+    setAuthWarning(null);
+
+    try {
+      const result = await getScenarioSnapshot();
+      setSnapshot(result);
+    } catch (err) {
+      const msg =
+        typeof err === "object" && err && "message" in err
+          ? String((err as { message?: unknown }).message ?? "Failed to load snapshot.")
+          : "Failed to load snapshot.";
+
+      if (msg.includes("401") || msg.toLowerCase().includes("unauthorized")) {
+        setAuthWarning("This page requires a fresh login.");
+      } else {
+        setError(msg);
+      }
+    } finally {
+      setLoading(false);
+    }
   }
 
-  if (snapshotQuery.isError || !snapshotQuery.data) {
-    return <div style={{ fontFamily: "Arial, sans-serif", padding: 24, color: "crimson" }}>Failed to load persistence console.</div>;
+  async function reset() {
+    setBusy(true);
+    setError(null);
+    setMessage(null);
+
+    try {
+      const result = await resetScenarioState();
+      setMessage(result.message);
+      await load();
+    } catch (err) {
+      const msg =
+        typeof err === "object" && err && "message" in err
+          ? String((err as { message?: unknown }).message ?? "Failed to reset snapshot.")
+          : "Failed to reset snapshot.";
+      setError(msg);
+    } finally {
+      setBusy(false);
+    }
   }
 
-  const error = (resetMutation.error as Error | null)?.message;
+  useEffect(() => {
+    void load();
+  }, []);
 
   return (
-    <div style={{ fontFamily: "Arial, sans-serif", padding: 24 }}>
-      <h1 style={{ marginTop: 0 }}>Persistence Console</h1>
-      <p style={{ color: "#555" }}>
-        Snapshot and reset surface for the persisted seeded lifecycle scenario.
-      </p>
-
-      <div style={{ display: "grid", gap: 16 }}>
-        <ScenarioSnapshotPanel snapshot={snapshotQuery.data} />
-
-        <div style={panelStyle}>
-          <button
-            onClick={() => resetMutation.mutate()}
-            disabled={resetMutation.isPending}
-            style={buttonStyle}
-          >
-            {resetMutation.isPending ? "Resetting..." : "Reset Scenario State"}
-          </button>
-
-          {resetMutation.data && <p style={{ margin: 0 }}>{resetMutation.data.message}</p>}
-          {error && <p style={{ margin: 0, color: "crimson" }}>{error}</p>}
-        </div>
+    <AppSurface
+      title="Persistence Console"
+      subtitle="Control and inspect the active seeded lifecycle snapshot."
+    >
+      <div className="action-row">
+        <button onClick={() => void load()} disabled={loading || busy}>Refresh</button>
+        <button onClick={() => void reset()} disabled={busy}>{busy ? "Resetting..." : "Reset Snapshot"}</button>
       </div>
-    </div>
+
+      {error ? <ErrorState message={error} /> : null}
+      {authWarning ? <ProtectedNotice message={authWarning} /> : null}
+      {message ? <div className="notice-card notice-success">{message}</div> : null}
+
+      <section className="panel">
+        <div className="panel-header">
+          <h2 className="panel-title">Active Snapshot</h2>
+        </div>
+
+        {loading ? (
+          <LoadingState message="Loading snapshot..." />
+        ) : snapshot?.exists ? (
+          <div className="kv-grid">
+            <div className="kv-row"><div className="kv-label">Case</div><div className="kv-value">{snapshot.caseId}</div></div>
+            <div className="kv-row"><div className="kv-label">Claim A</div><div className="kv-value">{snapshot.claimAId}</div></div>
+            <div className="kv-row"><div className="kv-label">Claim B</div><div className="kv-value">{snapshot.claimBId}</div></div>
+            <div className="kv-row"><div className="kv-label">Contradiction</div><div className="kv-value">{snapshot.contradictionId}</div></div>
+            <div className="kv-row"><div className="kv-label">Case Status</div><div className="kv-value">{snapshot.caseStatus ?? "N/A"}</div></div>
+            <div className="kv-row"><div className="kv-label">Contradiction Status</div><div className="kv-value">{snapshot.contradictionStatus ?? "N/A"}</div></div>
+            <div className="kv-row"><div className="kv-label">Created</div><div className="kv-value">{snapshot.createdAtUtc ? new Date(snapshot.createdAtUtc).toLocaleString() : "N/A"}</div></div>
+          </div>
+        ) : (
+          <EmptyState message="No active snapshot." />
+        )}
+      </section>
+    </AppSurface>
   );
 }
-
-const panelStyle: React.CSSProperties = {
-  border: "1px solid #ddd",
-  borderRadius: 14,
-  padding: 16,
-  display: "grid",
-  gap: 12,
-};
-
-const buttonStyle: React.CSSProperties = {
-  border: "1px solid #bbb",
-  borderRadius: 10,
-  padding: "10px 14px",
-  background: "white",
-  cursor: "pointer",
-  font: "inherit",
-};

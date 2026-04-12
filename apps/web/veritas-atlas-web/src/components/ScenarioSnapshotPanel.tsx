@@ -1,4 +1,4 @@
-import type { ScenarioSnapshotResponse } from "../api/persistence";
+import type { ScenarioSnapshotResponse } from "../api/contracts";
 
 export function ScenarioSnapshotPanel({
   snapshot,

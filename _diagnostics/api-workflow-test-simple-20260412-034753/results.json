@@ -1,0 +1,445 @@
+[
+  {
+    "Name": "Login",
+    "Status": "PASS",
+    "Method": "POST",
+    "Url": "http://localhost:5091/api/v1/auth/login",
+    "HttpStatus": 200,
+    "Note": "",
+    "Body": {
+      "tokenPreview": "eyJhbGciOiJIUzI1NiIsInR5..."
+    },
+    "TimeUtc": "2026-04-11T23:47:54.0310840Z"
+  },
+  {
+    "Name": "Auth Me",
+    "Status": "PASS",
+    "Method": "GET",
+    "Url": "http://localhost:5091/api/v1/auth/me",
+    "HttpStatus": 200,
+    "Note": "",
+    "Body": {
+      "user": "admin1",
+      "role": "admin",
+      "isAuthenticated": true,
+      "claims": [
+        {
+          "type": "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name",
+          "value": "admin1"
+        },
+        {
+          "type": "http://schemas.microsoft.com/ws/2008/06/identity/claims/role",
+          "value": "admin"
+        },
+        {
+          "type": "preferred_username",
+          "value": "admin1"
+        },
+        {
+          "type": "http://schemas.microsoft.com/ws/2008/06/identity/claims/role",
+          "value": "admin"
+        },
+        {
+          "type": "exp",
+          "value": "1775980073"
+        },
+        {
+          "type": "iss",
+          "value": "VeritasAtlas"
+        },
+        {
+          "type": "aud",
+          "value": "VeritasAtlasUsers"
+        }
+      ]
+    },
+    "TimeUtc": "2026-04-11T23:47:54.0442669Z"
+  },
+  {
+    "Name": "Clear Workflow Audit",
+    "Status": "PASS",
+    "Method": "POST",
+    "Url": "http://localhost:5091/api/v1/workflow-audit/clear",
+    "HttpStatus": 200,
+    "Note": "",
+    "Body": {
+      "cleared": true,
+      "timestampUtc": "2026-04-11T23:47:54.053219Z"
+    },
+    "TimeUtc": "2026-04-11T23:47:54.0558030Z"
+  },
+  {
+    "Name": "Reset Persistence Snapshot",
+    "Status": "PASS",
+    "Method": "POST",
+    "Url": "http://localhost:5091/api/v1/persistence/reset",
+    "HttpStatus": 200,
+    "Note": "",
+    "Body": {
+      "success": true,
+      "message": "Scenario snapshot and workflow audit have been cleared.",
+      "timestampUtc": "2026-04-11T23:47:54.0597721Z"
+    },
+    "TimeUtc": "2026-04-11T23:47:54.0613127Z"
+  },
+  {
+    "Name": "Seed Lifecycle",
+    "Status": "PASS",
+    "Method": "POST",
+    "Url": "http://localhost:5091/api/v1/actions/seed/lifecycle",
+    "HttpStatus": 200,
+    "Note": "",
+    "Body": {
+      "caseId": "974a698e-f955-42c1-ba1f-12891a6a50b2",
+      "primaryClaimId": "0fc68ef5-e870-42a5-8939-00a8e941070c",
+      "secondaryClaimId": "4041096d-a1fa-48d4-a2bc-c681684d1517",
+      "contradictionId": "652e6b6b-a141-4262-a2a7-aaafc6724a13",
+      "caseStatus": "Open",
+      "contradictionStatus": "Draft",
+      "timestampUtc": "2026-04-11T23:47:54.160084Z"
+    },
+    "TimeUtc": "2026-04-11T23:47:54.1616061Z"
+  },
+  {
+    "Name": "Read Workflow Audit",
+    "Status": "PASS",
+    "Method": "GET",
+    "Url": "http://localhost:5091/api/v1/workflow-audit/entries",
+    "HttpStatus": 200,
+    "Note": "",
+    "Body": [
+      {
+        "id": "49d9064d-ee06-4383-b4e3-4d8b7736c70d",
+        "entityType": "Seed",
+        "entityId": "974a698e-f955-42c1-ba1f-12891a6a50b2",
+        "actionName": "SeedLifecycle",
+        "previousStatus": null,
+        "nextStatus": "Open",
+        "role": "admin",
+        "success": true,
+        "message": "Seeded lifecycle scenario.",
+        "timestampUtc": "2026-04-11T23:47:54.1586544Z"
+      }
+    ],
+    "TimeUtc": "2026-04-11T23:47:54.1714327Z"
+  },
+  {
+    "Name": "Read Persistence Snapshot",
+    "Status": "PASS",
+    "Method": "GET",
+    "Url": "http://localhost:5091/api/v1/persistence/snapshot",
+    "HttpStatus": 200,
+    "Note": "",
+    "Body": {
+      "exists": true,
+      "caseId": "974a698e-f955-42c1-ba1f-12891a6a50b2",
+      "claimAId": "0fc68ef5-e870-42a5-8939-00a8e941070c",
+      "claimBId": "4041096d-a1fa-48d4-a2bc-c681684d1517",
+      "contradictionId": "652e6b6b-a141-4262-a2a7-aaafc6724a13",
+      "createdAtUtc": "2026-04-11T23:47:54.1580261Z",
+      "caseStatus": "Open",
+      "contradictionStatus": "Draft",
+      "timestampUtc": "2026-04-11T23:47:54.1742818Z"
+    },
+    "TimeUtc": "2026-04-11T23:47:54.1755584Z"
+  },
+  {
+    "Name": "Submit Case",
+    "Status": "PASS",
+    "Method": "POST",
+    "Url": "http://localhost:5091/api/v1/actions/cases/974a698e-f955-42c1-ba1f-12891a6a50b2/submit",
+    "HttpStatus": 200,
+    "Note": "",
+    "Body": {
+      "id": "974a698e-f955-42c1-ba1f-12891a6a50b2",
+      "status": "InReview",
+      "message": "Case submitted successfully."
+    },
+    "TimeUtc": "2026-04-11T23:47:54.1869686Z"
+  },
+  {
+    "Name": "Read Workflow Audit",
+    "Status": "PASS",
+    "Method": "GET",
+    "Url": "http://localhost:5091/api/v1/workflow-audit/entries",
+    "HttpStatus": 200,
+    "Note": "",
+    "Body": [
+      {
+        "id": "49d9064d-ee06-4383-b4e3-4d8b7736c70d",
+        "entityType": "Seed",
+        "entityId": "974a698e-f955-42c1-ba1f-12891a6a50b2",
+        "actionName": "SeedLifecycle",
+        "previousStatus": null,
+        "nextStatus": "Open",
+        "role": "admin",
+        "success": true,
+        "message": "Seeded lifecycle scenario.",
+        "timestampUtc": "2026-04-11T23:47:54.1586544Z"
+      }
+    ],
+    "TimeUtc": "2026-04-11T23:47:54.1905032Z"
+  },
+  {
+    "Name": "Read Persistence Snapshot",
+    "Status": "PASS",
+    "Method": "GET",
+    "Url": "http://localhost:5091/api/v1/persistence/snapshot",
+    "HttpStatus": 200,
+    "Note": "",
+    "Body": {
+      "exists": true,
+      "caseId": "974a698e-f955-42c1-ba1f-12891a6a50b2",
+      "claimAId": "0fc68ef5-e870-42a5-8939-00a8e941070c",
+      "claimBId": "4041096d-a1fa-48d4-a2bc-c681684d1517",
+      "contradictionId": "652e6b6b-a141-4262-a2a7-aaafc6724a13",
+      "createdAtUtc": "2026-04-11T23:47:54.1580261Z",
+      "caseStatus": "Open",
+      "contradictionStatus": "Draft",
+      "timestampUtc": "2026-04-11T23:47:54.1929011Z"
+    },
+    "TimeUtc": "2026-04-11T23:47:54.1941300Z"
+  },
+  {
+    "Name": "Approve Case",
+    "Status": "PASS",
+    "Method": "POST",
+    "Url": "http://localhost:5091/api/v1/actions/cases/974a698e-f955-42c1-ba1f-12891a6a50b2/approve",
+    "HttpStatus": 200,
+    "Note": "",
+    "Body": {
+      "id": "974a698e-f955-42c1-ba1f-12891a6a50b2",
+      "status": "Approved",
+      "message": "Case approved successfully."
+    },
+    "TimeUtc": "2026-04-11T23:47:54.2074231Z"
+  },
+  {
+    "Name": "Read Workflow Audit",
+    "Status": "PASS",
+    "Method": "GET",
+    "Url": "http://localhost:5091/api/v1/workflow-audit/entries",
+    "HttpStatus": 200,
+    "Note": "",
+    "Body": [
+      {
+        "id": "49d9064d-ee06-4383-b4e3-4d8b7736c70d",
+        "entityType": "Seed",
+        "entityId": "974a698e-f955-42c1-ba1f-12891a6a50b2",
+        "actionName": "SeedLifecycle",
+        "previousStatus": null,
+        "nextStatus": "Open",
+        "role": "admin",
+        "success": true,
+        "message": "Seeded lifecycle scenario.",
+        "timestampUtc": "2026-04-11T23:47:54.1586544Z"
+      }
+    ],
+    "TimeUtc": "2026-04-11T23:47:54.2113271Z"
+  },
+  {
+    "Name": "Read Persistence Snapshot",
+    "Status": "PASS",
+    "Method": "GET",
+    "Url": "http://localhost:5091/api/v1/persistence/snapshot",
+    "HttpStatus": 200,
+    "Note": "",
+    "Body": {
+      "exists": true,
+      "caseId": "974a698e-f955-42c1-ba1f-12891a6a50b2",
+      "claimAId": "0fc68ef5-e870-42a5-8939-00a8e941070c",
+      "claimBId": "4041096d-a1fa-48d4-a2bc-c681684d1517",
+      "contradictionId": "652e6b6b-a141-4262-a2a7-aaafc6724a13",
+      "createdAtUtc": "2026-04-11T23:47:54.1580261Z",
+      "caseStatus": "Open",
+      "contradictionStatus": "Draft",
+      "timestampUtc": "2026-04-11T23:47:54.2140677Z"
+    },
+    "TimeUtc": "2026-04-11T23:47:54.2155458Z"
+  },
+  {
+    "Name": "Prepare Publication",
+    "Status": "PASS",
+    "Method": "POST",
+    "Url": "http://localhost:5091/api/v1/actions/cases/974a698e-f955-42c1-ba1f-12891a6a50b2/prepare",
+    "HttpStatus": 200,
+    "Note": "",
+    "Body": {
+      "id": "974a698e-f955-42c1-ba1f-12891a6a50b2",
+      "status": "Approved",
+      "message": "Case prepared for publication successfully."
+    },
+    "TimeUtc": "2026-04-11T23:47:54.2209704Z"
+  },
+  {
+    "Name": "Read Workflow Audit",
+    "Status": "PASS",
+    "Method": "GET",
+    "Url": "http://localhost:5091/api/v1/workflow-audit/entries",
+    "HttpStatus": 200,
+    "Note": "",
+    "Body": [
+      {
+        "id": "49d9064d-ee06-4383-b4e3-4d8b7736c70d",
+        "entityType": "Seed",
+        "entityId": "974a698e-f955-42c1-ba1f-12891a6a50b2",
+        "actionName": "SeedLifecycle",
+        "previousStatus": null,
+        "nextStatus": "Open",
+        "role": "admin",
+        "success": true,
+        "message": "Seeded lifecycle scenario.",
+        "timestampUtc": "2026-04-11T23:47:54.1586544Z"
+      }
+    ],
+    "TimeUtc": "2026-04-11T23:47:54.2248050Z"
+  },
+  {
+    "Name": "Read Persistence Snapshot",
+    "Status": "PASS",
+    "Method": "GET",
+    "Url": "http://localhost:5091/api/v1/persistence/snapshot",
+    "HttpStatus": 200,
+    "Note": "",
+    "Body": {
+      "exists": true,
+      "caseId": "974a698e-f955-42c1-ba1f-12891a6a50b2",
+      "claimAId": "0fc68ef5-e870-42a5-8939-00a8e941070c",
+      "claimBId": "4041096d-a1fa-48d4-a2bc-c681684d1517",
+      "contradictionId": "652e6b6b-a141-4262-a2a7-aaafc6724a13",
+      "createdAtUtc": "2026-04-11T23:47:54.1580261Z",
+      "caseStatus": "Open",
+      "contradictionStatus": "Draft",
+      "timestampUtc": "2026-04-11T23:47:54.2274068Z"
+    },
+    "TimeUtc": "2026-04-11T23:47:54.2289807Z"
+  },
+  {
+    "Name": "Publish Case",
+    "Status": "PASS",
+    "Method": "POST",
+    "Url": "http://localhost:5091/api/v1/actions/cases/974a698e-f955-42c1-ba1f-12891a6a50b2/publish",
+    "HttpStatus": 200,
+    "Note": "",
+    "Body": {
+      "id": "974a698e-f955-42c1-ba1f-12891a6a50b2",
+      "status": "Published",
+      "message": "Case published successfully."
+    },
+    "TimeUtc": "2026-04-11T23:47:54.2432078Z"
+  },
+  {
+    "Name": "Read Workflow Audit",
+    "Status": "PASS",
+    "Method": "GET",
+    "Url": "http://localhost:5091/api/v1/workflow-audit/entries",
+    "HttpStatus": 200,
+    "Note": "",
+    "Body": [
+      {
+        "id": "49d9064d-ee06-4383-b4e3-4d8b7736c70d",
+        "entityType": "Seed",
+        "entityId": "974a698e-f955-42c1-ba1f-12891a6a50b2",
+        "actionName": "SeedLifecycle",
+        "previousStatus": null,
+        "nextStatus": "Open",
+        "role": "admin",
+        "success": true,
+        "message": "Seeded lifecycle scenario.",
+        "timestampUtc": "2026-04-11T23:47:54.1586544Z"
+      }
+    ],
+    "TimeUtc": "2026-04-11T23:47:54.2477782Z"
+  },
+  {
+    "Name": "Read Persistence Snapshot",
+    "Status": "PASS",
+    "Method": "GET",
+    "Url": "http://localhost:5091/api/v1/persistence/snapshot",
+    "HttpStatus": 200,
+    "Note": "",
+    "Body": {
+      "exists": true,
+      "caseId": "974a698e-f955-42c1-ba1f-12891a6a50b2",
+      "claimAId": "0fc68ef5-e870-42a5-8939-00a8e941070c",
+      "claimBId": "4041096d-a1fa-48d4-a2bc-c681684d1517",
+      "contradictionId": "652e6b6b-a141-4262-a2a7-aaafc6724a13",
+      "createdAtUtc": "2026-04-11T23:47:54.1580261Z",
+      "caseStatus": "Open",
+      "contradictionStatus": "Draft",
+      "timestampUtc": "2026-04-11T23:47:54.2503906Z"
+    },
+    "TimeUtc": "2026-04-11T23:47:54.2515463Z"
+  },
+  {
+    "Name": "Resolve Contradiction",
+    "Status": "PASS",
+    "Method": "POST",
+    "Url": "http://localhost:5091/api/v1/actions/contradictions/652e6b6b-a141-4262-a2a7-aaafc6724a13/resolve",
+    "HttpStatus": 200,
+    "Note": "",
+    "Body": {
+      "entityType": "Contradiction",
+      "entityId": "652e6b6b-a141-4262-a2a7-aaafc6724a13",
+      "status": "Resolved",
+      "timestampUtc": "2026-04-11T23:47:54.2622234Z",
+      "message": "Contradiction resolved."
+    },
+    "TimeUtc": "2026-04-11T23:47:54.2636976Z"
+  },
+  {
+    "Name": "Read Workflow Audit",
+    "Status": "PASS",
+    "Method": "GET",
+    "Url": "http://localhost:5091/api/v1/workflow-audit/entries",
+    "HttpStatus": 200,
+    "Note": "",
+    "Body": [
+      {
+        "id": "b4e2956f-8cfc-4b4e-8bd0-646e073907b9",
+        "entityType": "Contradiction",
+        "entityId": "652e6b6b-a141-4262-a2a7-aaafc6724a13",
+        "actionName": "ResolveContradiction",
+        "previousStatus": "Draft",
+        "nextStatus": "Resolved",
+        "role": "admin",
+        "success": true,
+        "message": "Transition succeeded.",
+        "timestampUtc": "2026-04-11T23:47:54.2614226Z"
+      },
+      {
+        "id": "49d9064d-ee06-4383-b4e3-4d8b7736c70d",
+        "entityType": "Seed",
+        "entityId": "974a698e-f955-42c1-ba1f-12891a6a50b2",
+        "actionName": "SeedLifecycle",
+        "previousStatus": null,
+        "nextStatus": "Open",
+        "role": "admin",
+        "success": true,
+        "message": "Seeded lifecycle scenario.",
+        "timestampUtc": "2026-04-11T23:47:54.1586544Z"
+      }
+    ],
+    "TimeUtc": "2026-04-11T23:47:54.2733140Z"
+  },
+  {
+    "Name": "Read Persistence Snapshot",
+    "Status": "PASS",
+    "Method": "GET",
+    "Url": "http://localhost:5091/api/v1/persistence/snapshot",
+    "HttpStatus": 200,
+    "Note": "",
+    "Body": {
+      "exists": true,
+      "caseId": "974a698e-f955-42c1-ba1f-12891a6a50b2",
+      "claimAId": "0fc68ef5-e870-42a5-8939-00a8e941070c",
+      "claimBId": "4041096d-a1fa-48d4-a2bc-c681684d1517",
+      "contradictionId": "652e6b6b-a141-4262-a2a7-aaafc6724a13",
+      "createdAtUtc": "2026-04-11T23:47:54.1580261Z",
+      "caseStatus": "Published",
+      "contradictionStatus": "Resolved",
+      "timestampUtc": "2026-04-11T23:47:54.2756469Z"
+    },
+    "TimeUtc": "2026-04-11T23:47:54.2766148Z"
+  }
+]
