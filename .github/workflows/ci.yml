@@ -10,6 +10,13 @@ permissions:
   contents: read
 
 jobs:
+  runner-smoke:
+    name: Runner availability diagnostic
+    runs-on: ubuntu-latest
+    steps:
+      - name: Confirm GitHub-hosted runner
+        run: echo "github-hosted-runner-ready"
+
   backend:
     name: Backend build and tests
     runs-on: ubuntu-latest
