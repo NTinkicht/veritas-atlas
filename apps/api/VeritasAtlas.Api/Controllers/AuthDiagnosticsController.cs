@@ -10,19 +10,27 @@ public class AuthDiagnosticsController : ControllerBase
 {
     private readonly AuthRequestContext _authRequestContext;
     private readonly IConfiguration _configuration;
+    private readonly IHostEnvironment _environment;
 
     public AuthDiagnosticsController(
         AuthRequestContext authRequestContext,
-        IConfiguration configuration)
+        IConfiguration configuration,
+        IHostEnvironment environment)
     {
         _authRequestContext = authRequestContext;
         _configuration = configuration;
+        _environment = environment;
     }
 
     [HttpGet("public")]
     [AllowAnonymous]
     public IActionResult Public()
     {
+        if (!_environment.IsDevelopment())
+        {
+            return NotFound();
+        }
+
         return Ok(new
         {
             Mode = "public",
@@ -36,6 +44,11 @@ public class AuthDiagnosticsController : ControllerBase
     [Authorize]
     public IActionResult Protected()
     {
+        if (!_environment.IsDevelopment())
+        {
+            return NotFound();
+        }
+
         return Ok(new
         {
             Mode = "protected",
