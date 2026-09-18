@@ -8,18 +8,28 @@ namespace VeritasAtlas.Api.Infrastructure.Auth;
 public sealed class JwtTokenService
 {
     private readonly IConfiguration _configuration;
+    private readonly IHostEnvironment _environment;
 
-    public JwtTokenService(IConfiguration configuration)
+    public JwtTokenService(
+        IConfiguration configuration,
+        IHostEnvironment environment)
     {
         _configuration = configuration;
+        _environment = environment;
     }
 
     public (string Token, DateTime ExpiresAtUtc) CreateToken(string username, string role)
     {
-        var secret = _configuration["Auth:Jwt:Secret"] ?? "veritas-atlas-dev-secret-key-change-in-production-123456";
+        var secret = RuntimeSecurity.ResolveJwtSecret(
+            _configuration,
+            _environment.EnvironmentName);
         var issuer = _configuration["Auth:Jwt:Issuer"] ?? "VeritasAtlas";
         var audience = _configuration["Auth:Jwt:Audience"] ?? "VeritasAtlasUsers";
-        var expiresMinutes = int.TryParse(_configuration["Auth:Jwt:ExpiresMinutes"], out var parsedMinutes) ? parsedMinutes : 480;
+        var expiresMinutes = int.TryParse(
+            _configuration["Auth:Jwt:ExpiresMinutes"],
+            out var parsedMinutes)
+            ? parsedMinutes
+            : 480;
 
         var expiresAtUtc = DateTime.UtcNow.AddMinutes(expiresMinutes);
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secret));
