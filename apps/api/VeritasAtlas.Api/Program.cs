@@ -8,31 +8,35 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllers();
 builder.Services.AddHttpContextAccessor();
+builder.Services.AddHealthChecks();
 
 builder.Services.AddSingleton<DevUserStore>();
 builder.Services.AddSingleton<JwtTokenService>();
 builder.Services.AddScoped<AuthRequestContext>();
 
+var corsOrigins = RuntimeSecurity.ResolveCorsOrigins(
+    builder.Configuration,
+    builder.Environment.EnvironmentName);
+
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy("FrontendDev", policy =>
+    options.AddPolicy("Frontend", policy =>
     {
-        policy
-            .WithOrigins(
-                "http://localhost:5173",
-                "https://localhost:5173",
-                "http://127.0.0.1:5173",
-                "https://127.0.0.1:5173")
-            .AllowAnyHeader()
-            .AllowAnyMethod();
+        if (corsOrigins.Length > 0)
+        {
+            policy
+                .WithOrigins(corsOrigins)
+                .AllowAnyHeader()
+                .AllowAnyMethod();
+        }
     });
 });
 
 builder.Services.AddVeritasAtlasInfrastructure(builder.Configuration);
 
-var jwtSecret =
-    builder.Configuration["Auth:Jwt:Secret"]
-    ?? "veritas-atlas-dev-secret-key-change-in-production-123456";
+var jwtSecret = RuntimeSecurity.ResolveJwtSecret(
+    builder.Configuration,
+    builder.Environment.EnvironmentName);
 
 var jwtIssuer =
     builder.Configuration["Auth:Jwt:Issuer"]
@@ -48,7 +52,7 @@ builder.Services
     .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
-        options.RequireHttpsMetadata = false;
+        options.RequireHttpsMetadata = !builder.Environment.IsDevelopment();
         options.SaveToken = true;
         options.MapInboundClaims = true;
 
@@ -69,11 +73,13 @@ builder.Services.AddAuthorization();
 
 var app = builder.Build();
 
-app.UseCors("FrontendDev");
+app.UseCors("Frontend");
 
 app.UseAuthentication();
 app.UseAuthorization();
 
+app.MapHealthChecks("/health");
+app.MapHealthChecks("/health/live");
 app.MapControllers();
 
 app.Run();

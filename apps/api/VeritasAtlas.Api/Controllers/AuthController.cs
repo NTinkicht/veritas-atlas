@@ -12,21 +12,29 @@ public class AuthController : ControllerBase
     private readonly DevUserStore _devUserStore;
     private readonly JwtTokenService _jwtTokenService;
     private readonly AuthRequestContext _authRequestContext;
+    private readonly IHostEnvironment _environment;
 
     public AuthController(
         DevUserStore devUserStore,
         JwtTokenService jwtTokenService,
-        AuthRequestContext authRequestContext)
+        AuthRequestContext authRequestContext,
+        IHostEnvironment environment)
     {
         _devUserStore = devUserStore;
         _jwtTokenService = jwtTokenService;
         _authRequestContext = authRequestContext;
+        _environment = environment;
     }
 
     [HttpPost("login")]
     [AllowAnonymous]
     public ActionResult<LoginResponse> Login([FromBody] LoginRequest request)
     {
+        if (!_environment.IsDevelopment())
+        {
+            return NotFound();
+        }
+
         var user = _devUserStore.Validate(request.Username, request.Password);
         if (user is null)
         {

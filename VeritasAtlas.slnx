@@ -6,4 +6,7 @@
     <Project Path="apps/api/VeritasAtlas.Domain/VeritasAtlas.Domain.csproj" />
     <Project Path="apps/api/VeritasAtlas.Infrastructure/VeritasAtlas.Infrastructure.csproj" />
   </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/VeritasAtlas.Api.Tests/VeritasAtlas.Api.Tests.csproj" />
+  </Folder>
 </Solution>
