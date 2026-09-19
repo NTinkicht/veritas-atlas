@@ -111,6 +111,17 @@ not that the full EF schema, bootstrap authentication, or user-facing CRUD
 works. Verify those separately with a protected operator-only test and
 redact all credentials/tokens from any evidence.
 
+After that approved API release is live, the operator can run GitHub Actions
+**Veritas Staging Post-Deploy Smoke** (`workflow_dispatch` on trusted main).
+It calls the existing credential-free HTTP smoke script with
+`--require-db-readiness` and fails if the live API's `/health/ready` is not
+HTTP 200. It still cannot verify privileged login or database-backed business
+reads. Until the endpoint has been released, the ordinary PR smoke keeps
+testing the currently deployed liveness/auth boundary, without expecting the
+not-yet-deployed readiness endpoint. The post-deploy workflow uses a standard
+public runner and read-only permissions; it never accesses GitHub/Render/Neon
+secrets or starts a deploy.
+
 Do not flip H7/H8 or authorize autonomous deploy because this code merges.
 
 ## Staging initialization evidence — 19 September 2026
