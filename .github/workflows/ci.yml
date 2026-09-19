@@ -117,3 +117,22 @@ jobs:
           path: staging-ef-migration.sql
           if-no-files-found: error
           retention-days: 3
+
+  staging-http-smoke:
+    name: Staging HTTP smoke (unauthenticated)
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Setup Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Probe live staging without credentials
+        run: python tests/smoke/staging_http_smoke.py
