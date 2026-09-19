@@ -96,6 +96,8 @@ jobs:
           dotnet-version: 10.0.x
       - name: Install matching EF Core tools
         run: dotnet tool install --global dotnet-ef --version 10.0.5
+      - name: Restore NuGet packages
+        run: dotnet restore VeritasAtlas.slnx
       - name: Generate SQL without connecting to a database
         working-directory: apps/api/VeritasAtlas.Infrastructure
         run: |
