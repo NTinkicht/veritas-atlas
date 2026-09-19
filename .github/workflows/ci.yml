@@ -35,8 +35,8 @@ jobs:
         run: |
           set -o pipefail
           dotnet list VeritasAtlas.slnx package --vulnerable --include-transitive 2>&1 | tee nuget-vulnerability-audit.txt
-          if grep -Eiq 'has the following vulnerable packages|> (Critical|High|Moderate|Low)' nuget-vulnerability-audit.txt; then
-            echo "Vulnerable NuGet dependency detected" >&2
+          if grep -Eiq 'NU1900|has the following vulnerable packages|> (Critical|High|Moderate|Low)' nuget-vulnerability-audit.txt; then
+            echo "NuGet vulnerability audit failed or reported a vulnerable dependency" >&2
             exit 1
           fi
       - name: Build
