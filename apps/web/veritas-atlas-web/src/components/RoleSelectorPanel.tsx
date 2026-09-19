@@ -1,14 +1,10 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { getWorkflowRole, setWorkflowRole } from "../api/workflowRoleContext";
 
 const roles = ["operator", "reviewer", "publisher", "admin"];
 
 export function RoleSelectorPanel() {
-  const [role, setRole] = useState("operator");
-
-  useEffect(() => {
-    setRole(getWorkflowRole());
-  }, []);
+  const [role, setRole] = useState(getWorkflowRole);
 
   const onRoleChange = (value: string) => {
     setRole(value);
