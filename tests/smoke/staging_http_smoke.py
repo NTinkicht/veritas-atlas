@@ -85,7 +85,7 @@ def main() -> None:
             "Access-Control-Request-Headers": "content-type",
         },
     )
-    allow_origin = cors.get("Access-Control-Allow-Origin")
+    allow_origin = next(\n        (value for key, value in cors.items()\n         if key.lower() == "access-control-allow-origin"),\n        None,\n    )
     if allow_origin != WEB:
         raise AssertionError("frontend CORS origin not allowed")
     print("PASS frontend CORS origin allowed")
