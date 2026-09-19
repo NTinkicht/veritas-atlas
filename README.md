@@ -36,11 +36,12 @@ Cross-origin access outside Development is denied unless
 
 The API exposes:
 
-- `/health`
-- `/health/live`
+- `/health` — process liveness (backward compatible).
+- `/health/live` — process liveness; remains the Render restart probe.
+- `/health/ready` — PostgreSQL connectivity readiness, HTTP 503 on failure.
 
-These endpoints are intended for repository/runtime readiness checks and do not
-grant deployment or publication authority.
+Readiness is not proof of a fully migrated schema or authenticated user flow.
+These endpoints do not grant deployment or publication authority.
 
 ## Governed staging deployment
 

@@ -6,6 +6,7 @@ and `/health/live` are liveness checks, NOT proof of database connectivity.
 """
 from __future__ import annotations
 
+import argparse
 import json
 import time
 import urllib.error
@@ -54,9 +55,13 @@ def assert_status(label: str, url: str, expected: int, **kwargs: object) -> dict
     return headers
 
 
-def main() -> None:
+def main(*, require_db_readiness: bool = False) -> None:
     wait_200(f"{API}/health/live", label="API liveness")
     wait_200(f"{API}/health", label="API health endpoint (liveness only)")
+    if require_db_readiness:
+        # Run only after the approved API release contains /health/ready.
+        # This tests the configured staging PostgreSQL connection, not auth/E2E.
+        assert_status("database readiness", f"{API}/health/ready", 200)
     html = wait_200(f"{WEB}/", label="web homepage")
     if b"<html" not in html.lower():
         raise AssertionError("web homepage response was not HTML")
@@ -97,4 +102,9 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--require-db-readiness", action="store_true",
+        help="Post-deploy only: require a successful live PostgreSQL readiness probe.",
+    )
+    main(require_db_readiness=parser.parse_args().require_db_readiness)

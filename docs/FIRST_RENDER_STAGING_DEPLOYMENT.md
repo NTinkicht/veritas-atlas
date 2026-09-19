@@ -93,6 +93,37 @@ enabling staging for real users or importing any data. Do not copy replacement
 values to GitHub, OneCompany evidence, source, frontend build variables, or
 this chat.
 
+
+## PostgreSQL readiness (proposed separately from release)
+
+The API's additional `GET /health/ready` endpoint checks connectivity to the
+PostgreSQL configured in `ConnectionStrings__DefaultConnection`, and returns
+HTTP 200 when ready or HTTP 503 if that check fails. It does not expose the
+connection string, query result, token, or exception detail in its HTTP body.
+`/health` and `/health/live` remain **process liveness** checks, including
+when PostgreSQL is temporarily unavailable. Render's existing health-check
+path stays `/health/live` so an external database outage does not cause a
+process restart loop. The new endpoint exists **only after a separately
+approved Render API deploy of the commit introducing it**; PR CI checks the
+source but the credential-free external smoke still targets the previous live
+release until deployment. A ready response proves database connectivity,
+not that the full EF schema, bootstrap authentication, or user-facing CRUD
+works. Verify those separately with a protected operator-only test and
+redact all credentials/tokens from any evidence.
+
+After that approved API release is live, the operator can run GitHub Actions
+**Veritas Staging Post-Deploy Smoke** (`workflow_dispatch` on trusted main).
+It calls the existing credential-free HTTP smoke script with
+`--require-db-readiness` and fails if the live API's `/health/ready` is not
+HTTP 200. It still cannot verify privileged login or database-backed business
+reads. Until the endpoint has been released, the ordinary PR smoke keeps
+testing the currently deployed liveness/auth boundary, without expecting the
+not-yet-deployed readiness endpoint. The post-deploy workflow uses a standard
+public runner and read-only permissions; it never accesses GitHub/Render/Neon
+secrets or starts a deploy.
+
+Do not flip H7/H8 or authorize autonomous deploy because this code merges.
+
 ## Staging initialization evidence — 19 September 2026
 
 The owner explicitly authorized the **first** EF Core schema initialization for
