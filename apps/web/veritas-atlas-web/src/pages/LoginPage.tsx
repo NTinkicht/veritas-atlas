@@ -5,8 +5,8 @@ import { setAccessToken } from "../api/httpAuth";
 
 export function LoginPage() {
   const [searchParams] = useSearchParams();
-  const [username, setUsername] = useState("admin1");
-  const [password, setPassword] = useState("password123");
+  const [username, setUsername] = useState(import.meta.env.DEV ? "admin1" : "");
+  const [password, setPassword] = useState(import.meta.env.DEV ? "password123" : "");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -64,7 +64,7 @@ export function LoginPage() {
       <section className="login-panel">
         <div className="login-card">
           <h2>Log in</h2>
-          <p>Use the development credentials below to enter the command surface.</p>
+          <p>{import.meta.env.DEV ? "Use the local development credentials below." : "Sign in with your separately provisioned Veritas staging credentials."}</p>
 
           {error ? <div className="notice-card notice-danger" style={{ marginBottom: 16 }}>{error}</div> : null}
 
@@ -84,9 +84,11 @@ export function LoginPage() {
             </button>
           </form>
 
-          <div className="login-hint">
-            Default dev credentials: <strong>admin1</strong> / <strong>password123</strong>
-          </div>
+          {import.meta.env.DEV ? (
+            <div className="login-hint">
+              Default dev credentials: <strong>admin1</strong> / <strong>password123</strong>
+            </div>
+          ) : null}
         </div>
       </section>
     </div>

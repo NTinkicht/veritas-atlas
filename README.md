@@ -41,3 +41,9 @@ The API exposes:
 
 These endpoints are intended for repository/runtime readiness checks and do not
 grant deployment or publication authority.
+
+## Governed staging deployment
+
+See [first Render staging deployment](docs/FIRST_RENDER_STAGING_DEPLOYMENT.md).
+The deployment Blueprint must be reviewed and manually synced, uses separate
+Veritas resources, and does not authorize OneCompany target mutations.
