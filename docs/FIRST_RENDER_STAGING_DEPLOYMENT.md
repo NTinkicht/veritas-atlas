@@ -68,3 +68,27 @@ new Veritas services after saving logs. Preserve the new dedicated staging
 database for forensic review or delete it only with owner authorization.
 Do not change HUMAN or lego-teddy resources. H7/H8 remain blocked until a
 reviewed OneCompany target-specific gate transition records the live evidence.
+
+## Reproducible schema migration SQL (no automatic apply)
+
+A dedicated PR-only CI job `Staging migration SQL (review only)` uses the
+same checked-out revision and EF Core 10.0.5 to generate the exact idempotent
+migration script with no staging Neon/Render secrets. Download the
+`veritas-staging-ef-migration-sql` artifact from the successful PR Actions
+run and review its SHA-256, expected `__EFMigrationsHistory` updates, tables,
+indexes and foreign keys before any database write.
+
+The current source contains migrations `20260401172450_InitialCreate` and
+`20260406222302_ContradictionSlice` (the latter has an empty Up method).
+The separately provisioned Neon `Veritas Atlas Staging` database was observed
+to have no app tables as of the first Render release. A reviewed SQL artifact is
+**not approval to apply it**. Only after an explicit owner go/no-go should an
+authorized operator apply it to Neon project `quiet-bar-44039561`, database
+`veritas_atlas`; confirm `__EFMigrationsHistory`, table counts and
+non-destructive API read access. Never run this SQL against Project HUMAN.
+
+Because the initial Neon role credential and staging bootstrap credential were
+shared in a chat during setup, rotate BOTH privately in Neon/Render before
+enabling staging for real users or importing any data. Do not copy replacement
+values to GitHub, OneCompany evidence, source, frontend build variables, or
+this chat.
