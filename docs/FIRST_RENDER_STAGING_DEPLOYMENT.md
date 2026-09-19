@@ -92,3 +92,35 @@ shared in a chat during setup, rotate BOTH privately in Neon/Render before
 enabling staging for real users or importing any data. Do not copy replacement
 values to GitHub, OneCompany evidence, source, frontend build variables, or
 this chat.
+
+## Staging initialization evidence — 19 September 2026
+
+The owner explicitly authorized the **first** EF Core schema initialization for
+Neon project `quiet-bar-44039561`, database `veritas_atlas` **only**, after
+rotating the database and bootstrap credentials. This does not authorize future
+migrations, production changes, autonomous release or OneCompany cutover.
+
+- Approved source: PR #5; CI run `35429346453`, artifact `10579784714`;
+  raw idempotent EF SQL SHA-256
+  `350f62749a168d5d41b72764b6a22994ef18973ce9b02c064f0999efa584f298`.
+- Neon helper did not correctly split EF's dollar-quoted `DO $EF$` blocks, so
+  the reviewed script was decomposed into its same 51 first-init DDL/history
+  operations for this previously empty staging database. This form is for
+  the **first empty database only**; it is not a general replacement for EF's
+  idempotent script on an already initialized database.
+- Neon migration ID `7322be3c-7dac-4c6c-ab7c-598b4b7de0e0` passed a
+  temporary-branch rehearsal and applied successfully to staging `main`.
+  Temporary branch was deleted.
+- Independent target verification: 13 application tables, 35 secondary
+  indexes, 22 foreign-key constraints, and EF history records
+  `20260401172450_InitialCreate` and
+  `20260406222302_ContradictionSlice`.
+- The `staging-http-smoke` PR job tests external liveness, static web,
+  rejection of unauthenticated `/me`, rejection of the known development
+  fixture, and the configured web-origin CORS preflight using **no real
+  credentials**. A green smoke does not prove a database-backed operation or
+  authenticated bootstrap login; those still require a separate secure
+  operator/E2E verification.
+
+The runtime/release ownership H7/H8 and OneCompany adoption gates are not
+automatically cleared by successful schema initialization or this smoke.
