@@ -1,0 +1,27 @@
+name: Veritas Staging Post-Deploy Smoke
+
+# Manual until OneCompany has reviewed release and event-dispatch authority.
+# A PR merge does not deploy: this checks the live API only after its owner-
+# authorized Render release, with no production or staging credentials.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  staging-readiness-smoke:
+    name: Staging post-deploy PostgreSQL readiness
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout trusted workflow commit
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Setup Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Verify external staging liveness, auth boundary, and PostgreSQL readiness
+        run: python tests/smoke/staging_http_smoke.py --require-db-readiness
