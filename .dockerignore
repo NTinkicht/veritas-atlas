@@ -1,0 +1,15 @@
+.git
+.github
+_diagnostics
+Script
+frontend
+apps/web
+tests
+**/bin
+**/obj
+**/node_modules
+**/dist
+**/appsettings.Development.json
+**/.env
+**/.env.*
+*.log

@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
+using Microsoft.AspNetCore.RateLimiting;
 using VeritasAtlas.Api.Infrastructure.Auth;
 using VeritasAtlas.Infrastructure.Extensions;
 
@@ -11,6 +12,18 @@ builder.Services.AddHttpContextAccessor();
 builder.Services.AddHealthChecks();
 
 builder.Services.AddSingleton<DevUserStore>();
+builder.Services.AddSingleton<ProductionBootstrapAuthenticator>();
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.AddFixedWindowLimiter("auth-login", limiter =>
+    {
+        limiter.PermitLimit = 6;
+        limiter.Window = TimeSpan.FromMinutes(1);
+        limiter.QueueLimit = 0;
+        limiter.AutoReplenishment = true;
+    });
+});
 builder.Services.AddSingleton<JwtTokenService>();
 builder.Services.AddScoped<AuthRequestContext>();
 
@@ -33,6 +46,9 @@ builder.Services.AddCors(options =>
 });
 
 builder.Services.AddVeritasAtlasInfrastructure(builder.Configuration);
+
+ProductionBootstrapAuthenticator.ValidateConfiguration(
+    builder.Configuration, builder.Environment.EnvironmentName);
 
 var jwtSecret = RuntimeSecurity.ResolveJwtSecret(
     builder.Configuration,
@@ -73,6 +89,8 @@ builder.Services.AddAuthorization();
 
 var app = builder.Build();
 
+app.UseRouting();
+app.UseRateLimiter();
 app.UseCors("Frontend");
 
 app.UseAuthentication();
