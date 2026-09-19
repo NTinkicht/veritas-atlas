@@ -1,4 +1,6 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using VeritasAtlas.Api.Infrastructure.Health;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
 using Microsoft.AspNetCore.RateLimiting;
@@ -9,7 +11,13 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllers();
 builder.Services.AddHttpContextAccessor();
-builder.Services.AddHealthChecks();
+// Keep liveness independent of downstreams; /health/ready tests the actual
+// externally configured PostgreSQL connection without exposing credentials.
+var readinessConnectionString = builder.Configuration.GetConnectionString("DefaultConnection")
+    ?? throw new InvalidOperationException("Connection string 'DefaultConnection' was not found.");
+builder.Services.AddHealthChecks()
+    .AddNpgSql(readinessConnectionString, name: "postgresql",
+        tags: new[] { "ready" }, timeout: TimeSpan.FromSeconds(8));
 
 builder.Services.AddSingleton<DevUserStore>();
 builder.Services.AddSingleton<ProductionBootstrapAuthenticator>();
@@ -96,8 +104,18 @@ app.UseCors("Frontend");
 app.UseAuthentication();
 app.UseAuthorization();
 
-app.MapHealthChecks("/health");
-app.MapHealthChecks("/health/live");
+app.MapHealthChecks("/health", new HealthCheckOptions
+{
+    Predicate = HealthEndpointPredicates.IsLiveness
+});
+app.MapHealthChecks("/health/live", new HealthCheckOptions
+{
+    Predicate = HealthEndpointPredicates.IsLiveness
+});
+app.MapHealthChecks("/health/ready", new HealthCheckOptions
+{
+    Predicate = HealthEndpointPredicates.IsReadiness
+});
 app.MapControllers();
 
 app.Run();
