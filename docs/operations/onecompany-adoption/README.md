@@ -19,6 +19,10 @@ release instructions. The evidence below remains scoped to this project only.
   staging bootstrap credentials must have independently verifiable rotation
   before staging user data.
 
+PR #7 is merged, not automatically deployed. For live follow-up use Veritas
+issue #10; the imported entrypoint/runbook are marked historical and cannot
+clear H7/H8 by themselves.
+
 These files retain the original relative hierarchy under this directory to
 preserve audit provenance. Existing links targeting their former location in
 OneCompany are historical and should not be treated as operational links.

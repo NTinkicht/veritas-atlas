@@ -1,3 +1,12 @@
+> **Historical transfer, not a live operator instruction.** This entry was
+> authored before Veritas PR #7 merged at
+> `78d799d0372cc01f2afaade33c6cf807c4b97010`. The
+> `/health/ready` *code is merged* but the two Render services still require
+> a separately authorized deployment and verification; no release is
+> inferred from the merge. Reconcile exact current GitHub, Render and Neon
+> evidence before using any historical facts for a consequential decision.
+> Current Veritas adoption work is tracked in project issue #10.
+
 # Veritas Atlas H8 — staging release and recovery contract
 
 **Status: blocked / planning-only.** Exact observed Veritas default-branch SHA
