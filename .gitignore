@@ -38,3 +38,8 @@ TestResults/
 tmp/
 temp/
 .cache/
+
+# Visual Studio generated state and per-user settings
+.vs/
+*.csproj.user
+*.suo
