@@ -6,8 +6,8 @@ export function CaseScoreboardPage() {
 
   return (
     <AppSurface
-      title="C as eS co re bo ar d"
-      subtitle="Stable production shell."
+      title="Case Scoreboard"
+      subtitle="Review current case status totals and operational workload."
       links={links}
     />
   );
