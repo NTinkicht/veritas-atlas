@@ -64,6 +64,21 @@ public sealed class CaseService : ICaseService
         };
     }
 
+    public async Task<IReadOnlyDictionary<string, int>> GetCaseStatusCountsAsync(
+        CancellationToken cancellationToken = default)
+    {
+        var counts = await _dbContext.Cases
+            .AsNoTracking()
+            .GroupBy(x => x.Status)
+            .Select(group => new { Status = group.Key, Count = group.Count() })
+            .ToListAsync(cancellationToken);
+
+        return counts.ToDictionary(
+            item => item.Status.ToString(),
+            item => item.Count,
+            StringComparer.OrdinalIgnoreCase);
+    }
+
     public async Task<Case> GetCaseByIdAsync(Guid id, CancellationToken cancellationToken = default)
     {
         var entity = await _dbContext.Cases
