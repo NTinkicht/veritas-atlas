@@ -10,6 +10,11 @@ EVENT = json.loads(Path(os.environ["GITHUB_EVENT_PATH"]).read_text())
 MAX_PAGES = 10
 CI_WORKFLOW_NAME = "Veritas Atlas CI"
 CI_WORKFLOW_PATH = ".github/workflows/ci.yml"
+TRUSTED_CONTROL_PATHS = frozenset({
+    CI_WORKFLOW_PATH,
+    ".github/workflows/native-factory-merge-controller.yml",
+    "scripts/native_factory_merge.py",
+})
 REQUIRED_JOBS = frozenset({
     "Runner availability diagnostic",
     "Backend build, tests and dependency audit",
@@ -198,8 +203,8 @@ def gates(number):
         return None
 
     sha = pr["head"]["sha"]
-    if CI_WORKFLOW_PATH in changed_paths(number):
-        print(f"PR #{number}: CI_WORKFLOW_CHANGE_REQUIRES_EXTERNAL_MERGE")
+    if changed_paths(number) & TRUSTED_CONTROL_PATHS:
+        print(f"PR #{number}: TRUSTED_CONTROL_CHANGE_REQUIRES_EXTERNAL_MERGE")
         return None
     if not latest_ci_green(sha):
         print(f"PR #{number}: LATEST_EXACT_HEAD_CI_NOT_GREEN")
