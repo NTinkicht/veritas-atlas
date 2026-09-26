@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { apiGet } from "../api/http";
 import { AppSurface } from "../components/AppSurface";
 import { useFrontendNav } from "../hooks/useFrontendNav";
 
@@ -27,12 +28,10 @@ export function CaseScoreboardPage() {
       const nextScores = await Promise.all(
         STATUSES.map(async (status) => {
           const query = new URLSearchParams({ page: "1", pageSize: "1", status });
-          const response = await fetch(`/api/v1/cases?${query.toString()}`, {
-            credentials: "same-origin",
-            headers: { Accept: "application/json" },
-          });
-          if (!response.ok) throw new Error(`Case scoreboard request failed (${response.status})`);
-          const data = (await response.json()) as CasesResponse;
+          const data = await apiGet<CasesResponse>(
+            `/api/v1/cases?${query.toString()}`,
+            false,
+          );
           return { status, count: Number.isFinite(data.totalCount) ? data.totalCount : 0 };
         }),
       );
