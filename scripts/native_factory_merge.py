@@ -64,7 +64,7 @@ def changed_paths(number):
     }
 
 
-def latest_ci_run(number, sha):
+def latest_ci_run(number, sha, base_sha):
     payload = gh(
         f"repos/{REPO}/actions/runs?head_sha={sha}&event=pull_request&per_page=100"
     )
@@ -75,7 +75,11 @@ def latest_ci_run(number, sha):
         and run.get("name") == CI_WORKFLOW_NAME
         and run.get("path") == CI_WORKFLOW_PATH
         and any(
-            isinstance(pr, dict) and pr.get("number") == number
+            isinstance(pr, dict)
+            and pr.get("number") == number
+            and (pr.get("base") or {}).get("ref") == "main"
+            and (pr.get("base") or {}).get("sha") == base_sha
+            and (pr.get("head") or {}).get("sha") == sha
             for pr in (run.get("pull_requests") or [])
         )
     ]
@@ -91,8 +95,8 @@ def latest_ci_run(number, sha):
     )
 
 
-def latest_ci_green(number, sha):
-    run = latest_ci_run(number, sha)
+def latest_ci_green(number, sha, base_sha):
+    run = latest_ci_run(number, sha, base_sha)
     if (
         not run
         or run.get("status") != "completed"
@@ -121,6 +125,9 @@ def latest_review_decisions(number, sha):
     latest = {}
     for review in reviews:
         if review.get("commit_id") != sha:
+            continue
+        state = str(review.get("state") or "").upper()
+        if state not in {"APPROVED", "CHANGES_REQUESTED", "DISMISSED"}:
             continue
         login = (review.get("user") or {}).get("login", "").lower()
         if not login:
@@ -207,10 +214,14 @@ def gates(number):
         return None
 
     sha = pr["head"]["sha"]
+    base_sha = pr.get("base", {}).get("sha")
+    if not isinstance(base_sha, str) or len(base_sha) != 40:
+        print(f"PR #{number}: BASE_SHA_UNAVAILABLE")
+        return None
     if changed_paths(number) & TRUSTED_CONTROL_PATHS:
         print(f"PR #{number}: TRUSTED_CONTROL_CHANGE_REQUIRES_EXTERNAL_MERGE")
         return None
-    if not latest_ci_green(number, sha):
+    if not latest_ci_green(number, sha, base_sha):
         print(f"PR #{number}: LATEST_EXACT_HEAD_CI_NOT_GREEN")
         return None
     if not review_gate_clean(number, sha):
@@ -219,19 +230,20 @@ def gates(number):
     if has_unresolved_threads(number):
         print(f"PR #{number}: UNRESOLVED_REVIEW_THREADS")
         return None
-    return pr, sha
+    return pr, sha, base_sha
 
 
 for number in candidates():
     first = gates(number)
     if not first:
         continue
-    _, sha = first
+    _, sha, base_sha = first
 
     pr = gh(f"repos/{REPO}/pulls/{number}")
     if (
         pr.get("state") != "open"
         or pr.get("head", {}).get("sha") != sha
+        or pr.get("base", {}).get("sha") != base_sha
         or pr.get("mergeable") is not True
     ):
         print(f"PR #{number}: HEAD_MOVED_OR_NOT_MERGEABLE")
@@ -239,7 +251,7 @@ for number in candidates():
 
     # Repeat every mutable review/CI predicate immediately before the
     # expected-head merge call.
-    if not latest_ci_green(number, sha):
+    if not latest_ci_green(number, sha, base_sha):
         print(f"PR #{number}: FINAL_CI_RECHECK_BLOCKED")
         continue
     if not review_gate_clean(number, sha) or has_unresolved_threads(number):
