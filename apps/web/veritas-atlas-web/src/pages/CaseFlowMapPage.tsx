@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { getCases } from "../api/cases";
-import type { CaseItem } from "../api/contracts";
+import { getCaseStatusCounts } from "../api/cases";
+import type { CaseStatusCount } from "../api/contracts";
 import { AppSurface } from "../components/AppSurface";
 import { useFrontendNav } from "../hooks/useFrontendNav";
 
@@ -17,7 +17,8 @@ const CASE_STATUS_ORDER = [
 
 export function CaseFlowMapPage() {
   const links = useFrontendNav();
-  const [items, setItems] = useState<CaseItem[]>([]);
+  const [counts, setCounts] = useState<CaseStatusCount[]>([]);
+  const [totalCount, setTotalCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -25,15 +26,9 @@ export function CaseFlowMapPage() {
     setLoading(true);
     setError(null);
     try {
-      const first = await getCases(1, 100);
-      const allItems = [...first.items];
-
-      for (let page = 2; page <= first.totalPages; page += 1) {
-        const next = await getCases(page, 100);
-        allItems.push(...next.items);
-      }
-
-      setItems(allItems);
+      const snapshot = await getCaseStatusCounts();
+      setCounts(snapshot.items);
+      setTotalCount(snapshot.totalCount);
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "Failed to load case flow summary.",
@@ -47,20 +42,18 @@ export function CaseFlowMapPage() {
     void load();
   }, []);
 
-  const counts = new Map<string, number>();
-  for (const item of items) {
-    counts.set(item.status, (counts.get(item.status) ?? 0) + 1);
-  }
+  const countsByStatus = new Map(
+    counts.map((item) => [item.status.toLowerCase(), item.count]),
+  );
 
   const known = CASE_STATUS_ORDER.map((status) => ({
     status,
-    count: counts.get(status) ?? 0,
+    count: countsByStatus.get(status.toLowerCase()) ?? 0,
   }));
   const knownKeys = new Set(CASE_STATUS_ORDER.map((status) => status.toLowerCase()));
-  const unexpected = Array.from(counts.entries())
-    .filter(([status]) => !knownKeys.has(status.toLowerCase()))
-    .sort(([left], [right]) => left.localeCompare(right))
-    .map(([status, count]) => ({ status, count }));
+  const unexpected = counts
+    .filter((item) => !knownKeys.has(item.status.toLowerCase()))
+    .sort((left, right) => left.status.localeCompare(right.status));
   const stages = [...known, ...unexpected];
 
   return (
@@ -100,7 +93,7 @@ export function CaseFlowMapPage() {
               </div>
             ))}
           </dl>
-          <p>{items.length} cases represented in this read-only snapshot.</p>
+          <p>{totalCount} cases represented in this read-only snapshot.</p>
         </section>
       ) : null}
     </AppSurface>
