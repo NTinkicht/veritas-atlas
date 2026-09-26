@@ -64,7 +64,7 @@ def changed_paths(number):
     }
 
 
-def latest_ci_run(sha):
+def latest_ci_run(number, sha):
     payload = gh(
         f"repos/{REPO}/actions/runs?head_sha={sha}&event=pull_request&per_page=100"
     )
@@ -74,6 +74,10 @@ def latest_ci_run(sha):
         and run.get("event") == "pull_request"
         and run.get("name") == CI_WORKFLOW_NAME
         and run.get("path") == CI_WORKFLOW_PATH
+        and any(
+            isinstance(pr, dict) and pr.get("number") == number
+            for pr in (run.get("pull_requests") or [])
+        )
     ]
     if not runs:
         return None
@@ -87,8 +91,8 @@ def latest_ci_run(sha):
     )
 
 
-def latest_ci_green(sha):
-    run = latest_ci_run(sha)
+def latest_ci_green(number, sha):
+    run = latest_ci_run(number, sha)
     if (
         not run
         or run.get("status") != "completed"
@@ -138,8 +142,8 @@ def review_gate_clean(number, sha):
         for login, review in decisions.items()
     )
     adverse = any(
-        login in AUTHORIZED_REVIEWERS and review.get("state") == "CHANGES_REQUESTED"
-        for login, review in decisions.items()
+        review.get("state") == "CHANGES_REQUESTED"
+        for review in decisions.values()
     )
     return approved and not adverse
 
@@ -206,7 +210,7 @@ def gates(number):
     if changed_paths(number) & TRUSTED_CONTROL_PATHS:
         print(f"PR #{number}: TRUSTED_CONTROL_CHANGE_REQUIRES_EXTERNAL_MERGE")
         return None
-    if not latest_ci_green(sha):
+    if not latest_ci_green(number, sha):
         print(f"PR #{number}: LATEST_EXACT_HEAD_CI_NOT_GREEN")
         return None
     if not review_gate_clean(number, sha):
@@ -235,7 +239,7 @@ for number in candidates():
 
     # Repeat every mutable review/CI predicate immediately before the
     # expected-head merge call.
-    if not latest_ci_green(sha):
+    if not latest_ci_green(number, sha):
         print(f"PR #{number}: FINAL_CI_RECHECK_BLOCKED")
         continue
     if not review_gate_clean(number, sha) or has_unresolved_threads(number):
