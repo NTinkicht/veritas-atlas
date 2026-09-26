@@ -143,6 +143,17 @@ export type CaseItem = {
 
 export type GetCasesResponse = PagedResponse<CaseItem>;
 
+export type CaseStatusCount = {
+  status: string;
+  count: number;
+};
+
+export type GetCaseStatusCountsResponse = {
+  items: CaseStatusCount[];
+  totalCount: number;
+};
+
+
 export type ContradictionItem = {
   id: Guid;
   caseId: Guid;

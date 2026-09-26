@@ -75,6 +75,14 @@ public sealed record GetCasesResponse(
     int TotalCount,
     int TotalPages);
 
+public sealed record CaseStatusCountResponse(
+    string Status,
+    int Count);
+
+public sealed record GetCaseStatusCountsResponse(
+    IReadOnlyCollection<CaseStatusCountResponse> Items,
+    int TotalCount);
+
 public sealed record CreateCaseRequest(
     string Title,
     string? Summary,
