@@ -10,6 +10,8 @@ on:
     types:
       - submitted
       - dismissed
+  schedule:
+    - cron: "*/15 * * * *"
   workflow_dispatch:
 
 permissions:
@@ -33,6 +35,4 @@ jobs:
       - name: Reconcile exact-head merge gates from trusted main
         env:
           GH_TOKEN: ${{ github.token }}
-          REQUIRED_CHECKS_JSON: >-
-            ["Runner availability diagnostic","Backend build, tests and dependency audit","Frontend build, lint and dependency audit","Backend Docker image build","Staging migration SQL (review only)","Staging HTTP smoke (unauthenticated)"]
         run: python scripts/native_factory_merge.py
