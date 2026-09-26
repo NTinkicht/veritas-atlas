@@ -1,4 +1,11 @@
-import { type FormEvent, useCallback, useEffect, useState } from "react";
+import {
+  type FormEvent,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
+import { apiGet } from "../api/http";
 import { AppSurface } from "../components/AppSurface";
 import { useFrontendNav } from "../hooks/useFrontendNav";
 
@@ -18,56 +25,70 @@ type CasesResponse = {
 };
 
 const PAGE_SIZE = 20;
+const CASE_STATUSES = [
+  "Open",
+  "InReview",
+  "OnHold",
+  "Approved",
+  "Rejected",
+  "Published",
+  "Closed",
+];
 
 export function CaseExplorerPage() {
   const links = useFrontendNav();
   const [cases, setCases] = useState<CaseItem[]>([]);
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("");
+  const [appliedSearch, setAppliedSearch] = useState("");
+  const [appliedStatus, setAppliedStatus] = useState("");
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const requestSequence = useRef(0);
 
   const loadCases = useCallback(
     async (
       requestedPage: number,
-      requestedSearch = search,
-      requestedStatus = status,
+      requestedSearch: string,
+      requestedStatus: string,
     ) => {
+      const requestId = ++requestSequence.current;
       setLoading(true);
       setError(null);
+
       const query = new URLSearchParams({
         page: String(requestedPage),
         pageSize: String(PAGE_SIZE),
-        sortBy: "UpdatedAt",
+        sortBy: "createdat",
         sortDirection: "desc",
       });
       if (requestedSearch.trim()) query.set("search", requestedSearch.trim());
       if (requestedStatus) query.set("status", requestedStatus);
 
       try {
-        const response = await fetch(`/api/v1/cases?${query.toString()}`, {
-          credentials: "same-origin",
-          headers: { Accept: "application/json" },
-        });
-        if (!response.ok) {
-          throw new Error(`Cases request failed (${response.status})`);
-        }
-        const data = (await response.json()) as CasesResponse;
+        const data = await apiGet<CasesResponse>(
+          `/api/v1/cases?${query.toString()}`,
+          false,
+        );
+        if (requestSequence.current !== requestId) return;
         setCases(data.items ?? []);
         setPage(data.page);
         setTotalPages(Math.max(1, data.totalPages));
         setTotalCount(data.totalCount);
       } catch (caught) {
+        if (requestSequence.current !== requestId) return;
         setCases([]);
         setError(caught instanceof Error ? caught.message : "Unable to load cases");
       } finally {
-        setLoading(false);
+        if (requestSequence.current === requestId) {
+          setLoading(false);
+        }
       }
     },
-    [search, status],
+    [],
   );
 
   useEffect(() => {
@@ -76,19 +97,24 @@ export function CaseExplorerPage() {
 
   function applyFilters(event: FormEvent) {
     event.preventDefault();
-    void loadCases(1);
+    const nextSearch = search.trim();
+    setAppliedSearch(nextSearch);
+    setAppliedStatus(status);
+    void loadCases(1, nextSearch, status);
   }
 
   function clearFilters() {
     setSearch("");
     setStatus("");
+    setAppliedSearch("");
+    setAppliedStatus("");
     void loadCases(1, "", "");
   }
 
   return (
     <AppSurface
       title="Case Explorer"
-      subtitle="Search and review the latest case activity from the live case service."
+      subtitle="Search and review cases from the live case service."
       links={links}
     >
       <form onSubmit={applyFilters} aria-label="Case filters">
@@ -105,9 +131,11 @@ export function CaseExplorerPage() {
           Status
           <select value={status} onChange={(event) => setStatus(event.target.value)}>
             <option value="">All statuses</option>
-            <option value="Open">Open</option>
-            <option value="Approved">Approved</option>
-            <option value="Rejected">Rejected</option>
+            {CASE_STATUSES.map((value) => (
+              <option value={value} key={value}>
+                {value}
+              </option>
+            ))}
           </select>
         </label>
         <button type="submit" disabled={loading}>Apply</button>
@@ -147,9 +175,21 @@ export function CaseExplorerPage() {
       )}
 
       <nav aria-label="Case pages">
-        <button type="button" disabled={loading || page <= 1} onClick={() => void loadCases(page - 1)}>Previous</button>
+        <button
+          type="button"
+          disabled={loading || page <= 1}
+          onClick={() => void loadCases(page - 1, appliedSearch, appliedStatus)}
+        >
+          Previous
+        </button>
         <span>Page {page} of {totalPages}</span>
-        <button type="button" disabled={loading || page >= totalPages} onClick={() => void loadCases(page + 1)}>Next</button>
+        <button
+          type="button"
+          disabled={loading || page >= totalPages}
+          onClick={() => void loadCases(page + 1, appliedSearch, appliedStatus)}
+        >
+          Next
+        </button>
       </nav>
     </AppSurface>
   );
