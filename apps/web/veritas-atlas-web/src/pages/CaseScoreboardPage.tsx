@@ -7,12 +7,29 @@ type CasesResponse = {
   totalCount: number;
 };
 
+type CaseStatus =
+  | "Open"
+  | "InReview"
+  | "OnHold"
+  | "Approved"
+  | "Rejected"
+  | "Published"
+  | "Closed";
+
 type Score = {
-  status: "Open" | "Approved" | "Rejected";
+  status: CaseStatus;
   count: number;
 };
 
-const STATUSES: Score["status"][] = ["Open", "Approved", "Rejected"];
+const STATUSES: CaseStatus[] = [
+  "Open",
+  "InReview",
+  "OnHold",
+  "Approved",
+  "Rejected",
+  "Published",
+  "Closed",
+];
 
 export function CaseScoreboardPage() {
   const links = useFrontendNav();
