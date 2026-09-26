@@ -6,6 +6,7 @@ namespace VeritasAtlas.Application.Interfaces;
 public interface ICaseService
 {
     Task<PagedResult<Case>> GetCasesAsync(CaseListFilters filters, CancellationToken cancellationToken = default);
+    Task<IReadOnlyDictionary<string, int>> GetCaseStatusCountsAsync(CancellationToken cancellationToken = default);
     Task<Case> GetCaseByIdAsync(Guid id, CancellationToken cancellationToken = default);
     Task<Case> CreateCaseAsync(
         string title,
