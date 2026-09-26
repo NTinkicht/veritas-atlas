@@ -46,6 +46,21 @@ public sealed class CasesController : ControllerBase
             result.TotalPages));
     }
 
+    [HttpGet("status-counts")]
+    public async Task<ActionResult<GetCaseStatusCountsResponse>> GetCaseStatusCounts(
+        CancellationToken cancellationToken = default)
+    {
+        var counts = await _caseService.GetCaseStatusCountsAsync(cancellationToken);
+        var items = counts
+            .OrderBy(item => item.Key, StringComparer.OrdinalIgnoreCase)
+            .Select(item => new CaseStatusCountResponse(item.Key, item.Value))
+            .ToArray();
+
+        return Ok(new GetCaseStatusCountsResponse(
+            items,
+            items.Sum(item => item.Count)));
+    }
+
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<GetCaseResponse>> GetCaseById(Guid id, CancellationToken cancellationToken = default)
     {
