@@ -57,11 +57,15 @@ def paged(path):
 
 
 def changed_paths(number):
-    return {
-        item["filename"]
-        for item in paged(f"repos/{REPO}/pulls/{number}/files")
-        if isinstance(item, dict) and isinstance(item.get("filename"), str)
-    }
+    paths = set()
+    for item in paged(f"repos/{REPO}/pulls/{number}/files"):
+        if not isinstance(item, dict):
+            continue
+        for field in ("filename", "previous_filename"):
+            value = item.get(field)
+            if isinstance(value, str) and value:
+                paths.add(value)
+    return paths
 
 
 def latest_ci_run(number, sha, base_sha):
@@ -120,12 +124,10 @@ def latest_ci_green(number, sha, base_sha):
     )
 
 
-def latest_review_decisions(number, sha):
+def latest_review_decisions(number):
     reviews = paged(f"repos/{REPO}/pulls/{number}/reviews")
     latest = {}
     for review in reviews:
-        if review.get("commit_id") != sha:
-            continue
         state = str(review.get("state") or "").upper()
         if state not in {"APPROVED", "CHANGES_REQUESTED", "DISMISSED"}:
             continue
@@ -143,9 +145,11 @@ def latest_review_decisions(number, sha):
 
 
 def review_gate_clean(number, sha):
-    decisions = latest_review_decisions(number, sha)
+    decisions = latest_review_decisions(number)
     approved = any(
-        login in AUTHORIZED_REVIEWERS and review.get("state") == "APPROVED"
+        login in AUTHORIZED_REVIEWERS
+        and review.get("state") == "APPROVED"
+        and review.get("commit_id") == sha
         for login, review in decisions.items()
     )
     adverse = any(
@@ -190,6 +194,21 @@ def has_unresolved_threads(number):
     raise RuntimeError("REVIEW_THREAD_PAGE_BOUND_EXCEEDED")
 
 
+def strict_base_enforcement():
+    """Require GitHub itself to reject a merge when main moved after tested CI.
+
+    The merge REST API has an expected-head precondition but no expected-base
+    parameter. Delegate the base CAS to GitHub's strict required-status-check
+    branch protection; if that protection cannot be proven, fail closed.
+    """
+    try:
+        protection = gh(f"repos/{REPO}/branches/main/protection")
+    except RuntimeError:
+        return False
+    checks = protection.get("required_status_checks")
+    return isinstance(checks, dict) and checks.get("strict") is True
+
+
 def candidates():
     if os.environ["GITHUB_EVENT_NAME"] == "pull_request_review":
         number = EVENT.get("pull_request", {}).get("number")
@@ -220,6 +239,9 @@ def gates(number):
         return None
     if changed_paths(number) & TRUSTED_CONTROL_PATHS:
         print(f"PR #{number}: TRUSTED_CONTROL_CHANGE_REQUIRES_EXTERNAL_MERGE")
+        return None
+    if not strict_base_enforcement():
+        print(f"PR #{number}: STRICT_BASE_PROTECTION_NOT_VERIFIED")
         return None
     if not latest_ci_green(number, sha, base_sha):
         print(f"PR #{number}: LATEST_EXACT_HEAD_CI_NOT_GREEN")
