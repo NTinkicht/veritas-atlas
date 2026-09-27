@@ -1,0 +1,48 @@
+name: Gemma L4 Worker
+
+on:
+  workflow_dispatch:
+    inputs:
+      task:
+        description: "Bounded engineering task"
+        required: true
+        type: string
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+  checks: read
+  actions: read
+
+jobs:
+  gemma:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'issue_comment' &&
+       contains(github.event.comment.body, '@gemma-l4'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Gemma L4 autonomous engineering
+        uses: google-github-actions/run-gemini-cli@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          use_gemini_code_assist: "true"
+          prompt: >-
+            Read GEMINI.md and repository governance first. You are actor gemma.
+            Reconcile the live GitHub issue/PR and exact head. Execute the bounded
+            engineering request: ${{ github.event.inputs.task || github.event.comment.body }}.
+            Implement real changes when requested, run tests, remediate failures,
+            and publish auditable results. Do not self-review your own material work.
+          settings: |-
+            {
+              "experimental": {"gemma": true},
+              "model": {"maxSessionTurns": 50}
+            }
