@@ -441,16 +441,16 @@ for number in candidates():
         print(f"PR #{number}: HEAD_MOVED_OR_NOT_MERGEABLE")
         continue
 
-    # Repeat every mutable platform/review/CI predicate immediately before the
-    # expected-head merge call.
-    if not strict_base_enforcement():
-        print(f"PR #{number}: FINAL_STRICT_BASE_PROTECTION_NOT_VERIFIED")
-        continue
+    # Repeat every mutable CI/review predicate, then re-check platform
+    # enforcement as the final gate immediately before the expected-head merge.
     if not latest_ci_green(number, sha, base_sha):
         print(f"PR #{number}: FINAL_CI_RECHECK_BLOCKED")
         continue
     if not review_gate_clean(number, sha, base_sha) or has_unresolved_threads(number):
         print(f"PR #{number}: FINAL_REVIEW_RECHECK_BLOCKED")
+        continue
+    if not strict_base_enforcement():
+        print(f"PR #{number}: FINAL_STRICT_BASE_PROTECTION_NOT_VERIFIED")
         continue
 
     merged = gh(
