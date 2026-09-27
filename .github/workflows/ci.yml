@@ -24,6 +24,8 @@ jobs:
           python-version: '3.12'
       - name: Confirm GitHub-hosted runner
         run: echo "github-hosted-runner-ready"
+      - name: Test Gemma outbound evidence guard
+        run: python tests/test_gemma_context_guard.py
       - name: Validate project-owned adoption/release evidence
         run: |
           python scripts/validate_adoption_release_evidence.py

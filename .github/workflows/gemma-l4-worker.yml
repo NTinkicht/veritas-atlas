@@ -1,0 +1,125 @@
+name: Gemma L4 Worker
+
+on:
+  workflow_dispatch:
+    inputs:
+      task:
+        description: "Bounded engineering task"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  gemma:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Run bounded OpenRouter Gemma task
+        env:
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          TASK: ${{ inputs.task }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "${OPENROUTER_API_KEY:-}" || { echo "OPENROUTER_API_KEY is not configured"; exit 78; }
+          git diff --quiet && git diff --cached --quiet || { echo "Checkout must start clean"; exit 1; }
+          HEAD_SHA="$(git rev-parse HEAD)"
+          git fetch --no-tags origin "$DEFAULT_BRANCH"
+          BASE_SHA="$(git merge-base HEAD "origin/$DEFAULT_BRANCH")"
+          export HEAD_SHA BASE_SHA
+          python - <<'PY'
+          import json
+          import os
+          import pathlib
+          import subprocess
+          import sys
+          import urllib.request
+
+          sys.path.insert(0, "scripts")
+          import gemma_context_guard as guard
+
+          max_diff = 60000
+          diff = subprocess.check_output(
+              ["git", "diff", "--no-ext-diff", "--no-color", f"{os.environ['BASE_SHA']}...{os.environ['HEAD_SHA']}"],
+              text=True,
+          )
+          diff_bytes = len(diff.encode("utf-8"))
+          changed = subprocess.check_output(
+              ["git", "diff", "--name-only", f"{os.environ['BASE_SHA']}...{os.environ['HEAD_SHA']}"],
+              text=True,
+          ).splitlines()
+          if diff_bytes > max_diff:
+              pathlib.Path("gemma-context-incomplete.json").write_text(
+                  json.dumps({
+                      "status": "CONTEXT_INCOMPLETE",
+                      "reason": "DIFF_EXCEEDS_BOUND",
+                      "head_sha": os.environ["HEAD_SHA"],
+                      "base_sha": os.environ["BASE_SHA"],
+                      "diff_bytes": diff_bytes,
+                      "max_diff_bytes": max_diff,
+                      "changed_files": changed,
+                  }, indent=2) + "\n",
+                  encoding="utf-8",
+              )
+              raise SystemExit("CONTEXT_INCOMPLETE: full base-to-head diff exceeds bounded evidence limit")
+
+          guard.validate_diff(diff)
+          prompt = pathlib.Path(".github/prompts/gemma-l4-worker.md").read_text(encoding="utf-8")
+          payload = {
+              "model": "google/gemma-3-27b-it:free",
+              "messages": [
+                  {"role": "system", "content": prompt},
+                  {
+                      "role": "user",
+                      "content": json.dumps({
+                          "task": os.environ["TASK"],
+                          "head_sha": os.environ["HEAD_SHA"],
+                          "base_sha": os.environ["BASE_SHA"],
+                          "changed_files": changed,
+                          "full_base_to_head_diff": diff,
+                      }, sort_keys=True),
+                  },
+              ],
+              "usage": {"include": True},
+              "temperature": 0,
+              "stream": False,
+          }
+          req = urllib.request.Request(
+              "https://openrouter.ai/api/v1/chat/completions",
+              data=json.dumps(payload).encode(),
+              headers={
+                  "Authorization": "Bearer " + os.environ["OPENROUTER_API_KEY"],
+                  "Content-Type": "application/json",
+              },
+          )
+          with urllib.request.urlopen(req, timeout=120) as response:
+              data = json.load(response)
+          usage = data.get("usage") or {}
+          cost = usage.get("cost")
+          if type(cost) not in (int, float) or cost != 0:
+              raise SystemExit("NONZERO_OR_UNKNOWN_INFERENCE_COST")
+          choices = data.get("choices")
+          if not isinstance(choices, list) or len(choices) != 1:
+              raise SystemExit("MODEL_OUTPUT_INVALID")
+          text = (choices[0].get("message") or {}).get("content")
+          if not isinstance(text, str) or not text.strip():
+              raise SystemExit("MODEL_OUTPUT_INVALID")
+          pathlib.Path("gemma-l4-result.md").write_text(text.rstrip() + "\n", encoding="utf-8")
+          PY
+          test "$(git rev-parse HEAD)" = "$HEAD_SHA"
+          git diff --exit-code -- . ':!gemma-l4-result.md' ':!gemma-context-incomplete.json'
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: gemma-l4-result
+          path: |
+            gemma-l4-result.md
+            gemma-context-incomplete.json
+          if-no-files-found: error
