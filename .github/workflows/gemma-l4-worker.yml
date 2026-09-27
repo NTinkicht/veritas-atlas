@@ -7,42 +7,55 @@ on:
         description: "Bounded engineering task"
         required: true
         type: string
-  issue_comment:
-    types: [created]
 
 permissions:
-  contents: write
-  pull-requests: write
-  issues: write
-  checks: read
-  actions: read
+  contents: read
 
 jobs:
   gemma:
-    if: >-
-      github.event_name == 'workflow_dispatch' ||
-      (github.event_name == 'issue_comment' &&
-       contains(github.event.comment.body, '@gemma-l4'))
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Gemma L4 autonomous engineering
-        uses: google-github-actions/run-gemini-cli@v0
+      - name: Run bounded OpenRouter Gemma task
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          TASK: ${{ inputs.task }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "${OPENROUTER_API_KEY:-}" || { echo "OPENROUTER_API_KEY is not configured"; exit 78; }
+          git diff --quiet && git diff --cached --quiet || { echo "Checkout must start clean"; exit 1; }
+          HEAD_BEFORE="$(git rev-parse HEAD)"
+          python - <<'PY'
+          import json, os, urllib.request
+          payload = {
+              "model": "google/gemma-3-27b-it:free",
+              "messages": [
+                  {"role": "system", "content": open("GEMINI.md", encoding="utf-8").read()},
+                  {"role": "user", "content": os.environ["TASK"]},
+              ],
+          }
+          req = urllib.request.Request(
+              "https://openrouter.ai/api/v1/chat/completions",
+              data=json.dumps(payload).encode(),
+              headers={
+                  "Authorization": "Bearer " + os.environ["OPENROUTER_API_KEY"],
+                  "Content-Type": "application/json",
+              },
+          )
+          with urllib.request.urlopen(req, timeout=120) as response:
+              data = json.load(response)
+          text = data["choices"][0]["message"]["content"]
+          open("gemma-l4-result.md", "w", encoding="utf-8").write(text + "\n")
+          PY
+          test "$(git rev-parse HEAD)" = "$HEAD_BEFORE"
+          git diff --exit-code -- . ':!gemma-l4-result.md'
+          echo "Gemma output captured as an untrusted job artifact; this worker has no repository write or review credential."
+      - uses: actions/upload-artifact@v4
         with:
-          use_gemini_code_assist: "true"
-          prompt: >-
-            Read GEMINI.md and repository governance first. You are actor gemma.
-            Reconcile the live GitHub issue/PR and exact head. Execute the bounded
-            engineering request: ${{ github.event.inputs.task || github.event.comment.body }}.
-            Implement real changes when requested, run tests, remediate failures,
-            and publish auditable results. Do not self-review your own material work.
-          settings: |-
-            {
-              "experimental": {"gemma": true},
-              "model": {"maxSessionTurns": 50}
-            }
+          name: gemma-l4-result
+          path: gemma-l4-result.md
+          if-no-files-found: error
