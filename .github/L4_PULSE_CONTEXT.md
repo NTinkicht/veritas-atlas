@@ -13,6 +13,26 @@ This file is the shared handoff ledger for the four staggered L4 engineering pul
 
 ## Rolling entries
 
+### 2026-09-27T11:28Z — manual remediation checkpoint while schedules paused
+- pulse_id: manual-remediation
+- schedules: PAUSED
+- active exact heads:
+  - PR #21 head 85c6535e53590828ad030c47a49074dd0331ad22 — CI green.
+  - PR #22 head 674892a2815101d5b700d1ae699b1cc7d8294c3a — CI green.
+  - PR #23 head 8ac31375c964184dde95a0d7745a9302ceedfbf9 — CI green.
+- verified actions:
+  - #21 stale P1 review threads were reconciled only after current code verification: fingerprint-bound mutable finding resolution, Severity-labelled detection, fail-closed material provenance, and protected workflow/release-authority paths are present.
+  - #22 historical last-commit-only/silent-truncation findings are fixed by full base-to-head bounded evidence and explicit CONTEXT_INCOMPLETE failure; all review threads are resolved.
+  - #23 real fail-closed H7/H8 evidence validator/tests/CI are present; no review threads remain.
+  - fresh CodeRabbit, Claude, Copilot and Codex review requests were attempted; Codex remains quota-blocked and the other GitHub review triggers produced no completed review evidence.
+  - owner-authorized external NONAUTHOR review handoff was posted to the existing persistent Claude coordination lane in Slack with exact heads and no-write/no-spend constraints; a request alone is not counted as PASS.
+- blockers:
+  - only remaining merge blocker is genuine current-head independent review evidence for #21/#22/#23. Do not weaken this gate or fabricate approval.
+  - #21/#22 touch trusted-control surfaces and require the external reviewed owner-authorized merge path.
+- next executable action: verify any returned independent exact-head external review; fix Medium+ findings directly, or external-merge with expected-head protection only after a clean PASS and live rechecks.
+- completion checklist: reconciled=yes; direct_fix=yes; CI_checked=yes; reviews_checked=yes; merge_checked=yes; WU_floor_checked=deferred_while_paused; ledger_written=yes
+
+
 ### 2026-09-27T09:20Z — manual remediation while schedules paused
 - pulse_id: manual-remediation
 - schedules: PAUSED
