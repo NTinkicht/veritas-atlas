@@ -29,13 +29,17 @@ jobs:
           test -n "${OPENROUTER_API_KEY:-}" || { echo "OPENROUTER_API_KEY is not configured"; exit 78; }
           git diff --quiet && git diff --cached --quiet || { echo "Checkout must start clean"; exit 1; }
           HEAD_BEFORE="$(git rev-parse HEAD)"
+          git diff --no-ext-diff --unified=3 HEAD^ HEAD -- . > gemma-repo-context.txt
+          head -c 60000 gemma-repo-context.txt > gemma-repo-context.bounded
+          mv gemma-repo-context.bounded gemma-repo-context.txt
           python - <<'PY'
           import json, os, urllib.request
+          context = open("gemma-repo-context.txt", encoding="utf-8", errors="replace").read()
           payload = {
               "model": "google/gemma-3-27b-it:free",
               "messages": [
                   {"role": "system", "content": open("GEMINI.md", encoding="utf-8").read()},
-                  {"role": "user", "content": os.environ["TASK"]},
+                  {"role": "user", "content": os.environ["TASK"] + "\n\nCurrent HEAD: " + os.environ.get("GITHUB_SHA", "") + "\nBounded current diff:\n" + context},
               ],
           }
           req = urllib.request.Request(
@@ -52,7 +56,7 @@ jobs:
           open("gemma-l4-result.md", "w", encoding="utf-8").write(text + "\n")
           PY
           test "$(git rev-parse HEAD)" = "$HEAD_BEFORE"
-          git diff --exit-code -- . ':!gemma-l4-result.md'
+          git diff --exit-code -- . ':!gemma-l4-result.md' ':!gemma-repo-context.txt'
           echo "Gemma output captured as an untrusted job artifact; this worker has no repository write or review credential."
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
