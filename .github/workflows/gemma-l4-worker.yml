@@ -16,7 +16,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           fetch-depth: 0
       - name: Run bounded OpenRouter Gemma task
@@ -54,7 +54,7 @@ jobs:
           test "$(git rev-parse HEAD)" = "$HEAD_BEFORE"
           git diff --exit-code -- . ':!gemma-l4-result.md'
           echo "Gemma output captured as an untrusted job artifact; this worker has no repository write or review credential."
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: gemma-l4-result
           path: gemma-l4-result.md
