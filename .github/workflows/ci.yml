@@ -26,6 +26,23 @@ jobs:
         run: echo "github-hosted-runner-ready"
       - name: Test Gemma outbound evidence guard
         run: python tests/test_gemma_context_guard.py
+      - name: Validate project-owned adoption/release evidence
+        run: |
+          python scripts/validate_adoption_release_evidence.py
+          python tests/adoption/test_validate_adoption_release_evidence.py
+
+      - name: Setup Python for native-factory policy tests
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Test native-factory finding reconciliation policy
+        run: python tests/test_native_factory_review_policy.py
+      - name: Test native-factory material-author provenance policy
+        run: python tests/test_native_factory_provenance.py
+      - name: Test external Mistral review trust chain
+        run: python tests/test_onecompany_external_review_gate.py
+      - name: Test strict GitHub ruleset policy
+        run: python tests/test_native_factory_ruleset_policy.py
 
   backend:
     name: Backend build, tests and dependency audit

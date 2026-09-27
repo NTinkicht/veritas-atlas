@@ -1,0 +1,35 @@
+name: Native Factory L4 Supervision
+
+on:
+  schedule:
+    - cron: "7,22,37,52 * * * *"
+  workflow_dispatch:
+  pull_request:
+    types:
+      - closed
+
+permissions:
+  contents: read
+  issues: read
+  pull-requests: read
+
+concurrency:
+  group: native-factory-supervision-${{ github.repository }}
+  cancel-in-progress: true
+
+jobs:
+  reconcile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      # Always execute the reconciler from trusted default-branch main.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: main
+          persist-credentials: false
+      - name: Self-test L4 selection rules
+        run: python scripts/native_factory_supervise.py --selftest
+      - name: Reconcile live L4 delivery state
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python scripts/native_factory_supervise.py

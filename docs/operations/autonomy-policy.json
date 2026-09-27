@@ -1,0 +1,83 @@
+{
+  "schema_version": "1.0",
+  "effective_date": "2026-09-27",
+  "autonomy_level": "L4",
+  "owner_authorized": true,
+  "source_of_truth": "github",
+  "continuous_engineering": {
+    "continue_when_ready_work_exists": true,
+    "no_idle": true,
+    "autonomous_implementation": true,
+    "ci_remediation": true,
+    "independent_non_author_exact_head_review": true,
+    "autonomous_merge": true,
+    "post_merge_replenishment": true,
+    "parallel_conflict_safe_wip": true,
+    "supervision_runtime": {
+      "native_read_only_script": "scripts/native_factory_supervise.py",
+      "trusted_main_workflow": ".github/workflows/native-factory-supervision.yml",
+      "ready_issue_label": "l4-ready",
+      "blocking_issue_labels": [
+        "l4-blocked",
+        "human-only",
+        "release-go-no-go"
+      ],
+      "mutating_execution_layer": "four_authorized_chatgpt_l4_scheduled_supervisors"
+    }
+  },
+  "merge_policy": {
+    "require_exact_head_ci": true,
+    "require_independent_non_author_review": true,
+    "required_finding_resolution_severity": "MEDIUM",
+    "require_no_unresolved_changes_requested": true,
+    "require_no_unresolved_required_threads": true,
+    "require_expected_head_merge": true,
+    "independent_review_failover": {
+      "native_authorized_exact_head_review": true,
+      "onecompany_external_mistral": {
+        "enabled": true,
+        "review_only": true,
+        "require_exact_repo_pr_head_base": true,
+        "require_exact_material_author_set": true,
+        "require_immutable_owner_dispatch": true,
+        "require_successful_protected_main_run": true,
+        "require_pass_report": true,
+        "grants_target_write_or_merge_authority": false
+      }
+    }
+  },
+  "human_only": [
+    "new_spending_or_paid_capacity",
+    "create_expand_or_export_credentials_or_secrets",
+    "destructive_production_operation",
+    "exceptional_or_first_production_migration_when_go_no_go_required",
+    "production_release_when_release_policy_requires_human_go_no_go",
+    "legal_or_business_policy",
+    "publish_sensitive_data",
+    "weaken_required_security_ci_or_review_controls",
+    "irreducible_product_direction",
+    "amend_autonomy_or_trusted_control_plane"
+  ],
+  "historical_l1_evidence_remains_historical": true,
+  "merge_does_not_imply_deployment": true,
+  "actor_identity": {
+    "material_actor_vocabulary": "model_level",
+    "distinct_actors": [
+      "chatgpt",
+      "codex",
+      "coderabbit"
+    ],
+    "reviewer_login_aliases": {
+      "chatgpt-codex-connector[bot]": "codex",
+      "coderabbitai[bot]": "coderabbit"
+    },
+    "transport_identity_does_not_merge_material_actors": true,
+    "authenticated_material_authorship": {
+      "preferred": "verified_platform_commit_provenance",
+      "ambiguous_transport_fallback": "immutable_owner_exact_head_attestation",
+      "attestation_marker": "L4-MATERIAL-AUTHORS",
+      "head_change_invalidates_attestation": true,
+      "edited_or_conflicting_attestation_fails_closed": true
+    }
+  }
+}
