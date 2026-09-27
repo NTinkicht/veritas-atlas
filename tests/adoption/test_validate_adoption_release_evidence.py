@@ -26,6 +26,29 @@ class AdoptionReleaseEvidenceTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "AUTHORITY_ESCALATION"):
             v.validate(self.h7, sample)
 
+    def test_missing_h7_constraint_fails_closed(self):
+        sample = copy.deepcopy(self.h7)
+        sample["constraints"].pop("merge_authority")
+        with self.assertRaisesRegex(ValueError, "H7_AUTHORITY_ESCALATION"):
+            v.validate(sample, self.h8)
+
+    def test_evidence_authority_mode_drift_fails_closed(self):
+        h7 = copy.deepcopy(self.h7)
+        h7["authority"] = "write-capable"
+        with self.assertRaisesRegex(ValueError, "H7_EVIDENCE_AUTHORITY_DRIFT"):
+            v.validate(h7, self.h8)
+
+        h8 = copy.deepcopy(self.h8)
+        h8["authority"] = "release-authority"
+        with self.assertRaisesRegex(ValueError, "H8_EVIDENCE_AUTHORITY_DRIFT"):
+            v.validate(self.h7, h8)
+
+    def test_external_writer_inventory_cannot_be_claimed_complete(self):
+        sample = copy.deepcopy(self.h8)
+        sample["verification"]["other_external_writers_exhaustively inventoried"] = True
+        with self.assertRaisesRegex(ValueError, "HISTORICAL_EVIDENCE_FALSELY_PROMOTED"):
+            v.validate(self.h7, sample)
+
     def test_deployed_source_or_target_drift_fails(self):
         sample = copy.deepcopy(self.h7)
         sample["writer_inventory"]["render"]["workspace_id"] = "wrong"

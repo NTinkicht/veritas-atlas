@@ -22,6 +22,16 @@ REQUIRED_H8_BLOCKERS = (
     "rollback/recovery drill",
     "credential",
 )
+REQUIRED_H7_CONSTRAINTS = frozenset({
+    "companyos_install",
+    "target_mutation",
+    "deployment",
+    "database_mutation",
+    "lease_dispatch_authority",
+    "merge_authority",
+    "budget_expansion",
+    "autonomy_promotion",
+})
 
 
 def load(path: Path) -> dict:
@@ -53,11 +63,19 @@ def validate(h7: dict, h8: dict) -> dict:
         raise ValueError("GATE_MISMATCH")
     if h7.get("status") != "blocked" or h8.get("status") != "blocked":
         raise ValueError("H7_H8_MUST_REMAIN_BLOCKED")
+    if h7.get("authority") != "read-only-evidence":
+        raise ValueError("H7_EVIDENCE_AUTHORITY_DRIFT")
+    if h8.get("authority") != "read-only-planning-evidence":
+        raise ValueError("H8_EVIDENCE_AUTHORITY_DRIFT")
     if h7.get("fail_closed") is not True or h7.get("cleared") is not False:
         raise ValueError("H7_FAIL_CLOSED_CONTRACT_BROKEN")
 
     constraints = h7.get("constraints")
-    if not isinstance(constraints, dict) or any(value is not False for value in constraints.values()):
+    if (
+        not isinstance(constraints, dict)
+        or set(constraints) != REQUIRED_H7_CONSTRAINTS
+        or any(constraints.get(key) is not False for key in REQUIRED_H7_CONSTRAINTS)
+    ):
         raise ValueError("H7_AUTHORITY_ESCALATION_DETECTED")
 
     release = h8.get("release_policy")
@@ -99,6 +117,7 @@ def validate(h7: dict, h8: dict) -> dict:
         "recovery_drill_verified",
         "immutable_container_digest_captured",
         "github_admin_protection_observed",
+        "other_external_writers_exhaustively inventoried",
         "credential_rotation_proof_in_non_secret_release_record",
         "candidate_security_advisories_resolved_or_owner_risk_accepted",
     )
