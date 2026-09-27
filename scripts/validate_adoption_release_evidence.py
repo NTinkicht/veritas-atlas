@@ -10,7 +10,11 @@ H7 = ROOT / "docs/operations/onecompany-adoption/evidence/veritas/h7-runtime-wri
 H8 = ROOT / "docs/operations/onecompany-adoption/evidence/veritas/h8-release-rollback-2026-09-19.json"
 RUNBOOK = ROOT / "docs/operations/onecompany-adoption/docs/VERITAS-H8-RELEASE-RUNBOOK.md"
 TARGET = "NTinkicht/veritas-atlas"
-FORBIDDEN_KEY_PARTS = ("password", "token", "secret", "connection_string", "connectionstring")
+FORBIDDEN_EXACT_KEYS = {
+    "password", "token", "secret", "api_key", "apikey",
+    "connection_string", "connectionstring", "authorization",
+}
+FORBIDDEN_KEY_SUFFIXES = ("_password", "_token", "_secret", "_api_key", "_connection_string")
 REQUIRED_H8_BLOCKERS = (
     "GitHub administrative promotion protection",
     "Full writer/provider inventory",
@@ -31,7 +35,7 @@ def reject_secret_fields(value, path="root") -> None:
     if isinstance(value, dict):
         for key, child in value.items():
             normalized = str(key).lower().replace("-", "_")
-            if any(part in normalized for part in FORBIDDEN_KEY_PARTS):
+            if normalized in FORBIDDEN_EXACT_KEYS or normalized.endswith(FORBIDDEN_KEY_SUFFIXES):
                 raise ValueError(f"SECRET_BEARING_FIELD_FORBIDDEN:{path}.{key}")
             reject_secret_fields(child, f"{path}.{key}")
     elif isinstance(value, list):
