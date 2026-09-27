@@ -14,8 +14,20 @@ jobs:
     name: Runner availability diagnostic
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Setup Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
       - name: Confirm GitHub-hosted runner
         run: echo "github-hosted-runner-ready"
+      - name: Validate project-owned adoption/release evidence
+        run: |
+          python scripts/validate_adoption_release_evidence.py
+          python tests/adoption/test_validate_adoption_release_evidence.py
 
   backend:
     name: Backend build, tests and dependency audit
