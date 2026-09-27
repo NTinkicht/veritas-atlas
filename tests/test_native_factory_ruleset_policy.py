@@ -14,6 +14,7 @@ REQUIRED={"Runner availability diagnostic","Backend build, tests and dependency 
 def base_ruleset():
     return {
         "enforcement":"active",
+        "target":"branch",
         "bypass_actors":[],
         "conditions":{"ref_name":{"include":["~DEFAULT_BRANCH"],"exclude":[]}},
         "rules":[
@@ -23,6 +24,7 @@ def base_ruleset():
                     "required_approving_review_count":1,
                     "dismiss_stale_reviews_on_push":True,
                     "require_last_push_approval":True,
+                    "required_review_thread_resolution":True,
                 },
             },
             {"type":"deletion"},
@@ -98,6 +100,15 @@ class RulesetPolicyTests(unittest.TestCase):
                 r=base_ruleset()
                 r["rules"]=[x for x in r["rules"] if x["type"] != missing]
                 self.assert_policy(r,False)
+
+    def test_non_branch_ruleset_fails(self):
+        r=base_ruleset(); r["target"]="tag"
+        self.assert_policy(r,False)
+
+    def test_review_thread_resolution_is_required(self):
+        r=base_ruleset()
+        r["rules"][0]["parameters"]["required_review_thread_resolution"]=False
+        self.assert_policy(r,False)
 
     def test_excluded_or_inactive_ruleset_fails(self):
         r=base_ruleset()
