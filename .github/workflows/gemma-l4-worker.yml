@@ -39,7 +39,11 @@ jobs:
           import os
           import pathlib
           import subprocess
+          import sys
           import urllib.request
+
+          sys.path.insert(0, "scripts")
+          import gemma_context_guard as guard
 
           max_diff = 60000
           diff = subprocess.check_output(
@@ -66,6 +70,7 @@ jobs:
               )
               raise SystemExit("CONTEXT_INCOMPLETE: full base-to-head diff exceeds bounded evidence limit")
 
+          guard.validate_diff(diff)
           prompt = pathlib.Path(".github/prompts/gemma-l4-worker.md").read_text(encoding="utf-8")
           payload = {
               "model": "google/gemma-3-27b-it:free",
