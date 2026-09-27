@@ -4,6 +4,16 @@ import os
 import subprocess
 from pathlib import Path
 
+from native_factory_provenance import (
+    attested_material_actors,
+    authenticated_material_actors,
+    complete_pr_commit_history,
+    owner_attestation_allowed,
+)
+from native_factory_review_policy import unresolved_substantive_findings as reconcile_findings
+from native_factory_ruleset_policy import strict_ruleset_enforces
+from onecompany_external_review_gate import external_mistral_pass
+
 REPO = os.environ["GITHUB_REPOSITORY"]
 OWNER, NAME = REPO.split("/", 1)
 EVENT = json.loads(Path(os.environ["GITHUB_EVENT_PATH"]).read_text())
@@ -11,10 +21,26 @@ MAX_PAGES = 10
 CI_WORKFLOW_NAME = "Veritas Atlas CI"
 CI_WORKFLOW_PATH = ".github/workflows/ci.yml"
 TRUSTED_CONTROL_PATHS = frozenset({
-    CI_WORKFLOW_PATH,
-    ".github/workflows/native-factory-merge-controller.yml",
     "scripts/native_factory_merge.py",
+    "scripts/native_factory_supervise.py",
+    "scripts/native_factory_provenance.py",
+    "scripts/native_factory_review_policy.py",
+    "scripts/native_factory_ruleset_policy.py",
+    "scripts/onecompany_external_review_gate.py",
+    "tests/test_native_factory_provenance.py",
+    "tests/test_native_factory_review_policy.py",
+    "tests/test_native_factory_ruleset_policy.py",
+    "tests/test_onecompany_external_review_gate.py",
+    "docs/operations/AUTONOMY_POLICY.md",
+    "docs/operations/autonomy-policy.json",
+    "docs/operations/onecompany-adoption/docs/VERITAS-H8-RELEASE-RUNBOOK.md",
+    "docs/FIRST_RENDER_STAGING_DEPLOYMENT.md",
 })
+TRUSTED_CONTROL_PREFIXES = (
+    ".github/workflows/",
+    "scripts/",
+    "docs/operations/onecompany-adoption/docs/VERITAS-H",
+)
 REQUIRED_JOBS = frozenset({
     "Runner availability diagnostic",
     "Backend build, tests and dependency audit",
@@ -28,7 +54,21 @@ AUTHORIZED_REVIEWERS = frozenset({
     "chatgpt-codex-connector[bot]",
 })
 
-
+# Canonical material-actor vocabulary. ChatGPT and Codex are distinct actors;
+# the GitHub Codex connector reviews as actor=codex. Commit trailers and
+# platform logins are normalized through the same table before comparison.
+ACTOR_ALIASES = {
+    "coderabbitai[bot]": "coderabbit",
+    "coderabbit": "coderabbit",
+    "chatgpt-codex-connector[bot]": "codex",
+    "chatgpt-codex-connector": "codex",
+    "codex": "codex",
+    "chatgpt": "chatgpt",
+}
+FINDING_COMMENT_AUTHORS = AUTHORIZED_REVIEWERS | frozenset({
+    "ntinkicht",
+    "github-actions[bot]",
+})
 def gh(path, method=None, fields=None):
     command = ["gh", "api"]
     if method:
@@ -124,6 +164,48 @@ def latest_ci_green(number, sha, base_sha):
     )
 
 
+def material_authors(number, sha):
+    """Return material actors only from a complete PR commit history."""
+    pr = gh(f"repos/{REPO}/pulls/{number}")
+    expected = pr.get("commits")
+    commits = paged(f"repos/{REPO}/pulls/{number}/commits")
+    # GitHub caps this endpoint at 250 commits; compare against the PR's
+    # authoritative count and reject any truncated or oversized history.
+    if not complete_pr_commit_history(commits, expected):
+        return set()
+    authors = authenticated_material_actors(commits, aliases=ACTOR_ALIASES)
+    if authors:
+        return authors
+    if not owner_attestation_allowed(commits):
+        return set()
+    return attested_material_actors(
+        paged(f"repos/{REPO}/issues/{number}/comments"),
+        sha=sha,
+        aliases=ACTOR_ALIASES,
+    )
+
+def reviewer_actor(login):
+    return ACTOR_ALIASES.get(login, login)
+
+
+def trusted_control_change(paths):
+    return any(
+        path in TRUSTED_CONTROL_PATHS
+        or any(path.startswith(prefix) for prefix in TRUSTED_CONTROL_PREFIXES)
+        for path in paths
+    )
+
+
+def unresolved_substantive_findings(number, sha):
+    """Return trusted Medium/P2+ findings not reconciled against exact content."""
+    return reconcile_findings(
+        reviews=paged(f"repos/{REPO}/pulls/{number}/reviews"),
+        issue_comments=paged(f"repos/{REPO}/issues/{number}/comments"),
+        inline_comments=paged(f"repos/{REPO}/pulls/{number}/comments"),
+        sha=sha,
+        finding_comment_authors=FINDING_COMMENT_AUTHORS,
+    )
+
 def latest_review_decisions(number):
     reviews = paged(f"repos/{REPO}/pulls/{number}/reviews")
     latest = {}
@@ -144,19 +226,44 @@ def latest_review_decisions(number):
     return {login: item[1] for login, item in latest.items()}
 
 
-def review_gate_clean(number, sha):
+def review_gate_clean(number, sha, base_sha):
     decisions = latest_review_decisions(number)
-    approved = any(
-        login in AUTHORIZED_REVIEWERS
-        and review.get("state") == "APPROVED"
-        and review.get("commit_id") == sha
-        for login, review in decisions.items()
-    )
+    authors = material_authors(number, sha)
+    if not authors:
+        return False
+
+    eligible_approvals = []
+    for login, review in decisions.items():
+        if (
+            login in AUTHORIZED_REVIEWERS
+            and review.get("state") == "APPROVED"
+            and review.get("commit_id") == sha
+            and reviewer_actor(login) not in authors
+        ):
+            eligible_approvals.append(review.get("id"))
+
     adverse = any(
         review.get("state") == "CHANGES_REQUESTED"
         for review in decisions.values()
     )
-    return approved and not adverse
+    if adverse:
+        return False
+
+    # A valid native approval is sufficient. Only invoke the external failover
+    # when the native lane did not produce an eligible exact-head approval.
+    if not eligible_approvals:
+        if not external_mistral_pass(
+            repo=REPO,
+            pr=number,
+            head=sha,
+            base=base_sha,
+            authors=authors,
+        ):
+            return False
+
+    if unresolved_substantive_findings(number, sha):
+        return False
+    return True
 
 
 def has_unresolved_threads(number):
@@ -195,18 +302,50 @@ def has_unresolved_threads(number):
 
 
 def strict_base_enforcement():
-    """Require GitHub itself to reject a merge when main moved after tested CI.
+    """Require platform-enforced strict base synchronization before merge.
 
-    The merge REST API has an expected-head precondition but no expected-base
-    parameter. Delegate the base CAS to GitHub's strict required-status-check
-    branch protection; if that protection cannot be proven, fail closed.
+    Prefer classic protection when readable. If the Actions token cannot read
+    that admin endpoint, accept only a readable ACTIVE repository ruleset that
+    targets main, has no bypass actors, requires PRs, prevents deletion/force
+    pushes, and requires every deterministic job with strict status-check policy.
     """
     try:
         protection = gh(f"repos/{REPO}/branches/main/protection")
+        checks = protection.get("required_status_checks")
+        if isinstance(checks, dict) and checks.get("strict") is True:
+            return True
+    except RuntimeError:
+        pass
+
+    try:
+        repository = gh(f"repos/{REPO}")
+        default_branch = repository.get("default_branch")
+        if default_branch != "main":
+            return False
+        summaries = gh(f"repos/{REPO}/rulesets")
     except RuntimeError:
         return False
-    checks = protection.get("required_status_checks")
-    return isinstance(checks, dict) and checks.get("strict") is True
+    if not isinstance(summaries, list):
+        return False
+    for summary in summaries:
+        if (
+            not isinstance(summary, dict)
+            or summary.get("enforcement") != "active"
+            or not summary.get("id")
+        ):
+            continue
+        try:
+            detail = gh(f"repos/{REPO}/rulesets/{summary['id']}")
+        except RuntimeError:
+            continue
+        if strict_ruleset_enforces(
+            detail,
+            branch="main",
+            required_checks=REQUIRED_JOBS,
+            default_branch=default_branch,
+        ):
+            return True
+    return False
 
 
 def candidates():
@@ -237,7 +376,7 @@ def gates(number):
     if not isinstance(base_sha, str) or len(base_sha) != 40:
         print(f"PR #{number}: BASE_SHA_UNAVAILABLE")
         return None
-    if changed_paths(number) & TRUSTED_CONTROL_PATHS:
+    if trusted_control_change(changed_paths(number)):
         print(f"PR #{number}: TRUSTED_CONTROL_CHANGE_REQUIRES_EXTERNAL_MERGE")
         return None
     if not strict_base_enforcement():
@@ -246,7 +385,7 @@ def gates(number):
     if not latest_ci_green(number, sha, base_sha):
         print(f"PR #{number}: LATEST_EXACT_HEAD_CI_NOT_GREEN")
         return None
-    if not review_gate_clean(number, sha):
+    if not review_gate_clean(number, sha, base_sha):
         print(f"PR #{number}: AUTHORIZED_EXACT_HEAD_REVIEW_NOT_CLEAN")
         return None
     if has_unresolved_threads(number):
@@ -276,7 +415,7 @@ for number in candidates():
     if not latest_ci_green(number, sha, base_sha):
         print(f"PR #{number}: FINAL_CI_RECHECK_BLOCKED")
         continue
-    if not review_gate_clean(number, sha) or has_unresolved_threads(number):
+    if not review_gate_clean(number, sha, base_sha) or has_unresolved_threads(number):
         print(f"PR #{number}: FINAL_REVIEW_RECHECK_BLOCKED")
         continue
 

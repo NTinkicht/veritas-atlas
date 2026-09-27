@@ -48,3 +48,15 @@ These endpoints do not grant deployment or publication authority.
 See [first Render staging deployment](docs/FIRST_RENDER_STAGING_DEPLOYMENT.md).
 The deployment Blueprint must be reviewed and manually synced, uses separate
 Veritas resources, and does not authorize OneCompany target mutations.
+
+
+## Engineering autonomy
+
+Current engineering autonomy is **L4 — Continuous Company**. See
+`docs/operations/AUTONOMY_POLICY.md` and
+`docs/operations/autonomy-policy.json`.
+
+L4 authorizes continuous bounded engineering, independent exact-head review,
+policy-compliant autonomous merge and post-merge next-WU selection. It does
+not itself authorize production deployment, destructive migration, new
+credentials/spend or any separate human release/go-no-go decision.

@@ -28,6 +28,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
+      # Security boundary: execute merge policy only from trusted default-branch main,
+      # never from the candidate PR's copy of this workflow or controller.
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           ref: main

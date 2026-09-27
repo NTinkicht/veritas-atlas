@@ -1,5 +1,7 @@
 # Veritas Atlas activation checkpoint — 19 September 2026
 
+> **Historical evidence notice (2026-09-27):** this document records the L1 authority observed on 19 September 2026. Current engineering autonomy is governed by `docs/operations/AUTONOMY_POLICY.md`, which is owner-authorized at L4. The historical L1 facts below remain unchanged and must not be used to infer current engineering authority. Separate deployment/migration/release gates described here remain in force where the current L4 policy reserves them.
+
 **Purpose:** put current target reality back into OneCompany, not to declare a
 cutover. Companion exact-target evidence:
 `source-evidence/veritas-atlas/staging-runtime-2026-09-19.json`.
