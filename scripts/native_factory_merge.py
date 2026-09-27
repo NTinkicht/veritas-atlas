@@ -301,18 +301,51 @@ def has_unresolved_threads(number):
     raise RuntimeError("REVIEW_THREAD_PAGE_BOUND_EXCEEDED")
 
 
-def strict_base_enforcement():
-    """Require platform-enforced strict base synchronization before merge.
+def _classic_protection_enforces(protection):
+    checks = protection.get("required_status_checks")
+    reviews = protection.get("required_pull_request_reviews")
+    enforce_admins = protection.get("enforce_admins")
+    force_pushes = protection.get("allow_force_pushes")
+    deletions = protection.get("allow_deletions")
+    if (
+        not isinstance(checks, dict)
+        or checks.get("strict") is not True
+        or not isinstance(reviews, dict)
+        or int(reviews.get("required_approving_review_count") or 0) < 1
+        or reviews.get("dismiss_stale_reviews") is not True
+        or reviews.get("require_last_push_approval") is not True
+        or not isinstance(enforce_admins, dict)
+        or enforce_admins.get("enabled") is not True
+        or not isinstance(force_pushes, dict)
+        or force_pushes.get("enabled") is not False
+        or not isinstance(deletions, dict)
+        or deletions.get("enabled") is not False
+    ):
+        return False
+    configured = checks.get("checks")
+    if not isinstance(configured, list):
+        return False
+    if not all(
+        any(
+            isinstance(item, dict)
+            and item.get("context") == context
+            and item.get("app_id") == 15368
+            for item in configured
+        )
+        for context in REQUIRED_JOBS
+    ):
+        return False
+    allowances = reviews.get("bypass_pull_request_allowances")
+    if not isinstance(allowances, dict):
+        return False
+    return not any(allowances.get(key) for key in ("users", "teams", "apps"))
 
-    Prefer classic protection when readable. If the Actions token cannot read
-    that admin endpoint, accept only a readable ACTIVE repository ruleset that
-    targets main, has no bypass actors, requires PRs, prevents deletion/force
-    pushes, and requires every deterministic job with strict status-check policy.
-    """
+
+def strict_base_enforcement():
+    """Require non-bypassable, publisher-bound, fresh-review protection on main."""
     try:
         protection = gh(f"repos/{REPO}/branches/main/protection")
-        checks = protection.get("required_status_checks")
-        if isinstance(checks, dict) and checks.get("strict") is True:
+        if isinstance(protection, dict) and _classic_protection_enforces(protection):
             return True
     except RuntimeError:
         pass
@@ -322,10 +355,8 @@ def strict_base_enforcement():
         default_branch = repository.get("default_branch")
         if default_branch != "main":
             return False
-        summaries = gh(f"repos/{REPO}/rulesets")
+        summaries = paged(f"repos/{REPO}/rulesets")
     except RuntimeError:
-        return False
-    if not isinstance(summaries, list):
         return False
     for summary in summaries:
         if (
@@ -410,13 +441,16 @@ for number in candidates():
         print(f"PR #{number}: HEAD_MOVED_OR_NOT_MERGEABLE")
         continue
 
-    # Repeat every mutable review/CI predicate immediately before the
-    # expected-head merge call.
+    # Repeat every mutable CI/review predicate, then re-check platform
+    # enforcement as the final gate immediately before the expected-head merge.
     if not latest_ci_green(number, sha, base_sha):
         print(f"PR #{number}: FINAL_CI_RECHECK_BLOCKED")
         continue
     if not review_gate_clean(number, sha, base_sha) or has_unresolved_threads(number):
         print(f"PR #{number}: FINAL_REVIEW_RECHECK_BLOCKED")
+        continue
+    if not strict_base_enforcement():
+        print(f"PR #{number}: FINAL_STRICT_BASE_PROTECTION_NOT_VERIFIED")
         continue
 
     merged = gh(
