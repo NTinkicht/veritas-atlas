@@ -43,6 +43,12 @@ jobs:
         run: python tests/test_onecompany_external_review_gate.py
       - name: Test strict GitHub ruleset policy
         run: python tests/test_native_factory_ruleset_policy.py
+      - name: Run L5 certification matrix
+        run: python scripts/l5_certification.py
+      - name: Run L5 certification regressions
+        run: python tests/test_l5_certification.py
+      - name: Verify L5 certification optimized mode
+        run: python -O scripts/l5_certification.py
 
   backend:
     name: Backend build, tests and dependency audit
