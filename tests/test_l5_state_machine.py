@@ -39,6 +39,7 @@ class L5StateMachineTest(unittest.TestCase):
             "review_base_sha": base,
             "reviewer_actor": "codex",
             "material_authors": ["chatgpt"],
+            "material_authors_head_sha": head,
             "review_eligible": True,
             "unresolved_threads": False,
             "mergeable": True,
@@ -67,6 +68,11 @@ class L5StateMachineTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             l5.reduce_evidence(sample)
 
+    def test_merged_missing_canonical_identity_reconciles(self):
+        sample = self.base()
+        sample.update(canonical_pr=None, active_prs=[], merged=True)
+        self.assertEqual(l5.reduce_evidence(sample)["next_action"], "RECONCILE_CANONICAL_PR")
+
     def test_duplicate_stream_blocks(self):
         sample = self.base()
         sample["active_prs"] = [30, 31]
@@ -79,6 +85,11 @@ class L5StateMachineTest(unittest.TestCase):
         sample = self.base()
         sample["reviewer_actor"] = "chatgpt"
         self.assertEqual(l5.reduce_evidence(sample)["next_action"], "DISPATCH_ELIGIBLE_NONAUTHOR_REVIEW")
+
+    def test_authorship_is_bound_to_exact_head(self):
+        sample = self.base()
+        sample["material_authors_head_sha"] = "c" * 40
+        self.assertEqual(l5.reduce_evidence(sample)["next_action"], "RECONCILE_MATERIAL_AUTHORSHIP")
 
     def test_empty_authorship_fails_closed(self):
         sample = self.base()
