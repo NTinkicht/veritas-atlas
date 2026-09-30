@@ -23,3 +23,7 @@ jobs:
           python-version: '3.12'
       - name: Validate deterministic L5 continuity invariants
         run: python scripts/l5_continuity.py --selftest
+      - name: Validate candidate L5 continuity policy
+        env:
+          GITHUB_REPOSITORY: NTinkicht/veritas-atlas
+        run: python scripts/l5_continuity.py --validate-policy
