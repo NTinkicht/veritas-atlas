@@ -11,7 +11,7 @@ from pathlib import Path
 POLICY_PATH = Path("scripts/l5_continuity_policy.json")
 MAX_PAGES = 10
 WORK_REF = re.compile(
-    r"(?i)\b(?:implements?|closes?|fixes?|resolves?|tracks?)\s+#([1-9][0-9]{0,5})(?![0-9])"
+    r"(?i)\b(?:implements?|closes?|fixes?|resolves?)\s+#([1-9][0-9]{0,5})(?![0-9])"
 )
 MANDATORY_BLOCKING_LABELS = {"l4-blocked", "human-only", "release-go-no-go"}
 
@@ -92,7 +92,7 @@ def quota_pr_rows(pulls: list[dict], *, count_drafts: bool) -> list[dict]:
 def represented_issue_numbers(pulls: list[dict], repo: str) -> set[int]:
     represented: set[int] = set()
     url_ref = re.compile(
-        rf"(?i)\b(?:implements?|closes?|fixes?|resolves?|tracks?)\s+"
+        rf"(?i)\b(?:implements?|closes?|fixes?|resolves?)\s+"
         rf"https://github\.com/{re.escape(repo)}/issues/([1-9][0-9]{{0,5}})(?![0-9])"
     )
     for pr in pulls:
@@ -136,12 +136,19 @@ def reconcile(policy: dict, repo: str) -> dict:
         {x.lower() for x in policy["blocking_labels"]},
         represented_issue_numbers(all_rows, repo),
     )
-    selected = candidates[:1] if deficit else []
+    # Phase 1 is intentionally fail-closed for parallel WIP. Until an explicit,
+    # reviewable conflict-proof mechanism exists, do not plan another stream while
+    # any internal PR is already active. This also prevents duplicate streams when
+    # GitHub's Development sidebar links an issue to an active PR but the PR body
+    # contains no canonical closing keyword we can safely parse here.
+    selected = candidates[:1] if deficit and not all_rows else []
     unfilled = max(0, deficit - len(selected))
     if deficit == 0:
         status = "QUOTA_SATISFIED"
+    elif all_rows:
+        status = "REPLENISHMENT_BLOCKED_ACTIVE_WIP_CONFLICT_PROOF_REQUIRED"
     elif selected:
-        status = "REPLENISHMENT_PLANNED_CONFLICT_CHECK_REQUIRED_FOR_MORE"
+        status = "REPLENISHMENT_PLANNED"
     else:
         status = "IDLE_CAPACITY_NO_READY_WORK"
     return {
@@ -167,7 +174,7 @@ def selftest() -> None:
             "draft": False,
             "base": {"ref": "main"},
             "head": {"repo": {"full_name": repo}},
-            "body": "Implements #3. Follow-up work remains in #9.",
+            "body": "Implements #3. Follow-up work remains in #9. Tracks #11.",
         },
         {
             "number": 8,
