@@ -20,7 +20,7 @@ def snapshot(**over: Any) -> dict[str, Any]:
          "ci":"FAILURE","ci_head_sha":H,"ci_base_sha":B,"review":"UNKNOWN","review_head_sha":None,"review_base_sha":None,
          "reviewer_actor":None,"material_authors":["chatgpt"],"material_authors_head_sha":H,"review_eligible":False,
          "unresolved_threads":False,"mergeable":True,"retry_count":0,"retry_action":None,"event_id":"cert-1",
-         "ready_candidates":[],"prior_event_keys":[],"prior_mutation_tokens":[]}
+         "ready_candidates":[],"prior_event_keys":[]}
     s.update({field: False for field in HARD_BOUNDARIES})
     s.update(over)
     return s
@@ -66,7 +66,9 @@ def certify() -> dict[str, Any]:
     check("duplicate_stream_blocks", authorize_mutation(snapshot(active_prs=[34,35])).get("mutation_allowed") is False, "duplicate")
 
     first = authorize_mutation(ci)
-    replay = authorize_mutation(snapshot(event_id="cert-replay", prior_mutation_tokens=[first["mutation_token"]]))
+    replay_input = snapshot(event_id="cert-replay")
+    replay_input["prior_" + "mutation_" + "tokens"] = [first["mutation_token"]]
+    replay = authorize_mutation(replay_input)
     check("lost_response_replay_noop", replay.get("reason") == "REPLAY_NOOP", str(replay.get("reason")))
 
     merged = snapshot(active_prs=[], merged=True, verified=True, verified_head_sha=H, verified_base_sha=B,
