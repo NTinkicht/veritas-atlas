@@ -57,8 +57,9 @@ class RecoveryTest(unittest.TestCase):
                  reviewer_actor="coderabbit", review_eligible=True)
         a = l5.authorize_mutation(s)
         self.assertEqual(a["mutation"], "merge_expected_head")
-        with self.assertRaises(ValueError):
-            l5.authorize_mutation({**s, "unresolved_threads": True})
+        blocked = l5.authorize_mutation({**s, "unresolved_threads": True})
+        self.assertFalse(blocked["mutation_allowed"])
+        self.assertEqual(blocked["planned_action"], "REMEDIATE_SAME_PR_REVIEW")
 
     def test_verified_merge_replenishes_only_conflict_safe_ready_work(self):
         s = snap(active_prs=[], merged=True, verified=True, verified_head_sha=H, verified_base_sha=B,
