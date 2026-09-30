@@ -8,20 +8,20 @@ from pathlib import Path
 from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from l5_recovery import MAX_RETRIES, authorize_mutation, plan_recovery
+from l5_recovery import HARD_BOUNDARIES, MAX_RETRIES, authorize_mutation, plan_recovery
 
 H, B = "a" * 40, "b" * 40
 
 
 def snapshot(**over: Any) -> dict[str, Any]:
     s = {"repository":"NTinkicht/veritas-atlas","issue":31,"canonical_pr":34,"active_prs":[34],"head_sha":H,"base_sha":B,
-         "head_current":True,"base_current":True,"implementation_complete":True,"emergency_stop":False,"human_only":False,
-         "release_go_no_go":False,"blocked":False,"destructive_production":False,"spend_required":False,"secret_scope_change":False,
-         "security_control_weakening":False,"merged":False,"verified":False,"verified_head_sha":None,"verified_base_sha":None,
+         "head_current":True,"base_current":True,"implementation_complete":True,
+         "merged":False,"verified":False,"verified_head_sha":None,"verified_base_sha":None,
          "ci":"FAILURE","ci_head_sha":H,"ci_base_sha":B,"review":"UNKNOWN","review_head_sha":None,"review_base_sha":None,
          "reviewer_actor":None,"material_authors":["chatgpt"],"material_authors_head_sha":H,"review_eligible":False,
          "unresolved_threads":False,"mergeable":True,"retry_count":0,"retry_action":None,"event_id":"cert-1",
          "ready_candidates":[],"prior_event_keys":[],"prior_mutation_tokens":[]}
+    s.update({field: False for field in HARD_BOUNDARIES})
     s.update(over)
     return s
 
@@ -58,7 +58,7 @@ def certify() -> dict[str, Any]:
     threads = authorize_mutation({**clean, "unresolved_threads": True})
     check("threads_block_merge_allow_remediation", threads.get("mutation") == "remediate_review", str(threads.get("mutation")))
 
-    for field in ("emergency_stop","human_only","release_go_no_go","blocked","destructive_production","spend_required","secret_scope_change","security_control_weakening"):
+    for field in HARD_BOUNDARIES:
         a = authorize_mutation(snapshot(**{field: True}))
         check(f"hard_boundary_{field}", a.get("mutation_allowed") is False, str(a.get("reason")))
 
