@@ -1,28 +1,21 @@
 #!/usr/bin/env python3
-"""Claude hostile-design L5 coordination kernel.
-
-Credential-free deterministic policy and coordination primitives. Gate evidence
-must be structured and authenticated by trusted adapters; model prose is never
-gate evidence.
-"""
+"""Claude-exact L5 coordination kernel."""
 from __future__ import annotations
-from dataclasses import dataclass, replace
+from dataclasses import dataclass,replace
 from enum import Enum
 from hashlib import sha256
 import json,re,uuid
 from typing import Any,Mapping,Protocol
-SHA40=re.compile(r"^[0-9a-fA-F]{40}$");DANGEROUS=frozenset({"push","update_branch","merge","enqueue","revert"});HARMLESS=frozenset({"label","comment","review_request","ci_rerun"});MAX_CI_RERUNS=2;MAX_FIX_ITERATIONS=5;MAX_REVIEW_ROUNDS=3;MAX_LEASES=12
-class RepoMode(str,Enum):
- NORMAL="NORMAL";MERGE_LOCKED="MERGE_LOCKED";MAIN_BROKEN="MAIN_BROKEN";MAIN_BROKEN_ENV="MAIN_BROKEN_ENV";AUTOMATION_DEGRADED="AUTOMATION_DEGRADED";PROVIDER_THROTTLED="PROVIDER_THROTTLED";GOVERNANCE_DRIFT="GOVERNANCE_DRIFT";SECURITY_INTEGRITY_FAILURE="SECURITY_INTEGRITY_FAILURE";CONTROLLER_INTEGRITY="CONTROLLER_INTEGRITY";HALTED="HALTED";ARCHIVED_PERMISSION_LOST="ARCHIVED_PERMISSION_LOST"
+SHA40=re.compile(r"^[0-9a-fA-F]{40}$");DANGEROUS=frozenset({"push","update_branch","merge","enqueue","revert","reserve_next_wu"});HARMLESS=frozenset({"comment","review_request","ci_rerun"});MAX_CI_RERUNS=2;MAX_FIX_ITERATIONS=5;MAX_REVIEW_ROUNDS=3;MAX_LEASES=12
+class RepoMode(str,Enum):NORMAL="NORMAL";MERGE_LOCKED="MERGE_LOCKED";MAIN_BROKEN="MAIN_BROKEN";MAIN_BROKEN_ENV="MAIN_BROKEN_ENV";AUTOMATION_DEGRADED="AUTOMATION_DEGRADED";PROVIDER_THROTTLED="PROVIDER_THROTTLED";GOVERNANCE_DRIFT="GOVERNANCE_DRIFT";SECURITY_INTEGRITY_FAILURE="SECURITY_INTEGRITY_FAILURE";CONTROLLER_INTEGRITY="CONTROLLER_INTEGRITY";HALTED="HALTED";ARCHIVED_PERMISSION_LOST="ARCHIVED_PERMISSION_LOST"
 HUMAN_CLEAR_ONLY=frozenset({RepoMode.HALTED,RepoMode.CONTROLLER_INTEGRITY,RepoMode.SECURITY_INTEGRITY_FAILURE,RepoMode.GOVERNANCE_DRIFT})
-class ItemState(str,Enum):
- GOVERNANCE_CHANGE="GOVERNANCE_CHANGE";WAIT_CI="WAIT_CI";CI_MISSING="CI_MISSING";CI_RED_INFRA="CI_RED_INFRA";CI_RED_DETERMINISTIC="CI_RED_DETERMINISTIC";BEHIND_BASE="BEHIND_BASE";CI_GREEN_UNREVIEWED="CI_GREEN_UNREVIEWED";FINDINGS_OPEN="FINDINGS_OPEN";DISPUTED_FINDING="DISPUTED_FINDING";BLOCK_HUMAN="BLOCK_HUMAN";WAIT_DEPENDENCY="WAIT_DEPENDENCY";MERGE_ELIGIBLE="MERGE_ELIGIBLE";MERGE_QUEUED="MERGE_QUEUED";MERGE_OUTCOME_UNKNOWN="MERGE_OUTCOME_UNKNOWN";MERGED_UNVERIFIED="MERGED_UNVERIFIED";MERGED_VERIFIED="MERGED_VERIFIED";MAIN_BROKEN="MAIN_BROKEN";REVERT_PENDING="REVERT_PENDING";SUPERSEDED="SUPERSEDED";PARKED="PARKED";WAIT_PROVIDER="WAIT_PROVIDER";IMPLEMENT="IMPLEMENT";IDLE="IDLE"
+class ItemState(str,Enum):GOVERNANCE_CHANGE="GOVERNANCE_CHANGE";WAIT_CI="WAIT_CI";CI_MISSING="CI_MISSING";CI_RED_INFRA="CI_RED_INFRA";CI_RED_DETERMINISTIC="CI_RED_DETERMINISTIC";BEHIND_BASE="BEHIND_BASE";CI_GREEN_UNREVIEWED="CI_GREEN_UNREVIEWED";FINDINGS_OPEN="FINDINGS_OPEN";DISPUTED_FINDING="DISPUTED_FINDING";BLOCK_HUMAN="BLOCK_HUMAN";WAIT_DEPENDENCY="WAIT_DEPENDENCY";MERGE_ELIGIBLE="MERGE_ELIGIBLE";MERGE_QUEUED="MERGE_QUEUED";MERGE_OUTCOME_UNKNOWN="MERGE_OUTCOME_UNKNOWN";MERGED_UNVERIFIED="MERGED_UNVERIFIED";MERGED_VERIFIED="MERGED_VERIFIED";MAIN_BROKEN="MAIN_BROKEN";REVERT_PENDING="REVERT_PENDING";SUPERSEDED="SUPERSEDED";PARKED="PARKED";WAIT_PROVIDER="WAIT_PROVIDER";IMPLEMENT="IMPLEMENT";IDLE="IDLE"
 @dataclass(frozen=True)
 class Observation:head:str;base:str;wu_body_hash:str="";pr_updated_at:str=""
 @dataclass(frozen=True)
 class Intent:op_id:str;idem_key:str;operation:str;expected_head:str;expected_base:str;epoch:int;state:str="PENDING"
 @dataclass(frozen=True)
-class Lease:key:str;holder:str;epoch:int;observed:Observation;acquired_at:float;expires_at:float;version:int;intent:Intent|None=None;active:bool=True
+class Lease:key:str;holder:str;epoch:int;observed:Observation;acquired_at:float;expires_at:float;version:int;intent:Intent|None=None
 @dataclass(frozen=True)
 class Budget:
  ci_reruns:int=0;fix_iterations:int=0;review_rounds:int=0;lease_acquisitions:int=0
@@ -31,8 +24,7 @@ class CASStore(Protocol):
  def read(self,key:str)->Lease|None:...
  def cas(self,key:str,expected_version:int|None,value:Lease)->bool:...
  def read_repo_mode(self,repo_id:str)->tuple[RepoMode,int|None]:...
- def cas_repo_mode(self,repo_id:str,expected_version:int|None,mode:RepoMode)->bool:...
- def list_leases(self)->list[Lease]:...
+ def cas_repo_mode(self,repo_id:str,expected_version:int|None,mode:RepoMode,*,human_clear:bool=False)->bool:...
 class MemoryCASStore:
  def __init__(self):self.leases={};self.modes={}
  def read(self,key):return self.leases.get(key)
@@ -40,61 +32,64 @@ class MemoryCASStore:
   cur=self.leases.get(key);actual=None if cur is None else cur.version
   if actual!=expected_version:return False
   self.leases[key]=value;return True
- def read_repo_mode(self,repo_id):return self.modes.get(repo_id,(RepoMode.NORMAL,None))
- def cas_repo_mode(self,repo_id,expected_version,mode):
+ def read_repo_mode(self,repo_id):return self.modes.get(repo_id,(RepoMode.AUTOMATION_DEGRADED,None))
+ def cas_repo_mode(self,repo_id,expected_version,mode,*,human_clear=False):
   cur=self.modes.get(repo_id);actual=None if cur is None else cur[1]
   if actual!=expected_version:return False
+  old=RepoMode.AUTOMATION_DEGRADED if cur is None else cur[0]
+  if old in HUMAN_CLEAR_ONLY and old!=mode and not human_clear:return False
   self.modes[repo_id]=(mode,1 if cur is None else cur[1]+1);return True
- def list_leases(self):return list(self.leases.values())
 def new_run_id():return str(uuid.uuid4())
-def idem_key(repo_id,item,head,operation):return sha256(json.dumps([repo_id,item,head,operation],separators=(",",":")).encode()).hexdigest()
+def idem_key(repo_id,item,head,base,operation):return sha256(json.dumps([repo_id,item,head,base,operation],separators=(",",":")).encode()).hexdigest()
 def lease_key(repo_id,item_kind,item_id,op_class):return f"{repo_id}:{item_kind}:{item_id}:{op_class}"
 def repo_merge_lock_key(repo_id):return lease_key(repo_id,"repo",repo_id,"REPO_MERGE_LOCK")
 def capacity_slot_key(repo_id,slot):
  if type(slot) is not int or slot<1:raise ValueError("CAPACITY_SLOT_INVALID")
  return lease_key(repo_id,"capacity",str(slot),f"CAPACITY_SLOT_{slot}")
 def acquire(store,key,holder,observed,*,now_srv,ttl=300):
+ if ttl<=0:raise ValueError("LEASE_TTL_INVALID")
  cur=store.read(key)
- if cur and cur.active and cur.expires_at>now_srv:return None
+ if cur and cur.expires_at>now_srv:return None
  if cur and cur.intent and cur.intent.state=="PENDING":return None
- epoch=1 if cur is None else cur.epoch+1;version=1 if cur is None else cur.version+1;nxt=Lease(key,holder,epoch,observed,now_srv,now_srv+ttl,version,intent=None,active=True)
- return nxt if store.cas(key,None if cur is None else cur.version,nxt) else None
+ e=1 if cur is None else cur.epoch+1;v=1 if cur is None else cur.version+1;n=Lease(key,holder,e,observed,now_srv,now_srv+ttl,v);return n if store.cas(key,None if cur is None else cur.version,n) else None
 def renew(store,lease,*,now_srv,ttl=300):
+ if ttl<=0 or now_srv>=lease.expires_at:return None
  cur=store.read(lease.key)
- if cur!=lease or not cur.active:return None
- nxt=replace(cur,expires_at=now_srv+ttl,version=cur.version+1);return nxt if store.cas(cur.key,cur.version,nxt) else None
-def attach_intent(store,lease,repo_id,item,operation):
+ if cur!=lease:return None
+ n=replace(cur,expires_at=now_srv+ttl,version=cur.version+1);return n if store.cas(cur.key,cur.version,n) else None
+def attach_intent(store,lease,repo_id,item,operation,*,now_srv):
+ if operation not in DANGEROUS|HARMLESS or now_srv>=lease.expires_at:return None
  cur=store.read(lease.key)
- if cur!=lease or not cur.active or operation not in DANGEROUS|HARMLESS or (cur.intent is not None and cur.intent.state=="PENDING"):return None
- it=Intent(str(uuid.uuid4()),idem_key(repo_id,item,cur.observed.head,operation),operation,cur.observed.head,cur.observed.base,cur.epoch);nxt=replace(cur,intent=it,version=cur.version+1);return nxt if store.cas(cur.key,cur.version,nxt) else None
+ if cur!=lease or (cur.intent is not None and cur.intent.state=="PENDING"):return None
+ i=Intent(str(uuid.uuid4()),idem_key(repo_id,item,cur.observed.head,cur.observed.base,operation),operation,cur.observed.head,cur.observed.base,cur.epoch);n=replace(cur,intent=i,version=cur.version+1);return n if store.cas(cur.key,cur.version,n) else None
 def resolve_intent(store,lease,state):
  if state not in {"DONE","ABORTED"}:raise ValueError("INTENT_RESOLUTION_INVALID")
  cur=store.read(lease.key)
  if cur!=lease or cur.intent is None or cur.intent.state!="PENDING":return None
- nxt=replace(cur,intent=replace(cur.intent,state=state),version=cur.version+1);return nxt if store.cas(cur.key,cur.version,nxt) else None
+ n=replace(cur,intent=replace(cur.intent,state=state),version=cur.version+1);return n if store.cas(cur.key,cur.version,n) else None
 def release(store,lease,*,now_srv):
  cur=store.read(lease.key)
- if cur!=lease or not cur.active:return None
- if cur.intent is not None and cur.intent.state=="PENDING":return None
- nxt=replace(cur,active=False,expires_at=now_srv,version=cur.version+1);return nxt if store.cas(cur.key,cur.version,nxt) else None
-def intent_recovery(lease,d):
- if lease.intent is None or lease.intent.state!="PENDING":return "NO_PENDING_INTENT"
+ if cur!=lease or (cur.intent is not None and cur.intent.state=="PENDING"):return None
+ n=replace(cur,expires_at=now_srv,version=cur.version+1);return n if store.cas(cur.key,cur.version,n) else None
+def intent_recovery(l,d):
+ if l.intent is None or l.intent.state!="PENDING":return "NO_PENDING_INTENT"
  if d=="APPLIED":return "RESOLVE_DONE"
  if d=="NOT_APPLIED":return "RESOLVE_ABORTED"
  if d=="UNKNOWN":return "READBACK_REQUIRED"
  raise ValueError("DETECTION_RESULT_INVALID")
-def fence_ok(store,repo_id,lease,observed_now,*,now_srv,max_write_latency=30,skew_margin=30,emergency_revert_authorized=False):
+def fence_ok(store,repo_id,lease,observed_now,*,now_srv,max_write_latency=30,skew_margin=30):
  cur=store.read(lease.key)
  if cur is None:return False,"LEASE_MISSING"
- if cur!=lease or not cur.active:return False,"LEASE_LOST"
+ if cur!=lease:return False,"LEASE_LOST"
  if now_srv+max_write_latency+skew_margin>=cur.expires_at:return False,"LEASE_TOO_CLOSE_TO_EXPIRY"
  if cur.observed!=observed_now:return False,"OBSERVATION_CHANGED"
  if cur.intent is None or cur.intent.state!="PENDING" or cur.intent.epoch!=cur.epoch:return False,"INTENT_INVALID"
- mode,_=store.read_repo_mode(repo_id);op=cur.intent.operation
- if op not in DANGEROUS|HARMLESS:return False,"OPERATION_NOT_ALLOWLISTED"
- if mode==RepoMode.NORMAL or op=="comment":return True,"OK"
- if op=="revert" and mode in {RepoMode.MAIN_BROKEN,RepoMode.MAIN_BROKEN_ENV} and emergency_revert_authorized:return True,"OK"
- return False,f"REPO_MODE_{mode.value}"
+ if cur.intent.operation not in DANGEROUS|HARMLESS:return False,"OPERATION_NOT_ALLOWLISTED"
+ mode,_=store.read_repo_mode(repo_id)
+ if mode in HUMAN_CLEAR_ONLY:return False,f"REPO_MODE_{mode.value}"
+ if mode==RepoMode.MAIN_BROKEN:return ((True,"OK") if cur.intent.operation=="revert" else (False,"REPO_MODE_MAIN_BROKEN"))
+ if mode!=RepoMode.NORMAL:return False,f"REPO_MODE_{mode.value}"
+ return True,"OK"
 def governance_mode(s:Mapping[str,Any]):
  if s.get("halted") is True:return RepoMode.HALTED
  if s.get("controller_integrity_failure") is True:return RepoMode.CONTROLLER_INTEGRITY
@@ -114,50 +109,48 @@ def _source_key(v):
  a=v.get("app_id");p=v.get("workflow_path")
  if not isinstance(a,(str,int)) or not isinstance(p,str) or not p:return None
  return str(a),p
-def _checks_ok(rows,head,base,sources):
+def _checks_ok(rows,h,b,sources):
  if not isinstance(rows,list) or not isinstance(sources,list) or not sources:return False
- exp=[_source_key(x) for x in sources]
- if any(x is None for x in exp) or len(set(exp))!=len(exp):return False
+ ex=[_source_key(x) for x in sources]
+ if any(x is None for x in ex) or len(set(ex))!=len(ex):return False
  by={}
  for r in rows:
+  if not isinstance(r,Mapping):return False
   k=_source_key(r)
   if k is not None:by.setdefault(k,[]).append(r)
- for k in exp:
+ for k in ex:
   c=by.get(k,[])
   if len(c)!=1:return False
   r=c[0]
-  if r.get("head_sha")!=head or r.get("tested_base_sha")!=base:return False
-  if r.get("latest_attempt") is not True or r.get("conclusion")!="success":return False
-  if r.get("assertion_history_complete") is not True or r.get("assertion_failure_any_attempt") is not False:return False
+  if r.get("head_sha")!=h or r.get("tested_base_sha")!=b or r.get("latest_attempt") is not True or r.get("conclusion")!="success" or r.get("assertion_failure_any_attempt") is not False or r.get("attempt_history_complete") is not True or r.get("source_verified") is not True:return False
  return True
-def _review_ok(r,head,base):
- if not isinstance(r,Mapping) or r.get("state")!="APPROVED" or r.get("commit_id")!=head or r.get("base_sha")!=base or r.get("complete") is not True or r.get("skipped") is True or r.get("covers_full_diff") is not True:return False
- a=r.get("author");authors=r.get("material_authors");ctrls=r.get("controller_identities")
- return isinstance(a,str) and isinstance(authors,list) and isinstance(ctrls,list) and a.lower() not in {str(x).lower() for x in authors+ctrls} and r.get("designated_independent") is True
+def _review_ok(r,h,b):
+ if not isinstance(r,Mapping):return False
+ req={"state":"APPROVED","commit_id":h,"base_sha":b,"complete":True,"skipped":False,"covers_full_diff":True,"designated_independent":True,"reviewer_eligible":True,"authorship_complete":True,"material_authors_head_sha":h,"identity_source_verified":True}
+ if any(r.get(k)!=v for k,v in req.items()):return False
+ reviewer=r.get("author");authors=r.get("material_authors");ctrls=r.get("controller_identities")
+ return isinstance(reviewer,str) and isinstance(authors,list) and isinstance(ctrls,list) and reviewer.strip().lower() not in {str(x).strip().lower() for x in authors+ctrls}
 TRUE_FIELDS=("merge_lock_owned","fence_ok","pr_open","same_repo","base_ref_expected","head_ref_matches_api","base_currency_ok","mergeable","mergeable_state_clean","live_rules_at_least_pinned","rulesets_or_protection_active","files_fully_enumerated","diff_within_limit","adapter_hash_ok","controller_hash_ok","code_scanning_present","review_decision_ok","findings_confirmed_closed","thread_resolution_policy_ok","human_gate_checks_ok","dependencies_verified","required_check_sources_pinned","credential_isolation_ok","secret_hygiene_ok")
 FALSE_FIELDS=("global_halted","repo_halted","unresolved_other_intent","pr_draft","pr_locked","fork_pr","controller_admin","controller_bypass","governed_path_touched","test_weakening","new_security_alert","secret_finding","later_changes_requested","unresolved_required_threads","human_hold")
-def merge_ok(s:Mapping[str,Any]):
- f=[];h=s.get("head_sha");b=s.get("base_sha")
- if not _sha(h):f.append("HEAD_UNKNOWN")
- if not _sha(b):f.append("BASE_UNKNOWN")
- if s.get("repo_mode")!=RepoMode.NORMAL.value:f.append("REPO_MODE_NOT_NORMAL")
- f += [k.upper()+"_NOT_TRUE" for k in TRUE_FIELDS if s.get(k) is not True];f += [k.upper()+"_NOT_FALSE" for k in FALSE_FIELDS if s.get(k) is not False]
- if _sha(h) and s.get("expected_head_sha")!=h:f.append("EXPECTED_HEAD_MISMATCH")
- if _sha(b) and s.get("expected_base_sha")!=b:f.append("EXPECTED_BASE_MISMATCH")
- if not (_sha(h) and _sha(b) and _checks_ok(s.get("required_checks"),h,b,s.get("required_check_sources"))):f.append("REQUIRED_CHECKS_INVALID")
- if not (_sha(h) and _sha(b) and _checks_ok(s.get("security_checks"),h,b,s.get("security_check_sources"))):f.append("SECURITY_CHECKS_INVALID")
- if not (_sha(h) and _sha(b) and _review_ok(s.get("review"),h,b)):f.append("REVIEW_INVALID")
- return not f,tuple(f)
-def classify_item(s:Mapping[str,Any],budget:Budget):
+def merge_ok(s):
+ fail=[];h=s.get("head_sha");b=s.get("base_sha")
+ if not _sha(h):fail.append("HEAD_UNKNOWN")
+ if not _sha(b):fail.append("BASE_UNKNOWN")
+ if s.get("repo_mode")!=RepoMode.NORMAL.value:fail.append("REPO_MODE_NOT_NORMAL")
+ fail += [k.upper()+"_NOT_TRUE" for k in TRUE_FIELDS if s.get(k) is not True];fail += [k.upper()+"_NOT_FALSE" for k in FALSE_FIELDS if s.get(k) is not False]
+ if _sha(h) and s.get("expected_head_sha")!=h:fail.append("EXPECTED_HEAD_MISMATCH")
+ if _sha(b) and s.get("expected_base_sha")!=b:fail.append("EXPECTED_BASE_MISMATCH")
+ if not (_sha(h) and _sha(b) and _checks_ok(s.get("required_checks"),h,b,s.get("required_check_sources"))):fail.append("REQUIRED_CHECKS_INVALID")
+ if not (_sha(h) and _sha(b) and _checks_ok(s.get("security_checks"),h,b,s.get("security_check_sources"))):fail.append("SECURITY_CHECKS_INVALID")
+ if not (_sha(h) and _sha(b) and _review_ok(s.get("review"),h,b)):fail.append("REVIEW_INVALID")
+ return not fail,tuple(fail)
+def classify_item(s,budget):
  if budget.exhausted():return ItemState.PARKED
  if s.get("no_actionable_work") is True:return ItemState.IDLE
  if s.get("governed_path_touched") is True or s.get("test_weakening") is True:return ItemState.GOVERNANCE_CHANGE
- if s.get("needs_human") is True:return ItemState.BLOCK_HUMAN
+ if s.get("needs_human") is True or s.get("human_hold") is True:return ItemState.BLOCK_HUMAN
  if s.get("dependency_wait") is True:return ItemState.WAIT_DEPENDENCY
- if s.get("merged") is True:
-  if s.get("post_merge_verified") is True:return ItemState.MERGED_VERIFIED
-  if s.get("main_broken") is True:return ItemState.MAIN_BROKEN
-  return ItemState.MERGED_UNVERIFIED
+ if s.get("merged") is True:return ItemState.MAIN_BROKEN if s.get("main_broken") is True else (ItemState.MERGED_VERIFIED if s.get("post_merge_verified") is True else ItemState.MERGED_UNVERIFIED)
  if s.get("merge_outcome_unknown") is True:return ItemState.MERGE_OUTCOME_UNKNOWN
  if s.get("merge_queued") is True:return ItemState.MERGE_QUEUED
  if s.get("superseded") is True:return ItemState.SUPERSEDED
@@ -174,5 +167,5 @@ def classify_item(s:Mapping[str,Any],budget:Budget):
  if s.get("independent_review_pass") is not True:return ItemState.CI_GREEN_UNREVIEWED
  return ItemState.MERGE_ELIGIBLE if merge_ok(s)[0] else ItemState.FINDINGS_OPEN
 def selftest():
- st=MemoryCASStore();o=Observation("a"*40,"b"*40,"wu","t");l=acquire(st,lease_key("r","pr","1","MERGE"),new_run_id(),o,now_srv=1000);assert l;li=attach_intent(st,l,"r","p","merge");assert li;assert fence_ok(st,"r",li,o,now_srv=1010)==(True,"OK");assert intent_recovery(li,"UNKNOWN")=="READBACK_REQUIRED";resolved=resolve_intent(st,li,"ABORTED");assert resolved;assert release(st,resolved,now_srv=1020);print("l5_kernel selftest PASS")
+ s=MemoryCASStore();s.cas_repo_mode("repo",None,RepoMode.NORMAL);o=Observation("a"*40,"b"*40);l=acquire(s,"k","r",o,now_srv=0);i=attach_intent(s,l,"repo","i","merge",now_srv=1);assert fence_ok(s,"repo",i,o,now_srv=2)==(True,"OK");assert release(s,i,now_srv=2) is None;d=resolve_intent(s,i,"DONE");assert release(s,d,now_srv=3);print("l5_kernel selftest PASS")
 if __name__=="__main__":selftest()
