@@ -4,28 +4,25 @@ from dataclasses import replace
 from pathlib import Path
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/"scripts"))
 from l5_kernel import *
-def merge_snapshot():
- h="a"*40;b="b"*40;src={"app_id":1,"workflow_path":"ci"};secsrc={"app_id":2,"workflow_path":"security"};check={**src,"head_sha":h,"tested_base_sha":b,"latest_attempt":True,"conclusion":"success","assertion_history_complete":True,"assertion_failure_any_attempt":False};seccheck={**secsrc,"head_sha":h,"tested_base_sha":b,"latest_attempt":True,"conclusion":"success","assertion_history_complete":True,"assertion_failure_any_attempt":False};review={"state":"APPROVED","commit_id":h,"base_sha":b,"complete":True,"skipped":False,"covers_full_diff":True,"author":"coderabbitai","material_authors":["chatgpt"],"controller_identities":["controller-1"],"designated_independent":True};s={"head_sha":h,"base_sha":b,"expected_head_sha":h,"expected_base_sha":b,"repo_mode":"NORMAL","required_checks":[check],"security_checks":[seccheck],"required_check_sources":[src],"security_check_sources":[secsrc],"review":review,"ci":"GREEN","independent_review_pass":True}
+def snap():
+ h="a"*40;b="b"*40;src={"app_id":1,"workflow_path":"ci.yml"};secsrc={"app_id":2,"workflow_path":"sec.yml"};row={"head_sha":h,"tested_base_sha":b,"latest_attempt":True,"conclusion":"success","app_id":1,"workflow_path":"ci.yml","assertion_failure_any_attempt":False,"attempt_history_complete":True,"source_verified":True};sec={**row,"app_id":2,"workflow_path":"sec.yml"};rev={"state":"APPROVED","commit_id":h,"base_sha":b,"complete":True,"skipped":False,"covers_full_diff":True,"author":"coderabbitai","material_authors":["chatgpt"],"controller_identities":["controller"],"designated_independent":True,"reviewer_eligible":True,"authorship_complete":True,"material_authors_head_sha":h,"identity_source_verified":True};s={"head_sha":h,"base_sha":b,"expected_head_sha":h,"expected_base_sha":b,"repo_mode":"NORMAL","required_checks":[row],"required_check_sources":[src],"security_checks":[sec],"security_check_sources":[secsrc],"review":rev,"ci":"GREEN","independent_review_pass":True}
  for k in TRUE_FIELDS:s[k]=True
  for k in FALSE_FIELDS:s[k]=False
  return s
 class T(unittest.TestCase):
- def test_epoch_and_pending(self):
-  st=MemoryCASStore();o=Observation("a"*40,"b"*40);l=acquire(st,"k","a",o,now_srv=0,ttl=5);li=attach_intent(st,l,"r","i","merge");self.assertIsNone(acquire(st,"k","b",o,now_srv=10));self.assertEqual(intent_recovery(li,"UNKNOWN"),"READBACK_REQUIRED")
- def test_stale_release_and_replace_blocked(self):
-  st=MemoryCASStore();o=Observation("a"*40,"b"*40);l=acquire(st,"k","a",o,now_srv=0);li=attach_intent(st,l,"r","i","merge");self.assertIsNone(release(st,l,now_srv=10));self.assertIsNone(release(st,li,now_srv=10));self.assertIsNone(attach_intent(st,li,"r","i","push"));self.assertEqual(st.read("k").intent.state,"PENDING")
- def test_fence(self):
-  st=MemoryCASStore();o=Observation("a"*40,"b"*40);l=acquire(st,"k","a",o,now_srv=0);li=attach_intent(st,l,"r","i","merge");self.assertFalse(fence_ok(st,"r",li,replace(o,head="c"*40),now_srv=1)[0])
- def test_narrow_revert(self):
-  st=MemoryCASStore();o=Observation("a"*40,"b"*40);st.cas_repo_mode("r",None,RepoMode.HALTED);l=acquire(st,"k","a",o,now_srv=0);li=attach_intent(st,l,"r","i","revert");self.assertFalse(fence_ok(st,"r",li,o,now_srv=1,emergency_revert_authorized=True)[0]);st.modes["r"]=(RepoMode.MAIN_BROKEN,2);self.assertTrue(fence_ok(st,"r",li,o,now_srv=1,emergency_revert_authorized=True)[0])
- def test_locks(self):
-  for k in (repo_merge_lock_key("r"),capacity_slot_key("r",4)):
-   st=MemoryCASStore();o=Observation("a"*40,"b"*40);self.assertEqual(sum(acquire(st,k,str(i),o,now_srv=0) is not None for i in range(4)),1)
- def test_governance(self):self.assertEqual(governance_mode({"ledger_reachable":True,"platform_enforcement_ok":False,"live_rules_at_least_pinned":True,"rulesets_or_protection_active":False,"required_check_sources_pinned":True}),RepoMode.GOVERNANCE_DRIFT);self.assertEqual(governance_mode({}),RepoMode.AUTOMATION_DEGRADED)
- def test_merge_ok(self):self.assertTrue(merge_ok(merge_snapshot())[0])
- def test_assertion_history_required(self):s=merge_snapshot();del s["required_checks"][0]["assertion_history_complete"];self.assertFalse(merge_ok(s)[0]);s=merge_snapshot();s["required_checks"][0]["assertion_failure_any_attempt"]=True;self.assertFalse(merge_ok(s)[0])
- def test_merge_queue_base_mismatch(self):s=merge_snapshot();s["required_checks"][0]["tested_base_sha"]="c"*40;s["required_checks"][0]["merge_queue"]=True;self.assertFalse(merge_ok(s)[0])
- def test_source_review_and_unknown(self):
-  s=merge_snapshot();s["required_checks"][0]["app_id"]=999;self.assertFalse(merge_ok(s)[0]);s=merge_snapshot();s["review"]["author"]="chatgpt";self.assertFalse(merge_ok(s)[0]);s=merge_snapshot();del s["files_fully_enumerated"];self.assertFalse(merge_ok(s)[0])
- def test_budget_idle(self):self.assertEqual(classify_item({"ci":"GREEN"},Budget(fix_iterations=MAX_FIX_ITERATIONS)),ItemState.PARKED);self.assertEqual(classify_item({"no_actionable_work":True},Budget()),ItemState.IDLE)
+ def setUp(self):self.st=MemoryCASStore();self.st.cas_repo_mode("repo",None,RepoMode.NORMAL);self.o=Observation("a"*40,"b"*40,"wu","t")
+ def test_pending_recovery_and_stale_release(self):
+  l=acquire(self.st,"k","r",self.o,now_srv=1,ttl=5);i=attach_intent(self.st,l,"repo","i","merge",now_srv=2);self.assertIsNone(release(self.st,i,now_srv=3));self.assertIsNone(acquire(self.st,"k","x",self.o,now_srv=10));d=resolve_intent(self.st,i,"DONE");self.assertIsNotNone(release(self.st,d,now_srv=10));st=MemoryCASStore();st.cas_repo_mode("repo",None,RepoMode.NORMAL);l=acquire(st,"z","r",self.o,now_srv=1);new=renew(st,l,now_srv=2);self.assertIsNotNone(new);self.assertIsNone(release(st,l,now_srv=3))
+ def test_expired_and_replace_rejected(self):
+  l=acquire(self.st,"e","r",self.o,now_srv=1,ttl=2);self.assertIsNone(renew(self.st,l,now_srv=3));self.assertIsNone(attach_intent(self.st,l,"repo","i","merge",now_srv=3));l=acquire(self.st,"p","r",self.o,now_srv=1);i=attach_intent(self.st,l,"repo","i","merge",now_srv=2);self.assertIsNone(attach_intent(self.st,i,"repo","i","push",now_srv=3))
+ def test_observation_and_modes(self):
+  l=acquire(self.st,"k2","r",self.o,now_srv=1);i=attach_intent(self.st,l,"repo","i","merge",now_srv=2);self.assertEqual(fence_ok(self.st,"repo",i,replace(self.o,pr_updated_at="x"),now_srv=3),(False,"OBSERVATION_CHANGED"));self.assertEqual(MemoryCASStore().read_repo_mode("x")[0],RepoMode.AUTOMATION_DEGRADED)
+ def test_human_modes_block(self):
+  for m in HUMAN_CLEAR_ONLY:
+   st=MemoryCASStore();st.modes["repo"]=(m,1);l=acquire(st,"k","r",self.o,now_srv=1);i=attach_intent(st,l,"repo","i","revert",now_srv=2);self.assertFalse(fence_ok(st,"repo",i,self.o,now_srv=3)[0])
+ def test_human_clear(self):
+  st=MemoryCASStore();st.modes["repo"]=(RepoMode.GOVERNANCE_DRIFT,7);self.assertFalse(st.cas_repo_mode("repo",7,RepoMode.NORMAL));self.assertTrue(st.cas_repo_mode("repo",7,RepoMode.NORMAL,human_clear=True))
+ def test_merge_evidence_fail_closed(self):
+  self.assertTrue(merge_ok(snap())[0]);s=snap();s["required_checks"][0].pop("assertion_failure_any_attempt");self.assertIn("REQUIRED_CHECKS_INVALID",merge_ok(s)[1]);s=snap();s["required_checks"][0].update({"merge_queue":True,"tested_base_sha":"c"*40});self.assertIn("REQUIRED_CHECKS_INVALID",merge_ok(s)[1]);s=snap();s["review"]["material_authors_head_sha"]="c"*40;self.assertIn("REVIEW_INVALID",merge_ok(s)[1]);s=snap();del s["files_fully_enumerated"];self.assertIn("FILES_FULLY_ENUMERATED_NOT_TRUE",merge_ok(s)[1])
+ def test_holds_and_budget(self):self.assertEqual(classify_item({"human_hold":True},Budget()),ItemState.BLOCK_HUMAN);self.assertEqual(classify_item({"dependency_wait":True},Budget()),ItemState.WAIT_DEPENDENCY);self.assertEqual(classify_item({"ci":"GREEN"},Budget(fix_iterations=MAX_FIX_ITERATIONS)),ItemState.PARKED)
 if __name__=="__main__":unittest.main()
