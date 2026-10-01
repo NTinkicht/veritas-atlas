@@ -22,6 +22,7 @@ from l5_recovery import (
 RETRYABLE = frozenset({"retry_ci", "dispatch_review", "remediate_review"})
 MUTATIONS = frozenset(SAFE_MUTATIONS.values())
 KNOWN_RETRY_SCOPES = frozenset(RETRY_SCOPES.values())
+REVIEW_SENSITIVE = frozenset({"dispatch_review", "merge_expected_head"})
 
 
 class LostResponse(Exception):
@@ -33,7 +34,7 @@ class AlreadyExists(Exception):
 
 
 class WriteRejected(Exception):
-    """Remote endpoint definitively rejected the write."""
+    """Remote endpoint definitively rejected the write without applying it."""
 
 
 def stream_key(auth: dict[str, Any], snapshot: dict[str, Any]) -> str:
@@ -105,7 +106,7 @@ def _live_gate(
             return "DUPLICATE_STREAM"
     elif streams.get(auth["issue"]) != [auth["canonical_pr"]] or sum(len(v) for v in streams.values()) != 1:
         return "DUPLICATE_STREAM"
-    if mutation == "dispatch_review" and live.get("review_eligible_nonauthor") is not True:
+    if mutation in REVIEW_SENSITIVE and live.get("review_eligible_nonauthor") is not True:
         return "REVIEWER_NOT_ELIGIBLE"
     if retry is not None and mutation in RETRYABLE:
         count, scope = retry
@@ -129,11 +130,13 @@ def _params(auth: dict[str, Any]) -> dict[str, Any]:
 
 def _reconcile(auth: dict[str, Any], client: Any, store: Any, *, written: bool) -> dict[str, Any]:
     token = auth["mutation_token"]
-    if client.verify_effect(auth["mutation"], _params(auth)) is True:
+    verdict = client.verify_effect(auth["mutation"], _params(auth))
+    if verdict is True:
         store.set_status(token, "COMPLETE")
         return {**_result("COMPLETE", "EFFECT_VERIFIED", token), "written": written}
-    store.set_status(token, "VERIFICATION_FAILED")
-    return {**_result("VERIFICATION_FAILED", "EFFECT_NOT_OBSERVED", token), "written": written}
+    # A non-True result is not proof that a lost/in-flight write failed. Keep the
+    # durable reservation PENDING so later replays reconcile instead of reissuing.
+    return {**_result("IN_PROGRESS", "EFFECT_NOT_YET_VERIFIED", token), "written": written}
 
 
 def execute_mutation(auth: dict[str, Any], snapshot: dict[str, Any], client: Any, store: Any) -> dict[str, Any]:
@@ -142,6 +145,7 @@ def execute_mutation(auth: dict[str, Any], snapshot: dict[str, Any], client: Any
     if reason:
         return _result("BLOCKED", reason, token)
 
+    stream = stream_key(auth, snapshot)
     prior = store.get(token)
     if prior is not None:
         status = prior.get("status")
@@ -149,13 +153,17 @@ def execute_mutation(auth: dict[str, Any], snapshot: dict[str, Any], client: Any
             return _result("REPLAY_NOOP", "ALREADY_COMPLETE", token)
         if status == "PENDING":
             return _reconcile(auth, client, store, written=False)
-        return _result("BLOCKED", f"PRIOR_{status}", token)
+        if status != "RETRYABLE":
+            return _result("BLOCKED", f"PRIOR_{status}", token)
 
-    stream = stream_key(auth, snapshot)
     observed_retry = store.retry_state(stream) if auth["mutation"] in RETRYABLE else None
     block = _live_gate(auth, client, retry=observed_retry)
     if block:
         return _result("BLOCKED", block, token)
+
+    perform_cas = getattr(client, "perform_cas", None)
+    if not callable(perform_cas):
+        return _result("BLOCKED", "ATOMIC_CAS_UNAVAILABLE", token)
 
     record = {
         "status": "PENDING",
@@ -172,7 +180,8 @@ def execute_mutation(auth: dict[str, Any], snapshot: dict[str, Any], client: Any
         auth.get("retry_action_after"),
         expected_retry=observed_retry,
     ):
-        if store.get(token) is not None:
+        existing = store.get(token)
+        if existing is not None and existing.get("status") == "PENDING":
             return _result("REPLAY_NOOP", "TOKEN_ALREADY_PERSISTED", token)
         return _result("BLOCKED", "RETRY_STATE_STALE", token)
 
@@ -186,7 +195,11 @@ def execute_mutation(auth: dict[str, Any], snapshot: dict[str, Any], client: Any
         return _result("BLOCKED", block, token)
 
     try:
-        client.perform(auth["mutation"], _params(auth))
+        cas_result = perform_cas(auth["mutation"], _params(auth))
+        if cas_result is False:
+            raise WriteRejected("ATOMIC_CAS_REJECTED")
+        if cas_result is not True:
+            return _reconcile(auth, client, store, written=False)
     except WriteRejected as exc:
         store.fail_and_restore(token, str(exc), stream, observed_retry)
         return _result("FAILED", "WRITE_REJECTED", token)
@@ -213,19 +226,35 @@ class MemoryStore:
         *,
         expected_retry: tuple[int, str | None] | None = None,
     ) -> bool:
-        if token in self.records:
+        existing = self.records.get(token)
+        if existing is not None and existing.get("status") != "RETRYABLE":
             return False
         if expected_retry is not None and self.retry.get(stream, (0, None)) != expected_retry:
             return False
-        self.records[token] = dict(record)
+
+        row = dict(record)
+        if expected_retry is not None:
+            row["retry_before"] = list(expected_retry)
+        if count is not None:
+            row["retry_written"] = [count, action]
+        self.records[token] = row
         if count is not None:
             self.retry[stream] = (count, action)
         return True
 
     def fail_and_restore(self, token: str, detail: Any, stream: str, prior_retry: tuple[int, str | None] | None) -> None:
-        self.records[token]["status"] = "FAILED"
-        self.records[token]["detail"] = detail
+        row = self.records[token]
+        row["detail"] = detail
         if prior_retry is None:
+            row["status"] = "FAILED"
+            return
+
+        row["status"] = "RETRYABLE"
+        written = row.get("retry_written")
+        if not isinstance(written, list) or len(written) != 2:
+            return
+        reserved = (written[0], written[1])
+        if self.retry.get(stream, (0, None)) != reserved:
             return
         if prior_retry == (0, None):
             self.retry.pop(stream, None)
