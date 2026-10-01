@@ -33,6 +33,38 @@ def repo_snapshot(**overrides):
     return row
 
 
+def intent_restraint_evidence(head: str, base: str, wu_hash: str) -> dict:
+    """Return a valid exact-state Engineering Intent & Restraint attestation."""
+    return {
+        "state": "PASS",
+        "head_sha": head,
+        "base_sha": base,
+        "wu_body_hash": wu_hash,
+        "complete": True,
+        "designated_independent": True,
+        "reviewer_eligible": True,
+        "identity_source_verified": True,
+        "wu_contract_frozen": True,
+        "intent_preserved": True,
+        "scope_discipline_verified": True,
+        "minimal_change_verified": True,
+        "no_overengineering": True,
+        "existing_mechanism_reused_or_justified": True,
+        "conventions_preserved": True,
+        "architecture_consistent": True,
+        "performance_preserved": True,
+        "api_semantics_preserved": True,
+        "diff_proportionate": True,
+        "adversarial_deletion_review_complete": True,
+        "deletion_candidates_resolved": True,
+        "failure_reasons": [],
+        "author": "coderabbitai",
+        "material_authors": ["chatgpt"],
+        "controller_identities": ["controller-1", "controller-2"],
+        "material_authors_head_sha": head,
+    }
+
+
 def merge_item():
     """Return a fully valid merge-eligible item."""
     head = "a" * 40
@@ -81,6 +113,9 @@ def merge_item():
         "review": review,
         "ci": "GREEN",
         "independent_review_pass": True,
+        "wu_body_hash": "wu-7",
+        "l5_intent_restraint_required": True,
+        "intent_restraint": intent_restraint_evidence(head, base, "wu-7"),
     }
     for key in TRUE_FIELDS:
         item[key] = True
@@ -177,7 +212,12 @@ class ControllerTests(unittest.TestCase):
 
     def test_ci_infra_path_executes_one_guarded_action(self):
         """A bounded infra retry performs exactly one guarded action."""
-        item = {"item_id": "7", "head_sha": "a" * 40, "base_sha": "b" * 40, "ci": "INFRA_FAILED"}
+        item = {
+            "item_id": "7",
+            "head_sha": "a" * 40,
+            "base_sha": "b" * 40,
+            "ci": "INFRA_FAILED",
+        }
         io = FakeIO(items=[item])
         result = run_once("repo", io, MemoryCASStore(), now_srv=1)
         self.assertEqual(result.status, "COMPLETE")
@@ -186,31 +226,54 @@ class ControllerTests(unittest.TestCase):
 
     def test_unknown_write_stays_pending_for_next_run(self):
         """An unknown result remains PENDING for next-run readback."""
-        item = {"item_id": "7", "head_sha": "a" * 40, "base_sha": "b" * 40, "ci": "INFRA_FAILED"}
+        item = {
+            "item_id": "7",
+            "head_sha": "a" * 40,
+            "base_sha": "b" * 40,
+            "ci": "INFRA_FAILED",
+        }
         io = FakeIO(items=[item])
         io.result = {"status": "IN_PROGRESS", "reason": "EFFECT_NOT_YET_VERIFIED"}
         store = MemoryCASStore()
         result = run_once("repo", io, store, now_srv=1)
         self.assertEqual(result.status, "WAIT")
         self.assertEqual(result.reason, "OUTCOME_UNKNOWN")
-        pending = [lease for lease in store.leases.values() if lease.intent and lease.intent.state == "PENDING"]
+        pending = [
+            lease
+            for lease in store.leases.values()
+            if lease.intent and lease.intent.state == "PENDING"
+        ]
         self.assertEqual(len(pending), 1)
 
     def test_replay_pending_is_not_marked_done(self):
         """A token reservation replay remains unresolved."""
-        item = {"item_id": "7", "head_sha": "a" * 40, "base_sha": "b" * 40, "ci": "INFRA_FAILED"}
+        item = {
+            "item_id": "7",
+            "head_sha": "a" * 40,
+            "base_sha": "b" * 40,
+            "ci": "INFRA_FAILED",
+        }
         io = FakeIO(items=[item])
         io.result = {"status": "REPLAY_NOOP", "reason": "TOKEN_ALREADY_PERSISTED"}
         store = MemoryCASStore()
         result = run_once("repo", io, store)
         self.assertEqual(result.status, "WAIT")
         self.assertEqual(result.reason, "OUTCOME_UNKNOWN")
-        pending = [lease for lease in store.leases.values() if lease.intent and lease.intent.state == "PENDING"]
+        pending = [
+            lease
+            for lease in store.leases.values()
+            if lease.intent and lease.intent.state == "PENDING"
+        ]
         self.assertEqual(len(pending), 1)
 
     def test_replay_already_complete_is_terminal(self):
         """A verified completed replay may resolve and release."""
-        item = {"item_id": "7", "head_sha": "a" * 40, "base_sha": "b" * 40, "ci": "INFRA_FAILED"}
+        item = {
+            "item_id": "7",
+            "head_sha": "a" * 40,
+            "base_sha": "b" * 40,
+            "ci": "INFRA_FAILED",
+        }
         io = FakeIO(items=[item])
         io.result = {"status": "REPLAY_NOOP", "reason": "ALREADY_COMPLETE"}
         store = MemoryCASStore()
@@ -226,7 +289,16 @@ class ControllerTests(unittest.TestCase):
         obs = Observation("a" * 40, "b" * 40)
         lease = acquire(store, "repo:item:1:PUSH", "old", obs, now_srv=0, ttl=300)
         with_intent = attach_intent(store, lease, "repo", "1", "push", now_srv=1)
-        io = FakeIO(items=[{"item_id": "9", "head_sha": "a" * 40, "base_sha": "b" * 40, "ci": "INFRA_FAILED"}])
+        io = FakeIO(
+            items=[
+                {
+                    "item_id": "9",
+                    "head_sha": "a" * 40,
+                    "base_sha": "b" * 40,
+                    "ci": "INFRA_FAILED",
+                }
+            ]
+        )
         io.pending = [with_intent]
         io.detections[with_intent.key] = "UNKNOWN"
         result = run_once("repo", io, store, now_srv=2)
@@ -236,7 +308,12 @@ class ControllerTests(unittest.TestCase):
 
     def test_observation_changes_before_intent(self):
         """A refreshed resource change prevents intent creation."""
-        item = {"item_id": "7", "head_sha": "a" * 40, "base_sha": "b" * 40, "ci": "INFRA_FAILED"}
+        item = {
+            "item_id": "7",
+            "head_sha": "a" * 40,
+            "base_sha": "b" * 40,
+            "ci": "INFRA_FAILED",
+        }
         changed = dict(item)
         changed["pr_updated_at"] = "changed"
         io = FakeIO(items=[item])
@@ -259,12 +336,18 @@ class ControllerTests(unittest.TestCase):
 
     def test_slow_run_fails_final_lease_margin(self):
         """Fresh trusted time prevents a slow invocation from writing."""
-        item = {"item_id": "7", "head_sha": "a" * 40, "base_sha": "b" * 40, "ci": "INFRA_FAILED"}
+        item = {
+            "item_id": "7",
+            "head_sha": "a" * 40,
+            "base_sha": "b" * 40,
+            "ci": "INFRA_FAILED",
+        }
 
         class SlowIO(FakeIO):
             def __init__(self, items):
                 super().__init__(items=items)
-                self.times = iter([1.0, 2.0, 299.0])
+                self.times = iter([1.0, 2.0, 3.0, 299.0])
+
             def trusted_now(self):
                 return next(self.times)
 
@@ -286,7 +369,16 @@ class ControllerTests(unittest.TestCase):
         lock = store.read(repo_merge_lock_key("repo"))
         self.assertIsNotNone(lock)
         self.assertEqual(lock.intent.state, "DONE")
-        io.items = [{"item_id": "7", "head_sha": "c" * 40, "base_sha": "b" * 40, "merged": True, "post_merge_verified": False}]
+
+        io.items = [
+            {
+                "item_id": "7",
+                "head_sha": "c" * 40,
+                "base_sha": "b" * 40,
+                "merged": True,
+                "post_merge_verified": False,
+            }
+        ]
         second = run_once("repo", io, store)
         self.assertEqual(second.status, "COMPLETE")
         self.assertEqual(second.reason, "POST_MERGE_VERIFIED")
@@ -299,7 +391,15 @@ class ControllerTests(unittest.TestCase):
         store = MemoryCASStore()
         first = run_once("repo", io, store)
         self.assertEqual(first.reason, "MERGED_UNVERIFIED")
-        io.items = [{"item_id": "7", "head_sha": "c" * 40, "base_sha": "b" * 40, "merged": True, "post_merge_verified": False}]
+        io.items = [
+            {
+                "item_id": "7",
+                "head_sha": "c" * 40,
+                "base_sha": "b" * 40,
+                "merged": True,
+                "post_merge_verified": False,
+            }
+        ]
         io.health = "UNKNOWN"
         second = run_once("repo", io, store)
         self.assertEqual(second.status, "WAIT")
@@ -312,7 +412,15 @@ class ControllerTests(unittest.TestCase):
         io = FakeIO(items=[item])
         store = MemoryCASStore()
         run_once("repo", io, store)
-        io.items = [{"item_id": "7", "head_sha": "c" * 40, "base_sha": "b" * 40, "merged": True, "post_merge_verified": False}]
+        io.items = [
+            {
+                "item_id": "7",
+                "head_sha": "c" * 40,
+                "base_sha": "b" * 40,
+                "merged": True,
+                "post_merge_verified": False,
+            }
+        ]
         io.health = "BROKEN"
         result = run_once("repo", io, store)
         self.assertEqual(result.reason, "MAIN_BROKEN")
@@ -320,8 +428,19 @@ class ControllerTests(unittest.TestCase):
 
     def test_deterministic_selection_prefers_repair_over_review(self):
         """Deterministic remediation has higher priority than review dispatch."""
-        repair = {"item_id": "9", "head_sha": "a" * 40, "base_sha": "b" * 40, "ci": "DETERMINISTIC_FAILED"}
-        review = {"item_id": "1", "head_sha": "a" * 40, "base_sha": "b" * 40, "ci": "GREEN", "independent_review_pass": False}
+        repair = {
+            "item_id": "9",
+            "head_sha": "a" * 40,
+            "base_sha": "b" * 40,
+            "ci": "DETERMINISTIC_FAILED",
+        }
+        review = {
+            "item_id": "1",
+            "head_sha": "a" * 40,
+            "base_sha": "b" * 40,
+            "ci": "GREEN",
+            "independent_review_pass": False,
+        }
         io = FakeIO(items=[review, repair])
         result = run_once("repo", io, MemoryCASStore())
         self.assertEqual(result.item_id, "9")
