@@ -438,7 +438,7 @@ def run_once(
     run_id: str | None = None,
 ) -> RunResult:
     """Execute one deterministic BOOT-to-ACTION controller invocation."""
-    del now_srv
+    del now_srv  # Compatibility only. All write timing uses fresh trusted time.
     rid = run_id or new_run_id()
     repo = io.repo_snapshot()
 
@@ -453,26 +453,52 @@ def run_once(
             _, version = store.read_repo_mode(repo_id)
             if current_mode not in HUMAN_CLEAR_ONLY:
                 store.cas_repo_mode(repo_id, version, derived)
-        return RunResult(rid, RunPhase.REPOSITORY_MODE, "BLOCKED", reason=derived.value)
+        return RunResult(
+            rid,
+            RunPhase.REPOSITORY_MODE,
+            "BLOCKED",
+            reason=derived.value,
+        )
 
     recovered, recovery_reason = _recover_pending(io, store)
     if not recovered:
-        return RunResult(rid, RunPhase.INTENT_RECOVERY, "WAIT", reason=recovery_reason)
+        return RunResult(
+            rid,
+            RunPhase.INTENT_RECOVERY,
+            "WAIT",
+            reason=recovery_reason,
+        )
 
     items = list(io.inventory())
+
     current_mode, _ = store.read_repo_mode(repo_id)
     if current_mode == RepoMode.MERGE_LOCKED:
         return _post_merge_verify(repo_id, io, store, items, rid)
 
     synced, sync_reason = _sync_mode(store, repo_id, derived)
     if not synced:
-        return RunResult(rid, RunPhase.REPOSITORY_MODE, "BLOCKED", reason=sync_reason)
+        return RunResult(
+            rid,
+            RunPhase.REPOSITORY_MODE,
+            "BLOCKED",
+            reason=sync_reason,
+        )
     if derived not in {RepoMode.NORMAL, RepoMode.MAIN_BROKEN}:
-        return RunResult(rid, RunPhase.REPOSITORY_MODE, "WAIT", reason=derived.value)
+        return RunResult(
+            rid,
+            RunPhase.REPOSITORY_MODE,
+            "WAIT",
+            reason=derived.value,
+        )
 
     selected = _select(io, items)
     if selected is None:
-        return RunResult(rid, RunPhase.SELECT, "IDLE", reason="NO_ACTIONABLE_ITEM")
+        return RunResult(
+            rid,
+            RunPhase.SELECT,
+            "IDLE",
+            reason="NO_ACTIONABLE_ITEM",
+        )
 
     item, state = selected
     item_id = _item_id(item)
@@ -480,70 +506,233 @@ def run_once(
     assert operation is not None
 
     if operation == "merge_expected_head" and not merge_ok(item)[0]:
-        return RunResult(rid, RunPhase.RECONCILE_ITEM, "BLOCKED", action=operation, item_id=item_id, reason="MERGE_OK_FALSE")
+        return RunResult(
+            rid,
+            RunPhase.RECONCILE_ITEM,
+            "BLOCKED",
+            action=operation,
+            item_id=item_id,
+            reason="MERGE_OK_FALSE",
+        )
 
     observed = io.observe_item(item)
     key = _lease_key_for(repo_id, item_id, operation, item)
-    lease = acquire(store, key, rid, observed, now_srv=_trusted_now(io))
+    lease = acquire(
+        store,
+        key,
+        rid,
+        observed,
+        now_srv=_trusted_now(io),
+    )
     if lease is None:
-        return RunResult(rid, RunPhase.ACQUIRE_CAS_LEASE, "WAIT", action=operation, item_id=item_id, reason="LEASE_BUSY")
+        return RunResult(
+            rid,
+            RunPhase.ACQUIRE_CAS_LEASE,
+            "WAIT",
+            action=operation,
+            item_id=item_id,
+            reason="LEASE_BUSY",
+        )
 
-    fresh, reason = _revalidate_before_write(repo_id, io, store, operation, item, observed)
+    fresh, reason = _revalidate_before_write(
+        repo_id,
+        io,
+        store,
+        operation,
+        item,
+        observed,
+    )
     if fresh is None:
-        return RunResult(rid, RunPhase.RECONCILE_ITEM, "WAIT", action=operation, item_id=item_id, reason=reason)
+        return RunResult(
+            rid,
+            RunPhase.RECONCILE_ITEM,
+            "WAIT",
+            action=operation,
+            item_id=item_id,
+            reason=reason,
+        )
 
-    with_intent = attach_intent(store, lease, repo_id, item_id, _intent_operation(operation), now_srv=_trusted_now(io))
+    with_intent = attach_intent(
+        store,
+        lease,
+        repo_id,
+        item_id,
+        _intent_operation(operation),
+        now_srv=_trusted_now(io),
+    )
     if with_intent is None:
-        return RunResult(rid, RunPhase.WRITE_INTENT, "WAIT", action=operation, item_id=item_id, reason="INTENT_CAS_FAILED")
+        return RunResult(
+            rid,
+            RunPhase.WRITE_INTENT,
+            "WAIT",
+            action=operation,
+            item_id=item_id,
+            reason="INTENT_CAS_FAILED",
+        )
 
-    final_item, reason = _revalidate_before_write(repo_id, io, store, operation, fresh, observed)
+    final_item, reason = _revalidate_before_write(
+        repo_id,
+        io,
+        store,
+        operation,
+        fresh,
+        observed,
+    )
     if final_item is None:
-        return RunResult(rid, RunPhase.FENCE_CHECK, "BLOCKED", action=operation, item_id=item_id, reason=reason)
+        return RunResult(
+            rid,
+            RunPhase.FENCE_CHECK,
+            "BLOCKED",
+            action=operation,
+            item_id=item_id,
+            reason=reason,
+        )
 
     observed_final = io.observe_item(final_item)
-    ok, fence_reason = fence_ok(store, repo_id, with_intent, observed_final, now_srv=_trusted_now(io))
+    fence_now = _trusted_now(io)
+    ok, fence_reason = fence_ok(
+        store,
+        repo_id,
+        with_intent,
+        observed_final,
+        now_srv=fence_now,
+    )
     if not ok:
-        return RunResult(rid, RunPhase.FENCE_CHECK, "BLOCKED", action=operation, item_id=item_id, reason=fence_reason)
+        return RunResult(
+            rid,
+            RunPhase.FENCE_CHECK,
+            "BLOCKED",
+            action=operation,
+            item_id=item_id,
+            reason=fence_reason,
+        )
 
     mutation = io.execute_guarded(operation, final_item, with_intent)
     status = mutation.get("status") if isinstance(mutation, Mapping) else None
     result_reason = mutation.get("reason") if isinstance(mutation, Mapping) else None
 
-    effect_complete = status == "COMPLETE" or (status == "REPLAY_NOOP" and result_reason == "ALREADY_COMPLETE")
-    replay_pending = status == "REPLAY_NOOP" and result_reason in {"TOKEN_ALREADY_PERSISTED", "EFFECT_NOT_YET_VERIFIED"}
+    effect_complete = status == "COMPLETE" or (
+        status == "REPLAY_NOOP" and result_reason == "ALREADY_COMPLETE"
+    )
+    replay_pending = status == "REPLAY_NOOP" and result_reason in {
+        "TOKEN_ALREADY_PERSISTED",
+        "EFFECT_NOT_YET_VERIFIED",
+    }
 
     if replay_pending:
-        return RunResult(rid, RunPhase.ACTION, "WAIT", action=operation, item_id=item_id, reason="OUTCOME_UNKNOWN", mutation_result=mutation)
+        return RunResult(
+            rid,
+            RunPhase.ACTION,
+            "WAIT",
+            action=operation,
+            item_id=item_id,
+            reason="OUTCOME_UNKNOWN",
+            mutation_result=mutation,
+        )
 
     if effect_complete:
         if operation in {"merge_expected_head", "revert"}:
-            transitioned, transition_reason = _enter_merge_locked(repo_id, store, with_intent)
+            transitioned, transition_reason = _enter_merge_locked(
+                repo_id,
+                store,
+                with_intent,
+            )
             if not transitioned:
-                return RunResult(rid, RunPhase.ACTION, "WAIT", action=operation, item_id=item_id, reason=transition_reason, mutation_result=mutation)
-            return RunResult(rid, RunPhase.EXIT, "WAIT", action=operation, item_id=item_id, reason="MERGED_UNVERIFIED", mutation_result=mutation)
+                return RunResult(
+                    rid,
+                    RunPhase.ACTION,
+                    "WAIT",
+                    action=operation,
+                    item_id=item_id,
+                    reason=transition_reason,
+                    mutation_result=mutation,
+                )
+            return RunResult(
+                rid,
+                RunPhase.EXIT,
+                "WAIT",
+                action=operation,
+                item_id=item_id,
+                reason="MERGED_UNVERIFIED",
+                mutation_result=mutation,
+            )
 
-        terminal, terminal_reason = _terminalize_non_main_write(io, store, with_intent, state="DONE")
+        terminal, terminal_reason = _terminalize_non_main_write(
+            io,
+            store,
+            with_intent,
+            state="DONE",
+        )
         if not terminal:
-            return RunResult(rid, RunPhase.ACTION, "WAIT", action=operation, item_id=item_id, reason=terminal_reason, mutation_result=mutation)
-        return RunResult(rid, RunPhase.EXIT, "COMPLETE", action=operation, item_id=item_id, mutation_result=mutation)
+            return RunResult(
+                rid,
+                RunPhase.ACTION,
+                "WAIT",
+                action=operation,
+                item_id=item_id,
+                reason=terminal_reason,
+                mutation_result=mutation,
+            )
+        return RunResult(
+            rid,
+            RunPhase.EXIT,
+            "COMPLETE",
+            action=operation,
+            item_id=item_id,
+            mutation_result=mutation,
+        )
 
     if status in {"FAILED", "BLOCKED"}:
-        terminal, terminal_reason = _terminalize_non_main_write(io, store, with_intent, state="ABORTED")
+        terminal, terminal_reason = _terminalize_non_main_write(
+            io,
+            store,
+            with_intent,
+            state="ABORTED",
+        )
         if not terminal:
-            return RunResult(rid, RunPhase.ACTION, "WAIT", action=operation, item_id=item_id, reason=terminal_reason, mutation_result=mutation)
-        return RunResult(rid, RunPhase.EXIT, status, action=operation, item_id=item_id, mutation_result=mutation)
+            return RunResult(
+                rid,
+                RunPhase.ACTION,
+                "WAIT",
+                action=operation,
+                item_id=item_id,
+                reason=terminal_reason,
+                mutation_result=mutation,
+            )
+        return RunResult(
+            rid,
+            RunPhase.EXIT,
+            status,
+            action=operation,
+            item_id=item_id,
+            mutation_result=mutation,
+        )
 
-    return RunResult(rid, RunPhase.ACTION, "WAIT", action=operation, item_id=item_id, reason="OUTCOME_UNKNOWN", mutation_result=mutation)
+    return RunResult(
+        rid,
+        RunPhase.ACTION,
+        "WAIT",
+        action=operation,
+        item_id=item_id,
+        reason="OUTCOME_UNKNOWN",
+        mutation_result=mutation,
+    )
 
 
 class GuardedWriteBridge:
     """Bridge controller actions into the existing certified write adapter."""
 
     def __init__(self, client: Any, token_store: Any):
+        """Store credential-bearing client and durable token store references."""
         self.client = client
         self.token_store = token_store
 
-    def execute(self, operation: str, item: Mapping[str, Any], lease: Lease) -> Mapping[str, Any]:
+    def execute(
+        self,
+        operation: str,
+        item: Mapping[str, Any],
+        lease: Lease,
+    ) -> Mapping[str, Any]:
         """Reproduce authorization and delegate to ``execute_mutation``."""
         from l5_activation import authorize_mutation
         from l5_write_adapter import execute_mutation
@@ -551,6 +740,7 @@ class GuardedWriteBridge:
         snapshot = item.get("activation_snapshot")
         if not isinstance(snapshot, dict):
             return {"status": "BLOCKED", "reason": "ACTIVATION_SNAPSHOT_MISSING"}
+
         auth = authorize_mutation(snapshot)
         expected = {
             "retry_ci": "retry_ci",
