@@ -1,15 +1,16 @@
 #!/usr/bin/env python3
 """Claude hostile-design L5 coordination kernel.
 
-This module is credential-free. It evaluates structured evidence, coordinates
-CAS leases/intents, and never treats LLM prose as gate evidence.
+Credential-free deterministic policy and coordination primitives. Gate evidence
+must be structured and authenticated by trusted adapters; model prose is never
+gate evidence.
 """
 from __future__ import annotations
 from dataclasses import dataclass, replace
 from enum import Enum
 from hashlib import sha256
-import json, re, uuid
-from typing import Any, Mapping, Protocol
+import json,re,uuid
+from typing import Any,Mapping,Protocol
 SHA40=re.compile(r"^[0-9a-fA-F]{40}$");DANGEROUS=frozenset({"push","update_branch","merge","enqueue","revert"});HARMLESS=frozenset({"label","comment","review_request","ci_rerun"});MAX_CI_RERUNS=2;MAX_FIX_ITERATIONS=5;MAX_REVIEW_ROUNDS=3;MAX_LEASES=12
 class RepoMode(str,Enum):
  NORMAL="NORMAL";MERGE_LOCKED="MERGE_LOCKED";MAIN_BROKEN="MAIN_BROKEN";MAIN_BROKEN_ENV="MAIN_BROKEN_ENV";AUTOMATION_DEGRADED="AUTOMATION_DEGRADED";PROVIDER_THROTTLED="PROVIDER_THROTTLED";GOVERNANCE_DRIFT="GOVERNANCE_DRIFT";SECURITY_INTEGRITY_FAILURE="SECURITY_INTEGRITY_FAILURE";CONTROLLER_INTEGRITY="CONTROLLER_INTEGRITY";HALTED="HALTED";ARCHIVED_PERMISSION_LOST="ARCHIVED_PERMISSION_LOST"
@@ -21,7 +22,7 @@ class Observation:head:str;base:str;wu_body_hash:str="";pr_updated_at:str=""
 @dataclass(frozen=True)
 class Intent:op_id:str;idem_key:str;operation:str;expected_head:str;expected_base:str;epoch:int;state:str="PENDING"
 @dataclass(frozen=True)
-class Lease:key:str;holder:str;epoch:int;observed:Observation;acquired_at:float;expires_at:float;version:int;intent:Intent|None=None
+class Lease:key:str;holder:str;epoch:int;observed:Observation;acquired_at:float;expires_at:float;version:int;intent:Intent|None=None;active:bool=True
 @dataclass(frozen=True)
 class Budget:
  ci_reruns:int=0;fix_iterations:int=0;review_rounds:int=0;lease_acquisitions:int=0
@@ -31,6 +32,7 @@ class CASStore(Protocol):
  def cas(self,key:str,expected_version:int|None,value:Lease)->bool:...
  def read_repo_mode(self,repo_id:str)->tuple[RepoMode,int|None]:...
  def cas_repo_mode(self,repo_id:str,expected_version:int|None,mode:RepoMode)->bool:...
+ def list_leases(self)->list[Lease]:...
 class MemoryCASStore:
  def __init__(self):self.leases={};self.modes={}
  def read(self,key):return self.leases.get(key)
@@ -43,6 +45,7 @@ class MemoryCASStore:
   cur=self.modes.get(repo_id);actual=None if cur is None else cur[1]
   if actual!=expected_version:return False
   self.modes[repo_id]=(mode,1 if cur is None else cur[1]+1);return True
+ def list_leases(self):return list(self.leases.values())
 def new_run_id():return str(uuid.uuid4())
 def idem_key(repo_id,item,head,operation):return sha256(json.dumps([repo_id,item,head,operation],separators=(",",":")).encode()).hexdigest()
 def lease_key(repo_id,item_kind,item_id,op_class):return f"{repo_id}:{item_kind}:{item_id}:{op_class}"
@@ -52,54 +55,51 @@ def capacity_slot_key(repo_id,slot):
  return lease_key(repo_id,"capacity",str(slot),f"CAPACITY_SLOT_{slot}")
 def acquire(store,key,holder,observed,*,now_srv,ttl=300):
  cur=store.read(key)
- if cur and cur.expires_at>now_srv:return None
+ if cur and cur.active and cur.expires_at>now_srv:return None
  if cur and cur.intent and cur.intent.state=="PENDING":return None
- epoch=1 if cur is None else cur.epoch+1;version=1 if cur is None else cur.version+1;nxt=Lease(key,holder,epoch,observed,now_srv,now_srv+ttl,version)
+ epoch=1 if cur is None else cur.epoch+1;version=1 if cur is None else cur.version+1;nxt=Lease(key,holder,epoch,observed,now_srv,now_srv+ttl,version,intent=None,active=True)
  return nxt if store.cas(key,None if cur is None else cur.version,nxt) else None
 def renew(store,lease,*,now_srv,ttl=300):
  cur=store.read(lease.key)
- if cur!=lease or cur.holder!=lease.holder or cur.epoch!=lease.epoch:return None
- nxt=replace(lease,expires_at=now_srv+ttl,version=lease.version+1);return nxt if store.cas(lease.key,lease.version,nxt) else None
+ if cur!=lease or not cur.active:return None
+ nxt=replace(cur,expires_at=now_srv+ttl,version=cur.version+1);return nxt if store.cas(cur.key,cur.version,nxt) else None
 def attach_intent(store,lease,repo_id,item,operation):
  cur=store.read(lease.key)
- if cur!=lease or cur.holder!=lease.holder or cur.epoch!=lease.epoch or operation not in DANGEROUS|HARMLESS:return None
- it=Intent(str(uuid.uuid4()),idem_key(repo_id,item,lease.observed.head,operation),operation,lease.observed.head,lease.observed.base,lease.epoch);nxt=replace(lease,intent=it,version=lease.version+1)
- return nxt if store.cas(lease.key,lease.version,nxt) else None
+ if cur!=lease or not cur.active or operation not in DANGEROUS|HARMLESS or (cur.intent is not None and cur.intent.state=="PENDING"):return None
+ it=Intent(str(uuid.uuid4()),idem_key(repo_id,item,cur.observed.head,operation),operation,cur.observed.head,cur.observed.base,cur.epoch);nxt=replace(cur,intent=it,version=cur.version+1);return nxt if store.cas(cur.key,cur.version,nxt) else None
 def resolve_intent(store,lease,state):
  if state not in {"DONE","ABORTED"}:raise ValueError("INTENT_RESOLUTION_INVALID")
  cur=store.read(lease.key)
  if cur!=lease or cur.intent is None or cur.intent.state!="PENDING":return None
  nxt=replace(cur,intent=replace(cur.intent,state=state),version=cur.version+1);return nxt if store.cas(cur.key,cur.version,nxt) else None
-def release(store,lease,*,now_srv,intent_state="DONE"):
+def release(store,lease,*,now_srv):
  cur=store.read(lease.key)
- if cur is None or cur.holder!=lease.holder or cur.epoch!=lease.epoch:return None
- it=cur.intent
- if it is not None and it.state=="PENDING":
-  if intent_state not in {"DONE","ABORTED"}:raise ValueError("INTENT_RELEASE_STATE_INVALID")
-  it=replace(it,state=intent_state)
- nxt=replace(cur,intent=it,expires_at=now_srv,version=cur.version+1);return nxt if store.cas(cur.key,cur.version,nxt) else None
+ if cur!=lease or not cur.active:return None
+ if cur.intent is not None and cur.intent.state=="PENDING":return None
+ nxt=replace(cur,active=False,expires_at=now_srv,version=cur.version+1);return nxt if store.cas(cur.key,cur.version,nxt) else None
 def intent_recovery(lease,d):
  if lease.intent is None or lease.intent.state!="PENDING":return "NO_PENDING_INTENT"
  if d=="APPLIED":return "RESOLVE_DONE"
  if d=="NOT_APPLIED":return "RESOLVE_ABORTED"
  if d=="UNKNOWN":return "READBACK_REQUIRED"
  raise ValueError("DETECTION_RESULT_INVALID")
-def fence_ok(store,repo_id,lease,observed_now,*,now_srv,max_write_latency=30,skew_margin=30):
+def fence_ok(store,repo_id,lease,observed_now,*,now_srv,max_write_latency=30,skew_margin=30,emergency_revert_authorized=False):
  cur=store.read(lease.key)
  if cur is None:return False,"LEASE_MISSING"
- if cur.holder!=lease.holder or cur.epoch!=lease.epoch or cur.version!=lease.version:return False,"LEASE_LOST"
+ if cur!=lease or not cur.active:return False,"LEASE_LOST"
  if now_srv+max_write_latency+skew_margin>=cur.expires_at:return False,"LEASE_TOO_CLOSE_TO_EXPIRY"
  if cur.observed!=observed_now:return False,"OBSERVATION_CHANGED"
  if cur.intent is None or cur.intent.state!="PENDING" or cur.intent.epoch!=cur.epoch:return False,"INTENT_INVALID"
- mode,_=store.read_repo_mode(repo_id)
- if mode!=RepoMode.NORMAL and cur.intent.operation not in {"revert","comment"}:return False,f"REPO_MODE_{mode.value}"
- if cur.intent.operation not in DANGEROUS|HARMLESS:return False,"OPERATION_NOT_ALLOWLISTED"
- return True,"OK"
+ mode,_=store.read_repo_mode(repo_id);op=cur.intent.operation
+ if op not in DANGEROUS|HARMLESS:return False,"OPERATION_NOT_ALLOWLISTED"
+ if mode==RepoMode.NORMAL or op=="comment":return True,"OK"
+ if op=="revert" and mode in {RepoMode.MAIN_BROKEN,RepoMode.MAIN_BROKEN_ENV} and emergency_revert_authorized:return True,"OK"
+ return False,f"REPO_MODE_{mode.value}"
 def governance_mode(s:Mapping[str,Any]):
  if s.get("halted") is True:return RepoMode.HALTED
  if s.get("controller_integrity_failure") is True:return RepoMode.CONTROLLER_INTEGRITY
  if s.get("security_integrity_failure") is True:return RepoMode.SECURITY_INTEGRITY_FAILURE
- if s.get("ledger_reachable") is False:return RepoMode.AUTOMATION_DEGRADED
+ if s.get("ledger_reachable") is not True:return RepoMode.AUTOMATION_DEGRADED
  if not all(s.get(k) is True for k in ("platform_enforcement_ok","live_rules_at_least_pinned","rulesets_or_protection_active","required_check_sources_pinned")) or s.get("controller_admin") is True or s.get("controller_bypass") is True:return RepoMode.GOVERNANCE_DRIFT
  if s.get("main_broken") is True:return RepoMode.MAIN_BROKEN
  if s.get("main_broken_env") is True:return RepoMode.MAIN_BROKEN_ENV
@@ -126,7 +126,9 @@ def _checks_ok(rows,head,base,sources):
   c=by.get(k,[])
   if len(c)!=1:return False
   r=c[0]
-  if r.get("head_sha")!=head or (r.get("tested_base_sha")!=base and r.get("merge_queue") is not True) or r.get("latest_attempt") is not True or r.get("conclusion")!="success" or r.get("assertion_failure_any_attempt") is True:return False
+  if r.get("head_sha")!=head or r.get("tested_base_sha")!=base:return False
+  if r.get("latest_attempt") is not True or r.get("conclusion")!="success":return False
+  if r.get("assertion_history_complete") is not True or r.get("assertion_failure_any_attempt") is not False:return False
  return True
 def _review_ok(r,head,base):
  if not isinstance(r,Mapping) or r.get("state")!="APPROVED" or r.get("commit_id")!=head or r.get("base_sha")!=base or r.get("complete") is not True or r.get("skipped") is True or r.get("covers_full_diff") is not True:return False
@@ -172,5 +174,5 @@ def classify_item(s:Mapping[str,Any],budget:Budget):
  if s.get("independent_review_pass") is not True:return ItemState.CI_GREEN_UNREVIEWED
  return ItemState.MERGE_ELIGIBLE if merge_ok(s)[0] else ItemState.FINDINGS_OPEN
 def selftest():
- st=MemoryCASStore();o=Observation("a"*40,"b"*40,"wu","t");l=acquire(st,lease_key("r","pr","1","MERGE"),new_run_id(),o,now_srv=1000);assert l;li=attach_intent(st,l,"r","p","merge");assert li;assert fence_ok(st,"r",li,o,now_srv=1010)==(True,"OK");assert intent_recovery(li,"UNKNOWN")=="READBACK_REQUIRED";print("l5_kernel selftest PASS")
+ st=MemoryCASStore();o=Observation("a"*40,"b"*40,"wu","t");l=acquire(st,lease_key("r","pr","1","MERGE"),new_run_id(),o,now_srv=1000);assert l;li=attach_intent(st,l,"r","p","merge");assert li;assert fence_ok(st,"r",li,o,now_srv=1010)==(True,"OK");assert intent_recovery(li,"UNKNOWN")=="READBACK_REQUIRED";resolved=resolve_intent(st,li,"ABORTED");assert resolved;assert release(st,resolved,now_srv=1020);print("l5_kernel selftest PASS")
 if __name__=="__main__":selftest()
