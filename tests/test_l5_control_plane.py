@@ -14,7 +14,7 @@ import l5_control_plane as cp  # noqa: E402
 
 
 class ControlPlaneTests(unittest.TestCase):
-    """Prove LIVE_SAFE permits reversible work but denies main changes."""
+    """Prove LIVE_SAFE permits reversible work but denies main/durable-queue changes."""
 
     def manifest(self, **overrides):
         value = {
@@ -35,12 +35,12 @@ class ControlPlaneTests(unittest.TestCase):
 
     def test_live_safe_allows_reversible_operations(self):
         path = self.manifest()
-        for operation in ("retry_ci", "dispatch_review", "remediate_review", "update_branch", "reserve_next_wu"):
+        for operation in ("retry_ci", "dispatch_review", "remediate_review", "update_branch"):
             self.assertEqual(cp.mutation_policy(operation, path), (True, "CONTROL_PLANE_LIVE_SAFE"))
 
-    def test_live_safe_blocks_main_changing_operations(self):
+    def test_live_safe_blocks_main_and_durable_queue_changes(self):
         path = self.manifest()
-        for operation in ("merge_expected_head", "revert"):
+        for operation in ("merge_expected_head", "revert", "reserve_next_wu"):
             self.assertEqual(cp.mutation_policy(operation, path), (False, "CONTROL_PLANE_LIVE_SAFE_MAIN_CHANGE_BLOCKED"))
 
     def test_shadow_and_malformed_manifest_fail_closed(self):
