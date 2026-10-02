@@ -11,7 +11,9 @@ from typing import Any, Mapping
 ROOT = Path(__file__).resolve().parents[1]
 MANIFEST = ROOT / ".l5" / "control-plane.json"
 SHA40 = re.compile(r"^[0-9a-f]{40}$")
-LIVE_SAFE_MAIN_CHANGING = frozenset({"merge_expected_head", "revert"})
+# These operations can alter main or durable queue ownership and therefore stay
+# unavailable until the platform-enforcement activation boundary is complete.
+LIVE_SAFE_MAIN_CHANGING = frozenset({"merge_expected_head", "revert", "reserve_next_wu"})
 REQUIRED_ACTIVATION = frozenset({
     "control_plane_reviewed_and_green",
     "api_hostile_simulation_green",
@@ -33,7 +35,7 @@ def load_manifest(path: Path | None = None) -> Mapping[str, Any]:
     """Load and structurally validate the local control-plane manifest."""
     try:
         value = json.loads(_manifest_path(path).read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as exc:
+    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
         raise ValueError("CONTROL_PLANE_UNAVAILABLE") from exc
     if not isinstance(value, Mapping) or value.get("schema_version") != "1.0":
         raise ValueError("CONTROL_PLANE_INVALID")
