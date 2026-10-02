@@ -64,6 +64,8 @@ def mutation_policy(operation: str | None = None, path: Path | None = None) -> t
             return False, "CONTROL_PLANE_MUTATIONS_DISABLED"
         if value.get("platform_enforcement") != "DEFERRED_FOR_VALIDATION":
             return False, "CONTROL_PLANE_LIVE_SAFE_INVALID"
+        if operation is not None and not isinstance(operation, str):
+            return False, "CONTROL_PLANE_INVALID_MUTATION"
         if operation in LIVE_SAFE_MAIN_CHANGING:
             return False, "CONTROL_PLANE_LIVE_SAFE_MAIN_CHANGE_BLOCKED"
         return True, "CONTROL_PLANE_LIVE_SAFE"
