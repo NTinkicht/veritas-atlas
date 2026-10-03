@@ -1,11 +1,13 @@
 from __future__ import annotations
-import sys,tempfile,unittest
+import os,sys,tempfile,threading,unittest
 from pathlib import Path
+from unittest import mock
 ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT/"scripts"))
 import l5_recovery as recovery
 import l5_write_adapter as wa
 H,B="a"*40,"b"*40
+ACTIVE_CONTROL_PLANE=ROOT/"tests"/"fixtures"/"l5-control-plane-active.json"
 
 def snap(**patch):
     row={"repository":"NTinkicht/veritas-atlas","issue":36,"canonical_pr":37,"active_prs":[37],"head_sha":H,"base_sha":B,"head_current":True,"base_current":True,"implementation_complete":True,"emergency_stop":False,"human_only":False,"release_go_no_go":False,"blocked":False,"destructive_production":False,"spend_required":False,"secret_scope_change":False,"security_control_weakening":False,"merged":False,"verified":False,"verified_head_sha":None,"verified_base_sha":None,"ci":"FAILURE","ci_head_sha":H,"ci_base_sha":B,"review":"UNKNOWN","review_head_sha":None,"review_base_sha":None,"reviewer_actor":None,"material_authors":["chatgpt"],"material_authors_head_sha":H,"review_eligible":False,"unresolved_threads":False,"mergeable":True,"retry_count":0,"retry_action":None,"event_id":"w1","ready_candidates":[],"prior_event_keys":[],"prior_mutation_tokens":[]};row.update(patch);return row
@@ -26,6 +28,12 @@ class Client:
     def verify_effect(self,_mutation,_params):return self.effect
 
 class AdapterTests(unittest.TestCase):
+    def setUp(self):
+        self._old_control_plane=os.environ.get("L5_CONTROL_PLANE_MANIFEST")
+        os.environ["L5_CONTROL_PLANE_MANIFEST"]=str(ACTIVE_CONTROL_PLANE)
+    def tearDown(self):
+        if self._old_control_plane is None:os.environ.pop("L5_CONTROL_PLANE_MANIFEST",None)
+        else:os.environ["L5_CONTROL_PLANE_MANIFEST"]=self._old_control_plane
     def test_atomic_refs_and_replay(self):
         s=snap();a=recovery.authorize_mutation(s);store=wa.MemoryStore();c=Client();o=wa.execute_mutation(a,s,c,store);self.assertEqual(o["status"],"COMPLETE");self.assertEqual((c.last_params["expected_head_sha"],c.last_params["expected_base_sha"]),(H,B));self.assertEqual(wa.execute_mutation(a,s,c,store)["status"],"REPLAY_NOOP")
     def test_release_boundary_rechecked(self):
@@ -57,6 +65,28 @@ class AdapterTests(unittest.TestCase):
         s=merge_snap();a=recovery.authorize_mutation(s);c=Client();c.live["review_eligible_nonauthor"]=False;self.assertEqual(wa.execute_mutation(a,s,c,wa.MemoryStore())["reason"],"REVIEWER_NOT_ELIGIBLE")
     def test_atomic_cas_required(self):
         s=snap();a=recovery.authorize_mutation(s);c=Client();c.perform_cas=None;self.assertEqual(wa.execute_mutation(a,s,c,wa.MemoryStore())["reason"],"ATOMIC_CAS_UNAVAILABLE")
+    def test_final_policy_denial_restores_pending_without_remote_write(self):
+        s=merge_snap();a=recovery.authorize_mutation(s);store=wa.MemoryStore();c=Client()
+        with mock.patch.object(wa,"mutation_policy_locked",return_value=(False,"CONTROL_PLANE_LIVE_SAFE_MAIN_CHANGE_BLOCKED")):
+            out=wa.execute_mutation(a,s,c,store)
+        self.assertEqual(out["status"],"BLOCKED");self.assertEqual(out["reason"],"CONTROL_PLANE_LIVE_SAFE_MAIN_CHANGE_BLOCKED");self.assertEqual(c.calls,0);self.assertEqual(store.get(a["mutation_token"])["status"],"RETRYABLE")
+    def test_control_plane_transition_waits_for_final_remote_cas(self):
+        s=merge_snap();a=recovery.authorize_mutation(s);store=wa.MemoryStore();entered=threading.Event();release=threading.Event();transition_entered=threading.Event();result={}
+        class BlockingClient(Client):
+            def perform_cas(self,mutation,params):
+                self.calls+=1;self.last_params=dict(params);entered.set();self.assert_release(release);return True
+            @staticmethod
+            def assert_release(event):
+                if not event.wait(2):raise RuntimeError("test release timeout")
+        c=BlockingClient()
+        worker=threading.Thread(target=lambda:result.setdefault("out",wa.execute_mutation(a,s,c,store)))
+        worker.start();self.assertTrue(entered.wait(2))
+        transition=threading.Thread(target=lambda:self._enter_transition_guard(transition_entered))
+        transition.start();self.assertFalse(transition_entered.wait(0.1));release.set();worker.join(2);transition.join(2)
+        self.assertFalse(worker.is_alive());self.assertFalse(transition.is_alive());self.assertTrue(transition_entered.is_set());self.assertEqual(result["out"]["status"],"COMPLETE");self.assertEqual(c.calls,1)
+    @staticmethod
+    def _enter_transition_guard(entered):
+        with wa.control_plane_guard():entered.set()
     def test_json_store_persists_owner(self):
         with tempfile.TemporaryDirectory() as tmp:
             p=Path(tmp)/"store.json";store=wa.JsonFileStore(p);token="5"*64;self.assertTrue(store.begin(token,{"status":"PENDING"},"stream",1,"CI",expected_retry=(0,None),expected_owner=None));fresh=wa.JsonFileStore(p);self.assertEqual(fresh.retry_state("stream"),(1,"CI"));self.assertEqual(fresh.retry_owner("stream"),token)
