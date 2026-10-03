@@ -37,8 +37,8 @@ Every evidence item MUST contain:
 
 The identity-bearing `source.uri` is the **final authoritative URI after trusted redirect resolution**, not the originally requested URI. Redirect history may be retained separately as non-identity audit metadata. Before reference derivation, normalize the final URI as follows:
 
-1. parse it as an absolute HTTP or HTTPS URI; reject userinfo and malformed/relative values;
-2. lowercase the scheme and DNS host and normalize an internationalized host to its ASCII IDNA form;
+1. parse it as an absolute HTTP or HTTPS URI; reject userinfo and malformed/relative values. Verified retrieval normally requires authenticated HTTPS on every hop. An HTTPS-to-HTTP or HTTP hop is ineligible unless the exact returned source bytes are independently authenticated under the HTTP exception defined below;
+2. lowercase the scheme and DNS host. For a Unicode host, apply the exact IDNA profile defined below and use its ASCII output before lowercasing;
 3. remove the default port (`:80` for HTTP, `:443` for HTTPS) and preserve any non-default port;
 4. remove the fragment entirely;
 5. use `/` for an empty path; preserve path segment and trailing-slash semantics otherwise;
@@ -46,13 +46,34 @@ The identity-bearing `source.uri` is the **final authoritative URI after trusted
 7. remove dot segments according to RFC 3986 section 5.2.4;
 8. preserve query parameter order and multiplicity exactly as present in the final authoritative URI, while applying the same percent-escape normalization to each query component. Do not sort query parameters because order can be source-significant.
 
+### Pinned IDNA profile
+
+Host normalization uses profile `idna-uts46-nontransitional-15.1-v1` and no ambient platform/runtime IDNA defaults are permitted. Conforming implementations MUST use:
+
+- Unicode data version **15.1.0**;
+- Unicode Technical Standard #46 compatibility processing;
+- **non-transitional** processing (`transitionalProcessing=false`);
+- STD3 ASCII rules enabled;
+- hyphen, Bidi, Joiner and DNS-length checks enabled;
+- rejection on any disallowed/unassigned input for that pinned profile rather than best-effort substitution.
+
+An implementation whose IDNA library cannot prove that exact table/profile/options combination MUST fail URI verification instead of producing an `evidence_ref`. A future Unicode/IDNA-table upgrade requires a new normalization-profile/version and a migration/revalidation decision; it MUST NOT silently change existing `ev1` identities.
+
+Normative host vectors for this profile include:
+
+- `BÜCHER.example` -> `xn--bcher-kva.example`;
+- `faß.de` -> `xn--fa-hia.de` (non-transitional behavior; `fass.de` is not conforming for this profile);
+- `EXAMPLE.COM` -> `example.com`.
+
+Tests MUST verify the normalized full `source.uri` and resulting `evidence_ref`, not only the intermediate host label.
+
 Adapters MUST emit the same normalized URI for equivalent URI spellings covered by these rules. A redirect target that differs materially from the requested URI is canonical because it is the resource actually retrieved.
 
 ## Trusted retrieval and source-authentication boundary
 
 Digest consistency alone is insufficient provenance. Before an item becomes verified/answerable evidence, the system MUST establish both **who/what performed the retrieval** and **that the retrieved bytes are authentically attributable to the authoritative source**.
 
-The normal accepted path is HTTPS retrieval by a trusted adapter or trusted Veritas Atlas server-side retriever with successful certificate/hostname validation. Its signed or otherwise authenticated attestation MUST bind the normalized final URI, exact `content_sha256`, `retrieved_at`, retriever identity, and source-authentication result.
+The normal accepted path is HTTPS retrieval by a trusted adapter or trusted Veritas Atlas server-side retriever with successful certificate/hostname validation on every retrieval/redirect hop. Its signed or otherwise authenticated attestation MUST bind the normalized final URI, exact `content_sha256`, `retrieved_at`, retriever identity, and source-authentication result.
 
 Plain HTTP MUST NOT become verified evidence merely because a trusted adapter fetched and hashed it. HTTP is eligible only when the exact source bytes carry an independent authenticity mechanism that the verifier validates, such as an authoritative detached signature or a trusted source-published digest obtained through a separately authenticated channel. That proof and its verification result MUST be bound into the retrieval attestation. Without such independent authentication, HTTP evidence remains unverified and ineligible for answer generation.
 
@@ -84,7 +105,7 @@ Classification fields intentionally remain outside `evidence_ref` identity so a 
 1. Missing or empty required fields fail closed; an item without complete provenance is not eligible evidence for an AI answer.
 2. `content_sha256` MUST equal SHA-256 over the exact bytes produced by the trusted retrieval boundary before parsing or normalization. Parsed text may additionally carry its own digest but cannot replace the retrieval digest.
 3. `retrieved_at` MUST be an offset-aware RFC3339 timestamp normalized to UTC for canonical serialization.
-4. `uri` MUST be the normalized final authoritative/public source URI defined above, not a search-results page, caller assertion, or AI-generated redirect.
+4. `uri` MUST be the normalized final authoritative/public source URI defined above, including the pinned IDNA profile, not a search-results page, caller assertion, or AI-generated redirect.
 5. `record_id` MUST use a stable source-native identifier when available. If the source genuinely provides none, the ingestion adapter must derive and explicitly namespace a deterministic identifier rather than leaving the field blank.
 6. `jurisdiction` and `source_type` MUST come from controlled normalized vocabularies **and** pass the trusted-classification boundary above. Unknown values must be represented explicitly as controlled `unknown`/`other` values according to the implementation schema, never guessed by the model.
 7. Parser identity MUST be immutable enough to reproduce interpretation of the bytes. A parser behavior change requires a new version.
@@ -114,12 +135,14 @@ RFC 8785 is normative: implementations MUST NOT substitute serializer-specific k
 
 - Same canonical envelope identity fields produce the same `evidence_ref` across processes and conforming RFC 8785 implementations, including non-ASCII and escapable characters.
 - Equivalent URI spellings normalize identically for scheme/host case, default ports, unreserved percent escapes, fragments and dot segments.
+- Pinned IDNA vectors above produce the exact ASCII hosts under Unicode 15.1.0 UTS #46 non-transitional processing; a library/profile/table mismatch fails closed.
 - Query order/multiplicity and meaningful trailing-slash differences are preserved; final redirect URI, not requested URI, is canonical.
 - Changed source bytes change both `content_sha256` and `evidence_ref`.
 - Changed parser version changes `evidence_ref` even for identical bytes.
 - Missing URI, record ID, retrieval timestamp, digest, trusted-retrieval attestation, jurisdiction, source type, classification proof, parser name or parser version is rejected.
 - Caller-supplied bytes with a self-consistent digest/reference but no trusted retrieval proof are rejected as unverified.
 - HTTPS hostname/certificate authentication failure rejects evidence even when bytes/hash are internally consistent.
+- HTTPS-to-HTTP downgrade without independently authenticated proof of the exact bytes is rejected.
 - Plain HTTP with no independently verified source signature/digest rejects evidence; a configured HTTP exception passes only when its independent authenticity proof validates the exact bytes.
 - Independent fetch rejects forbidden resolved addresses and revalidates every redirect hop; redirect-to-private/metadata destinations fail closed.
 - Caller/model-supplied jurisdiction/source type without trusted classification proof is rejected; an authorized correction retains the same `evidence_ref` but creates a new authenticated metadata audit revision.
