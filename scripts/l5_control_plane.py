@@ -2,9 +2,12 @@
 """Fail-closed local control-plane switch for L5 execution modes."""
 from __future__ import annotations
 
+import fcntl
 import json
 import os
 import re
+import threading
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, Mapping
 
@@ -21,6 +24,7 @@ REQUIRED_ACTIVATION = frozenset({
     "platform_enforcement_verified",
     "governance_drift_human_cleared",
 })
+_CONTROL_THREAD_LOCK = threading.RLock()
 
 
 def _manifest_path(path: Path | None = None) -> Path:
@@ -29,6 +33,26 @@ def _manifest_path(path: Path | None = None) -> Path:
         return path
     override = os.environ.get("L5_CONTROL_PLANE_MANIFEST")
     return Path(override) if override else MANIFEST
+
+
+@contextmanager
+def control_plane_guard(path: Path | None = None):
+    """Serialize policy transitions with the final mutation CAS boundary.
+
+    Runtime mode-transition code and the write adapter share this advisory lock.
+    A controller holding the guard may evaluate policy and execute exactly one
+    remote CAS without a concurrent local transition entering between them.
+    """
+    manifest = _manifest_path(path)
+    lock_path = manifest.with_suffix(manifest.suffix + ".lock")
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    with _CONTROL_THREAD_LOCK:
+        with lock_path.open("a+", encoding="utf-8") as lock:
+            fcntl.flock(lock.fileno(), fcntl.LOCK_EX)
+            try:
+                yield
+            finally:
+                fcntl.flock(lock.fileno(), fcntl.LOCK_UN)
 
 
 def load_manifest(path: Path | None = None) -> Mapping[str, Any]:
@@ -51,8 +75,8 @@ def load_manifest(path: Path | None = None) -> Mapping[str, Any]:
     return value
 
 
-def mutation_policy(operation: str | None = None, path: Path | None = None) -> tuple[bool, str]:
-    """Authorize one concrete operation under SHADOW, LIVE_SAFE, or ACTIVE mode."""
+def mutation_policy_locked(operation: str | None = None, path: Path | None = None) -> tuple[bool, str]:
+    """Evaluate mutation policy while the caller holds ``control_plane_guard``."""
     try:
         value = load_manifest(path)
     except ValueError as exc:
@@ -85,6 +109,12 @@ def mutation_policy(operation: str | None = None, path: Path | None = None) -> t
     if any(evidence.get(name) is not True for name in REQUIRED_ACTIVATION):
         return False, "ACTIVATION_EVIDENCE_INCOMPLETE"
     return True, "CONTROL_PLANE_ACTIVE"
+
+
+def mutation_policy(operation: str | None = None, path: Path | None = None) -> tuple[bool, str]:
+    """Authorize one concrete operation under a serialized policy snapshot."""
+    with control_plane_guard(path):
+        return mutation_policy_locked(operation, path)
 
 
 if __name__ == "__main__":
