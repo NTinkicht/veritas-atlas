@@ -1,0 +1,93 @@
+{
+  "schema": "veritas-evidence-provenance-vectors/v1",
+  "contract": "docs/EVIDENCE_PROVENANCE_CONTRACT.md",
+  "cases": [
+    {
+      "id": "accept-canonical-https",
+      "expected": "accept",
+      "source_uri_input": "HTTPS://EXAMPLE.COM:443/a/../record/%31#fragment",
+      "normalized_source_uri": "https://example.com/record/1",
+      "record_id": "record-1",
+      "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "parser_name": "public-record-parser",
+      "parser_version": "1.0.0",
+      "retrieved_at": "2026-10-03T20:00:00Z",
+      "retrieval_attestation": "trusted-test-attestation",
+      "jurisdiction": "test-jurisdiction",
+      "source_type": "court_record",
+      "classification_proof": "trusted-test-classification"
+    },
+    {
+      "id": "accept-query-order-preserved",
+      "expected": "accept",
+      "source_uri_input": "https://example.com/record?a=2&a=1",
+      "normalized_source_uri": "https://example.com/record?a=2&a=1",
+      "record_id": "record-query",
+      "content_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "parser_name": "public-record-parser",
+      "parser_version": "1.0.0",
+      "retrieved_at": "2026-10-03T20:00:00Z",
+      "retrieval_attestation": "trusted-test-attestation",
+      "jurisdiction": "test-jurisdiction",
+      "source_type": "filing",
+      "classification_proof": "trusted-test-classification"
+    },
+    {
+      "id": "reject-missing-retrieval-attestation",
+      "expected": "reject",
+      "reason": "missing_trusted_retrieval_attestation",
+      "normalized_source_uri": "https://example.com/record/2",
+      "record_id": "record-2",
+      "content_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "parser_name": "public-record-parser",
+      "parser_version": "1.0.0",
+      "retrieved_at": "2026-10-03T20:00:00Z",
+      "jurisdiction": "test-jurisdiction",
+      "source_type": "regulation",
+      "classification_proof": "trusted-test-classification"
+    },
+    {
+      "id": "reject-invalid-content-digest",
+      "expected": "reject",
+      "reason": "invalid_sha256",
+      "normalized_source_uri": "https://example.com/record/3",
+      "record_id": "record-3",
+      "content_sha256": "not-a-sha256",
+      "parser_name": "public-record-parser",
+      "parser_version": "1.0.0",
+      "retrieved_at": "2026-10-03T20:00:00Z",
+      "retrieval_attestation": "trusted-test-attestation",
+      "jurisdiction": "test-jurisdiction",
+      "source_type": "statute",
+      "classification_proof": "trusted-test-classification"
+    },
+    {
+      "id": "reject-missing-classification-proof",
+      "expected": "reject",
+      "reason": "untrusted_classification",
+      "normalized_source_uri": "https://example.com/record/4",
+      "record_id": "record-4",
+      "content_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "parser_name": "public-record-parser",
+      "parser_version": "1.0.0",
+      "retrieved_at": "2026-10-03T20:00:00Z",
+      "retrieval_attestation": "trusted-test-attestation",
+      "jurisdiction": "test-jurisdiction",
+      "source_type": "register"
+    },
+    {
+      "id": "reject-parser-version-missing",
+      "expected": "reject",
+      "reason": "missing_parser_version",
+      "normalized_source_uri": "https://example.com/record/5",
+      "record_id": "record-5",
+      "content_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "parser_name": "public-record-parser",
+      "retrieved_at": "2026-10-03T20:00:00Z",
+      "retrieval_attestation": "trusted-test-attestation",
+      "jurisdiction": "test-jurisdiction",
+      "source_type": "other_public_record",
+      "classification_proof": "trusted-test-classification"
+    }
+  ]
+}
