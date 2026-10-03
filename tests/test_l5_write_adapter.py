@@ -1,6 +1,7 @@
 from __future__ import annotations
-import os,sys,tempfile,unittest
+import os,sys,tempfile,threading,unittest
 from pathlib import Path
+from unittest import mock
 ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT/"scripts"))
 import l5_recovery as recovery
@@ -64,6 +65,28 @@ class AdapterTests(unittest.TestCase):
         s=merge_snap();a=recovery.authorize_mutation(s);c=Client();c.live["review_eligible_nonauthor"]=False;self.assertEqual(wa.execute_mutation(a,s,c,wa.MemoryStore())["reason"],"REVIEWER_NOT_ELIGIBLE")
     def test_atomic_cas_required(self):
         s=snap();a=recovery.authorize_mutation(s);c=Client();c.perform_cas=None;self.assertEqual(wa.execute_mutation(a,s,c,wa.MemoryStore())["reason"],"ATOMIC_CAS_UNAVAILABLE")
+    def test_final_policy_denial_restores_pending_without_remote_write(self):
+        s=merge_snap();a=recovery.authorize_mutation(s);store=wa.MemoryStore();c=Client()
+        with mock.patch.object(wa,"mutation_policy_locked",return_value=(False,"CONTROL_PLANE_LIVE_SAFE_MAIN_CHANGE_BLOCKED")):
+            out=wa.execute_mutation(a,s,c,store)
+        self.assertEqual(out["status"],"BLOCKED");self.assertEqual(out["reason"],"CONTROL_PLANE_LIVE_SAFE_MAIN_CHANGE_BLOCKED");self.assertEqual(c.calls,0);self.assertEqual(store.get(a["mutation_token"])["status"],"RETRYABLE")
+    def test_control_plane_transition_waits_for_final_remote_cas(self):
+        s=merge_snap();a=recovery.authorize_mutation(s);store=wa.MemoryStore();entered=threading.Event();release=threading.Event();transition_entered=threading.Event();result={}
+        class BlockingClient(Client):
+            def perform_cas(self,mutation,params):
+                self.calls+=1;self.last_params=dict(params);entered.set();self.assert_release(release);return True
+            @staticmethod
+            def assert_release(event):
+                if not event.wait(2):raise RuntimeError("test release timeout")
+        c=BlockingClient()
+        worker=threading.Thread(target=lambda:result.setdefault("out",wa.execute_mutation(a,s,c,store)))
+        worker.start();self.assertTrue(entered.wait(2))
+        transition=threading.Thread(target=lambda:self._enter_transition_guard(transition_entered))
+        transition.start();self.assertFalse(transition_entered.wait(0.1));release.set();worker.join(2);transition.join(2)
+        self.assertFalse(worker.is_alive());self.assertFalse(transition.is_alive());self.assertTrue(transition_entered.is_set());self.assertEqual(result["out"]["status"],"COMPLETE");self.assertEqual(c.calls,1)
+    @staticmethod
+    def _enter_transition_guard(entered):
+        with wa.control_plane_guard():entered.set()
     def test_json_store_persists_owner(self):
         with tempfile.TemporaryDirectory() as tmp:
             p=Path(tmp)/"store.json";store=wa.JsonFileStore(p);token="5"*64;self.assertTrue(store.begin(token,{"status":"PENDING"},"stream",1,"CI",expected_retry=(0,None),expected_owner=None));fresh=wa.JsonFileStore(p);self.assertEqual(fresh.retry_state("stream"),(1,"CI"));self.assertEqual(fresh.retry_owner("stream"),token)
