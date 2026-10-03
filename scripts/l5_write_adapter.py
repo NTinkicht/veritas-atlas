@@ -4,7 +4,7 @@ from __future__ import annotations
 import fcntl, json, os
 from pathlib import Path
 from typing import Any
-from l5_control_plane import mutation_policy
+from l5_control_plane import control_plane_guard, mutation_policy, mutation_policy_locked
 from l5_recovery import HARD_BOUNDARIES, MAX_RETRIES, RETRY_SCOPES, SAFE_MUTATIONS, SHA40, TOKEN64, _bool, authorize_mutation
 
 RETRYABLE=frozenset({"retry_ci","dispatch_review","remediate_review"})
@@ -92,7 +92,15 @@ def execute_mutation(auth,snapshot,client,store):
     if block:
         store.fail_and_restore(token,block,stream,observed_retry);return _result("BLOCKED",block,token)
     try:
-        result=perform_cas(auth["mutation"],_params(auth))
+        # Hold the shared control-plane guard from the final policy read through
+        # the atomic remote CAS. A local ACTIVE->LIVE_SAFE/SHADOW transition
+        # therefore cannot enter between authorization and the mutation sink.
+        with control_plane_guard():
+            final_allowed,final_reason=mutation_policy_locked(auth["mutation"])
+            if not final_allowed:
+                store.fail_and_restore(token,final_reason,stream,observed_retry)
+                return _result("BLOCKED",final_reason,token)
+            result=perform_cas(auth["mutation"],_params(auth))
         if result is False:raise WriteRejected("ATOMIC_CAS_REJECTED")
         if result is not True:return _reconcile(auth,client,store,written=False)
     except WriteRejected as exc:
