@@ -127,8 +127,23 @@ def strict_ruleset_enforces(
         return False
     if status_params.get("strict_required_status_checks_policy") is not True:
         return False
+
+    required_reviewers = pr_params.get("required_reviewers") or []
+    if not isinstance(required_reviewers, list):
+        return False
+    try:
+        reviewer_approval_required = any(
+            not isinstance(item, dict)
+            or int(item.get("minimum_approvals") or 0) > 0
+            for item in required_reviewers
+        )
+    except (TypeError, ValueError):
+        return False
+
     if (
         int(pr_params.get("required_approving_review_count") or 0) != 0
+        or pr_params.get("require_code_owner_review") is True
+        or reviewer_approval_required
         or pr_params.get("require_last_push_approval") is True
         or pr_params.get("require_extra_approval_for_unattributed_changes") is True
         or pr_params.get("required_review_thread_resolution") is not True
