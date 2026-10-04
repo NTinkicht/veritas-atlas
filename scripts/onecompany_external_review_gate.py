@@ -133,6 +133,7 @@ def external_mistral_status(
     if (
         not SHA.fullmatch(head)
         or not SHA.fullmatch(base)
+        or head == base
         or not normalized_authors
         or normalized_authors & MISTRAL_ALIASES
     ):
