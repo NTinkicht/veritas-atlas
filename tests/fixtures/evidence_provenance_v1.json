@@ -1,0 +1,228 @@
+{
+  "schema": "veritas-evidence-provenance-vectors/v1",
+  "contract": "docs/EVIDENCE_PROVENANCE_CONTRACT.md",
+  "cases": [
+    {
+      "id": "accept-canonical-https",
+      "expected": "accept",
+      "envelope": {
+        "schema_version": "1.0",
+        "evidence_ref": "ev1:a8830f07899f88c51dba4072ce11a6ae66d0a0da250e92a3c8fca7801d3a0a39",
+        "source_uri": "HTTPS://EXAMPLE.COM:443/a/../record/%31#fragment",
+        "record_id": "record-1",
+        "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "parser_name": "public-record-parser",
+        "parser_version": "1.0.0",
+        "retrieved_at": "2026-10-03T20:00:00Z",
+        "retrieval_attestation": "trusted-test-attestation",
+        "jurisdiction": "test-jurisdiction",
+        "source_type": "court_record",
+        "classification_proof": "trusted-test-classification"
+      },
+      "trust": {"retrieval": true, "classification": true, "digest": true},
+      "expected_normalized_source_uri": "https://example.com/record/1",
+      "expected_evidence_ref": "ev1:a8830f07899f88c51dba4072ce11a6ae66d0a0da250e92a3c8fca7801d3a0a39"
+    },
+    {
+      "id": "accept-query-order-preserved",
+      "expected": "accept",
+      "envelope": {
+        "schema_version": "1.0",
+        "evidence_ref": "ev1:9b050210943b431bc13f5303921976cc90ccd4f822601690947bc9b68332ec2a",
+        "source_uri": "https://EXAMPLE.com:443/record?a=2&a=1#ignored",
+        "record_id": "record-query",
+        "content_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "parser_name": "public-record-parser",
+        "parser_version": "1.0.0",
+        "retrieved_at": "2026-10-03T20:00:00Z",
+        "retrieval_attestation": "trusted-test-attestation",
+        "jurisdiction": "test-jurisdiction",
+        "source_type": "filing",
+        "classification_proof": "trusted-test-classification"
+      },
+      "trust": {"retrieval": true, "classification": true, "digest": true},
+      "expected_normalized_source_uri": "https://example.com/record?a=2&a=1",
+      "expected_evidence_ref": "ev1:9b050210943b431bc13f5303921976cc90ccd4f822601690947bc9b68332ec2a"
+    },
+    {
+      "id": "accept-content-digest-drift-a",
+      "expected": "accept",
+      "pair": "digest-drift",
+      "envelope": {
+        "schema_version": "1.0",
+        "evidence_ref": "ev1:a5e8221a6600b6f33987cecf269930ada28df8450af337428da22fb81005fbb3",
+        "source_uri": "https://example.com/record/drift",
+        "record_id": "record-drift",
+        "content_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+        "parser_name": "public-record-parser",
+        "parser_version": "1.0.0",
+        "retrieved_at": "2026-10-03T20:00:00Z",
+        "retrieval_attestation": "trusted-test-attestation",
+        "jurisdiction": "test-jurisdiction",
+        "source_type": "register",
+        "classification_proof": "trusted-test-classification"
+      },
+      "trust": {"retrieval": true, "classification": true, "digest": true},
+      "expected_normalized_source_uri": "https://example.com/record/drift",
+      "expected_evidence_ref": "ev1:a5e8221a6600b6f33987cecf269930ada28df8450af337428da22fb81005fbb3"
+    },
+    {
+      "id": "accept-content-digest-drift-b",
+      "expected": "accept",
+      "pair": "digest-drift",
+      "envelope": {
+        "schema_version": "1.0",
+        "evidence_ref": "ev1:51e2c73380ea746b4ca956e964d74911221fc7783305add18a208f8451ec4d1a",
+        "source_uri": "https://example.com/record/drift",
+        "record_id": "record-drift",
+        "content_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+        "parser_name": "public-record-parser",
+        "parser_version": "1.0.0",
+        "retrieved_at": "2026-10-03T20:00:00Z",
+        "retrieval_attestation": "trusted-test-attestation",
+        "jurisdiction": "test-jurisdiction",
+        "source_type": "register",
+        "classification_proof": "trusted-test-classification"
+      },
+      "trust": {"retrieval": true, "classification": true, "digest": true},
+      "expected_normalized_source_uri": "https://example.com/record/drift",
+      "expected_evidence_ref": "ev1:51e2c73380ea746b4ca956e964d74911221fc7783305add18a208f8451ec4d1a"
+    },
+    {
+      "id": "accept-parser-version-drift-v1",
+      "expected": "accept",
+      "pair": "parser-drift",
+      "envelope": {
+        "schema_version": "1.0",
+        "evidence_ref": "ev1:b06aae2494da6027e03340b10a8d9747f9ed06737fea22d255a23d7c549a89b2",
+        "source_uri": "https://example.com/record/parser",
+        "record_id": "record-parser",
+        "content_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+        "parser_name": "public-record-parser",
+        "parser_version": "1.0.0",
+        "retrieved_at": "2026-10-03T20:00:00Z",
+        "retrieval_attestation": "trusted-test-attestation",
+        "jurisdiction": "test-jurisdiction",
+        "source_type": "statute",
+        "classification_proof": "trusted-test-classification"
+      },
+      "trust": {"retrieval": true, "classification": true, "digest": true},
+      "expected_normalized_source_uri": "https://example.com/record/parser",
+      "expected_evidence_ref": "ev1:b06aae2494da6027e03340b10a8d9747f9ed06737fea22d255a23d7c549a89b2"
+    },
+    {
+      "id": "accept-parser-version-drift-v2",
+      "expected": "accept",
+      "pair": "parser-drift",
+      "envelope": {
+        "schema_version": "1.0",
+        "evidence_ref": "ev1:a46b8d7caa46865e81d2b6c63b062140044f98a259befedccc06bcf343f1e667",
+        "source_uri": "https://example.com/record/parser",
+        "record_id": "record-parser",
+        "content_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+        "parser_name": "public-record-parser",
+        "parser_version": "2.0.0",
+        "retrieved_at": "2026-10-03T20:00:00Z",
+        "retrieval_attestation": "trusted-test-attestation",
+        "jurisdiction": "test-jurisdiction",
+        "source_type": "statute",
+        "classification_proof": "trusted-test-classification"
+      },
+      "trust": {"retrieval": true, "classification": true, "digest": true},
+      "expected_normalized_source_uri": "https://example.com/record/parser",
+      "expected_evidence_ref": "ev1:a46b8d7caa46865e81d2b6c63b062140044f98a259befedccc06bcf343f1e667"
+    },
+    {
+      "id": "reject-missing-schema-version",
+      "expected": "reject",
+      "reason": "missing_schema_version",
+      "envelope": {
+        "source_uri": "https://example.com/record/2",
+        "record_id": "record-2",
+        "content_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "parser_name": "public-record-parser",
+        "parser_version": "1.0.0",
+        "retrieved_at": "2026-10-03T20:00:00Z",
+        "retrieval_attestation": "trusted-test-attestation",
+        "jurisdiction": "test-jurisdiction",
+        "source_type": "regulation",
+        "classification_proof": "trusted-test-classification"
+      },
+      "trust": {"retrieval": true, "classification": true, "digest": true}
+    },
+    {
+      "id": "reject-missing-retrieval-attestation",
+      "expected": "reject",
+      "reason": "missing_trusted_retrieval_attestation",
+      "envelope": {
+        "schema_version": "1.0",
+        "source_uri": "https://example.com/record/3",
+        "record_id": "record-3",
+        "content_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "parser_name": "public-record-parser",
+        "parser_version": "1.0.0",
+        "retrieved_at": "2026-10-03T20:00:00Z",
+        "jurisdiction": "test-jurisdiction",
+        "source_type": "regulation",
+        "classification_proof": "trusted-test-classification"
+      },
+      "trust": {"retrieval": true, "classification": true, "digest": true}
+    },
+    {
+      "id": "reject-invalid-content-digest",
+      "expected": "reject",
+      "reason": "invalid_sha256",
+      "envelope": {
+        "schema_version": "1.0",
+        "source_uri": "https://example.com/record/4",
+        "record_id": "record-4",
+        "content_sha256": "not-a-sha256",
+        "parser_name": "public-record-parser",
+        "parser_version": "1.0.0",
+        "retrieved_at": "2026-10-03T20:00:00Z",
+        "retrieval_attestation": "trusted-test-attestation",
+        "jurisdiction": "test-jurisdiction",
+        "source_type": "statute",
+        "classification_proof": "trusted-test-classification"
+      },
+      "trust": {"retrieval": true, "classification": true, "digest": true}
+    },
+    {
+      "id": "reject-untrusted-classification",
+      "expected": "reject",
+      "reason": "untrusted_classification",
+      "envelope": {
+        "schema_version": "1.0",
+        "source_uri": "https://example.com/record/5",
+        "record_id": "record-5",
+        "content_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "parser_name": "public-record-parser",
+        "parser_version": "1.0.0",
+        "retrieved_at": "2026-10-03T20:00:00Z",
+        "retrieval_attestation": "trusted-test-attestation",
+        "jurisdiction": "test-jurisdiction",
+        "source_type": "register",
+        "classification_proof": "caller-supplied"
+      },
+      "trust": {"retrieval": true, "classification": false, "digest": true}
+    },
+    {
+      "id": "reject-parser-version-missing",
+      "expected": "reject",
+      "reason": "missing_parser_version",
+      "envelope": {
+        "schema_version": "1.0",
+        "source_uri": "https://example.com/record/6",
+        "record_id": "record-6",
+        "content_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "parser_name": "public-record-parser",
+        "retrieved_at": "2026-10-03T20:00:00Z",
+        "retrieval_attestation": "trusted-test-attestation",
+        "jurisdiction": "test-jurisdiction",
+        "source_type": "other_public_record",
+        "classification_proof": "trusted-test-classification"
+      },
+      "trust": {"retrieval": true, "classification": true, "digest": true}
+    }
+  ]
+}
