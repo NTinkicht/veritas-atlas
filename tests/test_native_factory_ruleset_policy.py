@@ -21,9 +21,10 @@ def base_ruleset():
             {
                 "type":"pull_request",
                 "parameters":{
-                    "required_approving_review_count":1,
+                    "required_approving_review_count":0,
                     "dismiss_stale_reviews_on_push":True,
-                    "require_last_push_approval":True,
+                    "require_last_push_approval":False,
+                    "require_extra_approval_for_unattributed_changes":False,
                     "required_review_thread_resolution":True,
                 },
             },
@@ -83,11 +84,11 @@ class RulesetPolicyTests(unittest.TestCase):
         r["rules"][-1]["parameters"]["required_status_checks"][0]["integration_id"]=999
         self.assert_policy(r,False)
 
-    def test_fresh_non_author_review_is_required(self):
+    def test_routine_human_approval_dependency_is_forbidden(self):
         for field,value in (
-            ("required_approving_review_count",0),
-            ("dismiss_stale_reviews_on_push",False),
-            ("require_last_push_approval",False),
+            ("required_approving_review_count",1),
+            ("require_last_push_approval",True),
+            ("require_extra_approval_for_unattributed_changes",True),
         ):
             with self.subTest(field=field):
                 r=base_ruleset()
