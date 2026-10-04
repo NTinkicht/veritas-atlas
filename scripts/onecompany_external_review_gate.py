@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verify OneCompany-hosted external Mistral PASS evidence for Veritas."""
+"""Verify OneCompany-hosted external Mistral evidence for Veritas."""
 from __future__ import annotations
 
 import json
@@ -102,9 +102,7 @@ def _trusted_dispatch(
     ):
         return None
     try:
-        d_repo, d_pr, d_head, d_base, d_authors = parse_dispatch(
-            str(comment.get("body") or "")
-        )
+        d_repo, d_pr, d_head, d_base, d_authors = parse_dispatch(str(comment.get("body") or ""))
     except (ValueError, TypeError):
         return None
     if (
@@ -115,32 +113,40 @@ def _trusted_dispatch(
     return comment
 
 
-def external_mistral_pass(
+def external_mistral_status(
     *,
     repo: str,
     pr: int,
     head: str,
     base: str,
     authors: set[str] | frozenset[str],
-) -> bool:
-    """Accept only the latest trusted exact-target OneCompany verdict."""
+) -> str:
+    """Return the latest trusted exact-target verdict or a fail-closed status.
+
+    PASS is the only merge-satisfying value. CHANGES_REQUIRED and
+    INSUFFICIENT_EVIDENCE remain adverse. MISSING means no authenticated exact
+    target verdict exists yet; INVALID_TARGET means the caller supplied an
+    unsafe or self-authored target; UNAVAILABLE means trusted evidence could not
+    be reconciled from GitHub.
+    """
     normalized_authors = {str(actor).strip().lower() for actor in authors}
     if (
         not SHA.fullmatch(head)
         or not SHA.fullmatch(base)
+        or head == base
         or not normalized_authors
         or normalized_authors & MISTRAL_ALIASES
     ):
-        return False
+        return "INVALID_TARGET"
     prefix = f"repo={repo} pr={pr} head={head} base={base} "
-    candidates: list[tuple[str, int, str, dict]] = []
+    candidates: list[tuple[str, int, str]] = []
     try:
         for page in range(1, MAX_PAGES + 1):
             comments = public_json(
                 f"repos/{HOST_REPO}/issues/{HOST_ISSUE}/comments?per_page=100&page={page}"
             )
             if not isinstance(comments, list):
-                return False
+                return "UNAVAILABLE"
             for comment in comments:
                 if (
                     not isinstance(comment, dict)
@@ -163,8 +169,7 @@ def external_mistral_pass(
                 if len(visible) != 1 or visible[0] != verdict:
                     continue
                 if (
-                    f"repo={marker_repo} pr={marker_pr} "
-                    f"head={marker_head} base={marker_base} "
+                    f"repo={marker_repo} pr={marker_pr} head={marker_head} base={marker_base} "
                     != prefix
                 ):
                     continue
@@ -179,9 +184,6 @@ def external_mistral_pass(
                 run = _trusted_run(int(run_id), int(dispatch_id))
                 if run is None:
                     continue
-                # PASS runs must be green. Adverse verdicts are intentionally
-                # published before the workflow's final PASS-only step makes
-                # the run fail, so a trusted failure is valid adverse evidence.
                 conclusion = str(run.get("conclusion") or "")
                 if verdict == "PASS" and conclusion != "success":
                     continue
@@ -191,18 +193,32 @@ def external_mistral_pass(
                     str(run.get("created_at") or comment.get("created_at") or ""),
                     int(run_id),
                     verdict,
-                    run,
                 ))
             if len(comments) < 100:
                 break
             if page == MAX_PAGES:
-                return False
+                return "UNAVAILABLE"
         if not candidates:
-            return False
-        _created, _run_id, latest_verdict, _run = max(
-            candidates, key=lambda item: (item[0], item[1])
-        )
-        return latest_verdict == "PASS"
+            return "MISSING"
+        _created, _run_id, latest_verdict = max(candidates, key=lambda item: (item[0], item[1]))
+        return latest_verdict
     except Exception:
-        return False
+        return "UNAVAILABLE"
 
+
+def external_mistral_pass(
+    *,
+    repo: str,
+    pr: int,
+    head: str,
+    base: str,
+    authors: set[str] | frozenset[str],
+) -> bool:
+    """Backward-compatible merge gate: only an authenticated PASS is true."""
+    return external_mistral_status(
+        repo=repo,
+        pr=pr,
+        head=head,
+        base=base,
+        authors=authors,
+    ) == "PASS"
