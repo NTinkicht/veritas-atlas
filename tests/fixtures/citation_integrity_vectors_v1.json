@@ -1,0 +1,69 @@
+{
+  "schema_version": "citation-integrity/v1",
+  "contract": "docs/architecture/CITATION_INTEGRITY_MATRIX.md",
+  "canonical_fixtures": {
+    "E1": {
+      "source_uri": "https://example.gov/records/case-1001",
+      "source_record_id": "case-1001",
+      "content_utf8": "case-1001|status=final|amount=1250",
+      "content_sha256": "64ffbec288730a2d702f0f0517a08876e140ac5b56dd4c2491d3422f44f10b80",
+      "parser_name": "public-record",
+      "parser_version": "v1",
+      "immutable_reference": "ev1:a8830f07899f88c51dba4072ce11a6ae66d0a0da250e92a3c8fca7801d3a0a39",
+      "provenance_complete": true,
+      "scope": "tenant-a",
+      "freshness": "CURRENT",
+      "policy_version": "public-record-policy/v1"
+    },
+    "E2": {
+      "source_uri": "https://example.gov/records/case-1001",
+      "source_record_id": "case-1001",
+      "content_utf8": "case-1001|status=final|amount=1250",
+      "content_sha256": "64ffbec288730a2d702f0f0517a08876e140ac5b56dd4c2491d3422f44f10b80",
+      "parser_name": "public-record",
+      "parser_version": "v2",
+      "immutable_reference": "ev1:a46b8d7caa46865e81d2b6c63b062140044f98a259befedccc06bcf343f1e667",
+      "provenance_complete": true,
+      "scope": "tenant-a",
+      "freshness": "CURRENT",
+      "policy_version": "public-record-policy/v1"
+    },
+    "E3": {
+      "source_uri": "https://example.gov/records/case-2001",
+      "source_record_id": "case-2001",
+      "content_utf8": "case-2001|status=historical",
+      "content_sha256": "3466b2b7225f92c53ed9d107bfd6e40e58aa9baf4f8d5f9db7b5068607b5d160",
+      "parser_name": "public-record",
+      "parser_version": "v1",
+      "immutable_reference": "ev1:a5e8221a6600b6f33987cecf269930ada28df8450af337428da22fb81005fbb3",
+      "provenance_complete": true,
+      "scope": "tenant-a",
+      "freshness": "STALE",
+      "policy_version": "public-record-policy/v1"
+    },
+    "E4": {
+      "source_uri": "https://example.gov/records/case-3001",
+      "source_record_id": "case-3001",
+      "content_utf8": "case-3001|status=historical-allowed",
+      "content_sha256": "cc1ea3a206ea6300a7fb965844598b560417a9bc3bb990690755c28065957f6c",
+      "parser_name": "public-record",
+      "parser_version": "v1",
+      "immutable_reference": "ev1:b06aae2494da6027e03340b10a8d9747f9ed06737fea22d255a23d7c549a89b2",
+      "provenance_complete": true,
+      "scope": "tenant-a",
+      "freshness": "STALE",
+      "policy_version": "historical-claim-policy/v1"
+    }
+  },
+  "cases": [
+    {"id":"exact-record-match","fixture":"E1","claim_references":["ev1:a8830f07899f88c51dba4072ce11a6ae66d0a0da250e92a3c8fca7801d3a0a39"],"override":null,"policy":{"freshness_required":true,"scope":"tenant-a"},"expected":"accept"},
+    {"id":"missing-evidence","fixture":"E1","claim_references":["ev1:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"],"override":{"component":"reference","value":"unknown"},"policy":{"freshness_required":true,"scope":"tenant-a"},"expected":"reject","reason":"EVIDENCE_NOT_FOUND"},
+    {"id":"digest-mismatch","fixture":"E1","claim_references":["ev1:a8830f07899f88c51dba4072ce11a6ae66d0a0da250e92a3c8fca7801d3a0a39"],"override":{"component":"content_sha256","value":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"},"policy":{"freshness_required":true,"scope":"tenant-a"},"expected":"reject","reason":"EVIDENCE_DIGEST_MISMATCH"},
+    {"id":"parser-version-mismatch","fixture":"E1","claim_references":["ev1:a8830f07899f88c51dba4072ce11a6ae66d0a0da250e92a3c8fca7801d3a0a39"],"override":{"component":"parser_version","value":"v2"},"policy":{"freshness_required":true,"scope":"tenant-a"},"expected":"reject","reason":"EVIDENCE_REFERENCE_PARSER_MISMATCH"},
+    {"id":"freshness-required-stale","fixture":"E3","claim_references":["ev1:a5e8221a6600b6f33987cecf269930ada28df8450af337428da22fb81005fbb3"],"override":null,"policy":{"freshness_required":true,"scope":"tenant-a"},"expected":"reject","reason":"EVIDENCE_STALE"},
+    {"id":"freshness-required-unknown","fixture":"E1","claim_references":["ev1:a8830f07899f88c51dba4072ce11a6ae66d0a0da250e92a3c8fca7801d3a0a39"],"override":{"component":"freshness","value":"UNKNOWN"},"policy":{"freshness_required":true,"scope":"tenant-a"},"expected":"reject","reason":"EVIDENCE_FRESHNESS_UNKNOWN"},
+    {"id":"multi-reference-independent-validation","fixture":"E1","additional_fixture":"E2","claim_references":["ev1:a8830f07899f88c51dba4072ce11a6ae66d0a0da250e92a3c8fca7801d3a0a39","ev1:a46b8d7caa46865e81d2b6c63b062140044f98a259befedccc06bcf343f1e667"],"override":{"component":"additional_fixture.parser_version","value":"v1"},"policy":{"freshness_required":true,"scope":"tenant-a"},"expected":"reject","reason":"EVIDENCE_REFERENCE_PARSER_MISMATCH"},
+    {"id":"source-replacement-old-reference","fixture":"E1","claim_references":["ev1:a8830f07899f88c51dba4072ce11a6ae66d0a0da250e92a3c8fca7801d3a0a39"],"replacement":{"source_uri":"https://example.gov/records/case-1001","source_record_id":"case-1001","content_sha256":"2222222222222222222222222222222222222222222222222222222222222222","parser_name":"public-record","parser_version":"v1","immutable_reference":"ev1:51e2c73380ea746b4ca956e964d74911221fc7783305add18a208f8451ec4d1a"},"override":null,"policy":{"freshness_required":false,"scope":"tenant-a"},"expected":"accept_old_reference_without_substitution","expected_reference":"ev1:a8830f07899f88c51dba4072ce11a6ae66d0a0da250e92a3c8fca7801d3a0a39"},
+    {"id":"historical-policy-allows-stale","fixture":"E4","claim_references":["ev1:b06aae2494da6027e03340b10a8d9747f9ed06737fea22d255a23d7c549a89b2"],"override":null,"policy":{"freshness_required":false,"scope":"tenant-a"},"expected":"accept_with_status","expected_freshness_status":"STALE"}
+  ]
+}
