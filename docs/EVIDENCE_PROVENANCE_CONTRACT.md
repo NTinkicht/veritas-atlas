@@ -44,7 +44,7 @@ The identity-bearing `source.uri` is the **final authoritative URI after trusted
 5. use `/` for an empty path; preserve path segment and trailing-slash semantics otherwise;
 6. normalize percent escapes to uppercase hex and decode percent-encoded **unreserved** characters only; never decode reserved delimiters;
 7. remove dot segments according to RFC 3986 section 5.2.4;
-8. preserve query parameter order and multiplicity exactly as present in the final authoritative URI, while applying the same percent-escape normalization to each query component. Do not sort query parameters because order can be source-significant.
+8. preserve query parameter order and multiplicity exactly as present in the final authoritative URI, while applying the same percent-escape normalization to each query component. Do not sort query parameters because order can be source-significant. Before deriving `evidence_ref` or creating an envelope, reject the final URI if any query component contains credentials, access tokens, API keys, authorization material, session secrets, or other secret-bearing values; accepted non-secret query components retain their original order and multiplicity.
 
 ### Pinned IDNA profile
 
