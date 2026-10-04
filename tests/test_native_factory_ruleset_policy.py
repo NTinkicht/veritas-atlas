@@ -23,6 +23,8 @@ def base_ruleset():
                 "parameters":{
                     "required_approving_review_count":0,
                     "dismiss_stale_reviews_on_push":True,
+                    "require_code_owner_review":False,
+                    "required_reviewers":[],
                     "require_last_push_approval":False,
                     "require_extra_approval_for_unattributed_changes":False,
                     "required_review_thread_resolution":True,
@@ -87,6 +89,7 @@ class RulesetPolicyTests(unittest.TestCase):
     def test_routine_human_approval_dependency_is_forbidden(self):
         for field,value in (
             ("required_approving_review_count",1),
+            ("require_code_owner_review",True),
             ("require_last_push_approval",True),
             ("require_extra_approval_for_unattributed_changes",True),
         ):
@@ -94,6 +97,18 @@ class RulesetPolicyTests(unittest.TestCase):
                 r=base_ruleset()
                 r["rules"][0]["parameters"][field]=value
                 self.assert_policy(r,False)
+
+    def test_required_reviewer_approval_dependency_is_forbidden(self):
+        r=base_ruleset()
+        r["rules"][0]["parameters"]["required_reviewers"]=[
+            {"type":"Team","reviewer_id":123,"minimum_approvals":1}
+        ]
+        self.assert_policy(r,False)
+
+    def test_malformed_required_reviewer_policy_fails_closed(self):
+        r=base_ruleset()
+        r["rules"][0]["parameters"]["required_reviewers"]=["team-a"]
+        self.assert_policy(r,False)
 
     def test_missing_pr_or_force_push_protection_fails(self):
         for missing in ("pull_request","deletion","non_fast_forward"):
