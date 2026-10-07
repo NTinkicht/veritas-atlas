@@ -28,14 +28,38 @@ def classify(document: dict, case: dict) -> tuple[str, bool, str | None]:
     policy = copy.deepcopy(canonical)
     policy.update(case.get("policy_override") or {})
 
-    # A trusted replacement has highest precedence, even when other inputs are absent.
-    if case.get("replacement_proven") is True:
+    required_policy_fields = {
+        "policy_id",
+        "policy_version",
+        "source_match",
+        "freshness_required_for_current_claims",
+        "max_retrieval_age_seconds",
+        "revision_signal",
+        "revision_signal_required",
+        "replacement_authority",
+    }
+    complete_policy = all(
+        field in policy and policy[field] not in (None, "")
+        for field in required_policy_fields
+    )
+    supported = (
+        complete_policy
+        and policy.get("policy_id") == canonical["policy_id"]
+        and policy.get("policy_version") == canonical["policy_version"]
+        and policy.get("source_match") == canonical["source_match"]
+        and policy.get("revision_signal") == canonical["revision_signal"]
+        and policy.get("replacement_authority")
+        == canonical["replacement_authority"]
+    )
+
+    trusted_replacement = (
+        supported
+        and case.get("replacement_proven") is True
+        and case.get("replacement_authority_verified") is True
+    )
+    if trusted_replacement:
         state = "SUPERSEDED"
     else:
-        supported = (
-            policy.get("policy_id") == canonical["policy_id"]
-            and policy.get("policy_version") == canonical["policy_version"]
-        )
         retrieved = parse_utc(case.get("retrieved_at"))
         evaluated = parse_utc(case.get("evaluated_at"))
         max_age = policy.get("max_retrieval_age_seconds")
@@ -55,15 +79,35 @@ def classify(document: dict, case: dict) -> tuple[str, bool, str | None]:
             and retrieved <= evaluated
         )
 
-        if not supported or not valid_age_policy or not required_revision_ok or not valid_times:
+        if (
+            not supported
+            or not valid_age_policy
+            or not required_revision_ok
+            or not valid_times
+        ):
             state = "UNKNOWN"
         else:
             age = int((evaluated - retrieved).total_seconds())
             state = "CURRENT" if age <= max_age else "STALE"
 
     freshness_required = canonical["freshness_required_for_current_claims"]
-    eligible = state == "CURRENT" if freshness_required else state != "SUPERSEDED"
-    reason = None if eligible else "FRESHNESS_REQUIRED_NON_CURRENT"
+    if freshness_required:
+        eligible = state == "CURRENT"
+        reason = None if eligible else "FRESHNESS_REQUIRED_NON_CURRENT"
+    elif state == "CURRENT":
+        eligible = True
+        reason = None
+    elif state in {"STALE", "UNKNOWN"}:
+        claim_policy = case.get("claim_policy") or {}
+        eligible = (
+            claim_policy.get("historical_evidence_allowed") is True
+            and claim_policy.get("historical_time_context_preserved") is True
+        )
+        reason = None if eligible else "HISTORICAL_CONTEXT_REQUIRED"
+    else:
+        eligible = False
+        reason = "HISTORICAL_CONTEXT_REQUIRED"
+
     return state, eligible, reason
 
 
