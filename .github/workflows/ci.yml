@@ -32,8 +32,9 @@ jobs:
           python tests/adoption/test_validate_adoption_release_evidence.py
       - name: Test evidence provenance vectors
         run: python tests/test_evidence_provenance_vectors.py
-      - name: Test citation integrity vectors
-        run: python tests/test_citation_integrity_vectors.py
+      - name: Test citation and source freshness vectors
+        run: |
+          python tests/test_citation_integrity_vectors.py
           python tests/test_source_freshness_vectors.py
 
       - name: Setup Python for native-factory policy tests
