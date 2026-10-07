@@ -29,6 +29,16 @@
       "expected_eligible": true
     },
     {
+      "id": "fractional-second-rfc3339",
+      "policy": "P1",
+      "retrieved_at": "2026-10-01T00:00:00.500Z",
+      "evaluated_at": "2026-10-02T00:00:00.500Z",
+      "revision_verified": true,
+      "replacement_proven": false,
+      "expected_state": "CURRENT",
+      "expected_eligible": true
+    },
+    {
       "id": "age-boundary-stale",
       "policy": "P1",
       "retrieved_at": "2026-10-01T00:00:00Z",
