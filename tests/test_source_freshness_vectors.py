@@ -10,7 +10,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 VECTORS = ROOT / "tests" / "fixtures" / "source_freshness_vectors_v1.json"
-RFC3339_UTC = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$")
+RFC3339_UTC = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?Z$")
 
 
 def parse_utc(value: object) -> datetime | None:
@@ -42,14 +42,9 @@ def classify(document: dict, case: dict) -> tuple[str, bool, str | None]:
         field in policy and policy[field] not in (None, "")
         for field in required_policy_fields
     )
-    supported = (
-        complete_policy
-        and policy.get("policy_id") == canonical["policy_id"]
-        and policy.get("policy_version") == canonical["policy_version"]
-        and policy.get("source_match") == canonical["source_match"]
-        and policy.get("revision_signal") == canonical["revision_signal"]
-        and policy.get("replacement_authority")
-        == canonical["replacement_authority"]
+    supported = complete_policy and all(
+        policy.get(field) == canonical.get(field)
+        for field in required_policy_fields
     )
 
     trusted_replacement = (
@@ -97,7 +92,7 @@ def classify(document: dict, case: dict) -> tuple[str, bool, str | None]:
     elif state == "CURRENT":
         eligible = True
         reason = None
-    elif state in {"STALE", "UNKNOWN"}:
+    elif state in {"STALE", "UNKNOWN", "SUPERSEDED"}:
         claim_policy = case.get("claim_policy") or {}
         eligible = (
             claim_policy.get("historical_evidence_allowed") is True
