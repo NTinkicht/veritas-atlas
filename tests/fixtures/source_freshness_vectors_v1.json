@@ -7,14 +7,20 @@
       "policy_version": "1",
       "freshness_required_for_current_claims": true,
       "max_retrieval_age_seconds": 86400,
-      "revision_signal_required": true
+      "revision_signal_required": true,
+      "source_match": "registry:public-records",
+      "revision_signal": "source-version-id",
+      "replacement_authority": "adapter:public-records"
     },
     "PH": {
       "policy_id": "historical-record-source-policy",
       "policy_version": "1",
       "freshness_required_for_current_claims": false,
       "max_retrieval_age_seconds": 86400,
-      "revision_signal_required": true
+      "revision_signal_required": true,
+      "source_match": "registry:historical-records",
+      "revision_signal": "source-version-id",
+      "replacement_authority": "adapter:historical-records"
     }
   },
   "cases": [
@@ -60,7 +66,8 @@
       "replacement_source_version": "v2",
       "expected_state": "SUPERSEDED",
       "expected_eligible": false,
-      "reason": "FRESHNESS_REQUIRED_NON_CURRENT"
+      "reason": "FRESHNESS_REQUIRED_NON_CURRENT",
+      "replacement_authority_verified": true
     },
     {
       "id": "unknown-policy",
@@ -131,7 +138,8 @@
       "replacement_source_version": "v5",
       "expected_state": "SUPERSEDED",
       "expected_eligible": false,
-      "reason": "FRESHNESS_REQUIRED_NON_CURRENT"
+      "reason": "FRESHNESS_REQUIRED_NON_CURRENT",
+      "replacement_authority_verified": true
     },
     {
       "id": "historical-policy-preserves-stale",
@@ -141,7 +149,26 @@
       "revision_verified": true,
       "replacement_proven": false,
       "expected_state": "STALE",
-      "expected_eligible": true
+      "expected_eligible": true,
+      "claim_policy": {
+        "historical_evidence_allowed": true,
+        "historical_time_context_preserved": true
+      }
+    },
+    {
+      "id": "historical-policy-without-time-context-rejected",
+      "policy": "PH",
+      "retrieved_at": "2026-10-01T00:00:00Z",
+      "evaluated_at": "2026-10-02T00:00:01Z",
+      "revision_verified": true,
+      "replacement_proven": false,
+      "claim_policy": {
+        "historical_evidence_allowed": true,
+        "historical_time_context_preserved": false
+      },
+      "expected_state": "STALE",
+      "expected_eligible": false,
+      "reason": "HISTORICAL_CONTEXT_REQUIRED"
     }
   ]
 }
