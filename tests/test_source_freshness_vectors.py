@@ -43,7 +43,8 @@ def classify(document: dict, case: dict) -> tuple[str, bool, str | None]:
         for field in required_policy_fields
     )
     supported = complete_policy and all(
-        policy.get(field) == canonical.get(field)
+        type(policy.get(field)) is type(canonical.get(field))
+        and policy.get(field) == canonical.get(field)
         for field in required_policy_fields
     )
 
@@ -86,22 +87,20 @@ def classify(document: dict, case: dict) -> tuple[str, bool, str | None]:
             state = "CURRENT" if age <= max_age else "STALE"
 
     freshness_required = canonical["freshness_required_for_current_claims"]
-    if freshness_required:
-        eligible = state == "CURRENT"
-        reason = None if eligible else "FRESHNESS_REQUIRED_NON_CURRENT"
-    elif state == "CURRENT":
-        eligible = True
-        reason = None
-    elif state in {"STALE", "UNKNOWN", "SUPERSEDED"}:
-        claim_policy = case.get("claim_policy") or {}
-        eligible = (
-            claim_policy.get("historical_evidence_allowed") is True
-            and claim_policy.get("historical_time_context_preserved") is True
-        )
-        reason = None if eligible else "HISTORICAL_CONTEXT_REQUIRED"
+    claim_policy = case.get("claim_policy") or {}
+    historical_context = (
+        claim_policy.get("historical_evidence_allowed") is True
+        and claim_policy.get("historical_time_context_preserved") is True
+    )
+    if state == "CURRENT":
+        eligible, reason = True, None
+    elif historical_context and supported:
+        # A historical claim is not a current claim, even under P1.
+        eligible, reason = True, None
+    elif freshness_required:
+        eligible, reason = False, "FRESHNESS_REQUIRED_NON_CURRENT"
     else:
-        eligible = False
-        reason = "HISTORICAL_CONTEXT_REQUIRED"
+        eligible, reason = False, "HISTORICAL_CONTEXT_REQUIRED"
 
     return state, eligible, reason
 
@@ -120,6 +119,21 @@ def main() -> None:
             assert reason == case["reason"], (case["id"], reason, case["reason"])
         else:
             assert reason is None, (case["id"], reason)
+
+    # Guard exact JSON policy types: Python considers 1 == True.
+    drift = copy.deepcopy(document["cases"][0])
+    drift["policy_override"] = {"revision_signal_required": 1}
+    assert classify(document, drift) == (
+        "UNKNOWN", False, "FRESHNESS_REQUIRED_NON_CURRENT"
+    ), "numeric boolean must not match the canonical policy"
+
+    # P1 freshness applies to current claims only, not contextualized history.
+    historical = copy.deepcopy(document["cases"][2])
+    historical["claim_policy"] = {
+        "historical_evidence_allowed": True,
+        "historical_time_context_preserved": True,
+    }
+    assert classify(document, historical) == ("STALE", True, None)
 
     print(f"source-freshness vectors: {len(ids)} passed")
 
