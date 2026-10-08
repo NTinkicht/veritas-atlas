@@ -30,10 +30,16 @@ jobs:
         run: |
           python scripts/validate_adoption_release_evidence.py
           python tests/adoption/test_validate_adoption_release_evidence.py
-      - name: Test evidence provenance vectors
-        run: python tests/test_evidence_provenance_vectors.py
-      - name: Test citation integrity vectors
-        run: python tests/test_citation_integrity_vectors.py
+      # Discover and run every deterministic vector suite (including newly added
+      # vectors) without requiring a PR to modify the workflow that gates it.
+      - name: Test all deterministic contract vectors
+        run: |
+          set -euo pipefail
+          for vector_test in tests/test_*_vectors.py; do
+            test -f "$vector_test"
+            echo "Running $vector_test"
+            python "$vector_test"
+          done
 
       - name: Setup Python for native-factory policy tests
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
