@@ -139,7 +139,9 @@ def main() -> None:
             assert reason is None, (case["id"], reason)
 
     # Guard exact JSON policy types: Python considers 1 == True.
-    drift = copy.deepcopy(document["cases"][0])
+    drift = copy.deepcopy(
+        next(case for case in document["cases"] if case["id"] == "age-boundary-current")
+    )
     drift["policy_override"] = {"revision_signal_required": 1}
     assert classify(document, drift) == (
         "UNKNOWN", False, "FRESHNESS_REQUIRED_NON_CURRENT"
