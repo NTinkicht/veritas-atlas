@@ -14,7 +14,7 @@ VECTORS = ROOT / "tests" / "fixtures" / "source_freshness_vectors_v1.json"
 # RFC3339 permits fractional seconds beyond Python's six-digit datetime storage.
 # Preserve every accepted digit to avoid rounding away an age boundary.
 RFC3339_UTC = re.compile(
-    r"^(?P<whole>\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})(?:\.(?P<fraction>\d+))?Z$"
+    r"^(?P<whole>\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})(?:\.(?P<fraction>\d+))?(?:Z|\+00:00)$"
 )
 
 
