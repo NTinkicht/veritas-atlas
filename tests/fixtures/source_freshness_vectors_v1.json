@@ -128,6 +128,31 @@
       "reason": "FRESHNESS_REQUIRED_NON_CURRENT"
     },
     {
+      "id": "untrusted-replacement-authority-refused",
+      "policy": "P1",
+      "retrieved_at": "2026-10-01T00:00:00Z",
+      "evaluated_at": "2026-10-01T01:00:00Z",
+      "revision_verified": true,
+      "replacement_proven": true,
+      "replacement_authority_verified": false,
+      "source_version": "v1",
+      "replacement_source_version": "v2",
+      "expected_state": "CURRENT",
+      "expected_eligible": true
+    },
+    {
+      "id": "untrusted-replacement-authority-absent",
+      "policy": "P1",
+      "retrieved_at": "2026-10-01T00:00:00Z",
+      "evaluated_at": "2026-10-01T01:00:00Z",
+      "revision_verified": true,
+      "replacement_proven": true,
+      "source_version": "v1",
+      "replacement_source_version": "v2",
+      "expected_state": "CURRENT",
+      "expected_eligible": true
+    },
+    {
       "id": "replacement-wins-over-missing-input",
       "policy": "P1",
       "retrieved_at": null,
@@ -171,15 +196,14 @@
       "reason": "HISTORICAL_CONTEXT_REQUIRED"
     },
     {
-      "id": "unsupported-submicrosecond-precision",
+      "id": "submicrosecond-boundary-floor",
       "policy": "P1",
       "retrieved_at": "2026-10-01T00:00:00.0000009Z",
       "evaluated_at": "2026-10-02T00:00:01.0000000Z",
       "revision_verified": true,
       "replacement_proven": false,
-      "expected_state": "UNKNOWN",
-      "expected_eligible": false,
-      "reason": "FRESHNESS_REQUIRED_NON_CURRENT"
+      "expected_state": "CURRENT",
+      "expected_eligible": true
     },
     {
       "id": "historical-superseded-permitted",
