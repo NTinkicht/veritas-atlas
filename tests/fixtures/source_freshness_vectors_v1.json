@@ -45,6 +45,27 @@
       "expected_eligible": true
     },
     {
+      "id": "numeric-zero-utc-offset-current",
+      "policy": "P1",
+      "retrieved_at": "2026-10-01T00:00:00+00:00",
+      "evaluated_at": "2026-10-02T00:00:00+00:00",
+      "revision_verified": true,
+      "replacement_proven": false,
+      "expected_state": "CURRENT",
+      "expected_eligible": true
+    },
+    {
+      "id": "nonzero-offset-not-canonical-utc",
+      "policy": "P1",
+      "retrieved_at": "2026-10-01T00:00:00+01:00",
+      "evaluated_at": "2026-10-02T00:00:00+01:00",
+      "revision_verified": true,
+      "replacement_proven": false,
+      "expected_state": "UNKNOWN",
+      "expected_eligible": false,
+      "reason": "FRESHNESS_REQUIRED_NON_CURRENT"
+    },
+    {
       "id": "age-boundary-stale",
       "policy": "P1",
       "retrieved_at": "2026-10-01T00:00:00Z",
