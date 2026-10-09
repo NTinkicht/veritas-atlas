@@ -1,0 +1,261 @@
+{
+  "schema_version": "source-freshness-vectors/v1",
+  "contract": "docs/architecture/SOURCE_FRESHNESS_CONTRACT.md",
+  "policies": {
+    "P1": {
+      "policy_id": "public-record-source-policy",
+      "policy_version": "1",
+      "freshness_required_for_current_claims": true,
+      "max_retrieval_age_seconds": 86400,
+      "revision_signal_required": true,
+      "source_match": "registry:public-records",
+      "revision_signal": "source-version-id",
+      "replacement_authority": "adapter:public-records"
+    },
+    "PH": {
+      "policy_id": "historical-record-source-policy",
+      "policy_version": "1",
+      "freshness_required_for_current_claims": false,
+      "max_retrieval_age_seconds": 86400,
+      "revision_signal_required": true,
+      "source_match": "registry:historical-records",
+      "revision_signal": "source-version-id",
+      "replacement_authority": "adapter:historical-records"
+    }
+  },
+  "cases": [
+    {
+      "id": "age-boundary-current",
+      "policy": "P1",
+      "retrieved_at": "2026-10-01T00:00:00Z",
+      "evaluated_at": "2026-10-02T00:00:00Z",
+      "revision_verified": true,
+      "replacement_proven": false,
+      "expected_state": "CURRENT",
+      "expected_eligible": true
+    },
+    {
+      "id": "fractional-second-rfc3339",
+      "policy": "P1",
+      "retrieved_at": "2026-10-01T00:00:00.500Z",
+      "evaluated_at": "2026-10-02T00:00:00.500Z",
+      "revision_verified": true,
+      "replacement_proven": false,
+      "expected_state": "CURRENT",
+      "expected_eligible": true
+    },
+    {
+      "id": "numeric-zero-utc-offset-current",
+      "policy": "P1",
+      "retrieved_at": "2026-10-01T00:00:00+00:00",
+      "evaluated_at": "2026-10-02T00:00:00+00:00",
+      "revision_verified": true,
+      "replacement_proven": false,
+      "expected_state": "CURRENT",
+      "expected_eligible": true
+    },
+    {
+      "id": "nonzero-offset-not-canonical-utc",
+      "policy": "P1",
+      "retrieved_at": "2026-10-01T00:00:00+01:00",
+      "evaluated_at": "2026-10-02T00:00:00+01:00",
+      "revision_verified": true,
+      "replacement_proven": false,
+      "expected_state": "UNKNOWN",
+      "expected_eligible": false,
+      "reason": "FRESHNESS_REQUIRED_NON_CURRENT"
+    },
+    {
+      "id": "age-boundary-stale",
+      "policy": "P1",
+      "retrieved_at": "2026-10-01T00:00:00Z",
+      "evaluated_at": "2026-10-02T00:00:01Z",
+      "revision_verified": true,
+      "replacement_proven": false,
+      "expected_state": "STALE",
+      "expected_eligible": false,
+      "reason": "FRESHNESS_REQUIRED_NON_CURRENT"
+    },
+    {
+      "id": "replacement-precedes-stale",
+      "policy": "P1",
+      "retrieved_at": "2026-10-01T00:00:00Z",
+      "evaluated_at": "2026-10-02T01:00:00Z",
+      "revision_verified": true,
+      "replacement_proven": true,
+      "source_version": "v1",
+      "replacement_source_version": "v2",
+      "expected_state": "SUPERSEDED",
+      "expected_eligible": false,
+      "reason": "FRESHNESS_REQUIRED_NON_CURRENT",
+      "replacement_authority_verified": true
+    },
+    {
+      "id": "unknown-policy",
+      "policy": "P1",
+      "policy_override": {
+        "policy_version": "999"
+      },
+      "retrieved_at": "2026-10-01T00:00:00Z",
+      "evaluated_at": "2026-10-01T01:00:00Z",
+      "revision_verified": true,
+      "replacement_proven": false,
+      "expected_state": "UNKNOWN",
+      "expected_eligible": false,
+      "reason": "FRESHNESS_REQUIRED_NON_CURRENT"
+    },
+    {
+      "id": "required-revision-missing",
+      "policy": "P1",
+      "retrieved_at": "2026-10-01T00:00:00Z",
+      "evaluated_at": "2026-10-01T01:00:00Z",
+      "revision_verified": false,
+      "replacement_proven": false,
+      "expected_state": "UNKNOWN",
+      "expected_eligible": false,
+      "reason": "FRESHNESS_REQUIRED_NON_CURRENT"
+    },
+    {
+      "id": "missing-retrieved-at",
+      "policy": "P1",
+      "retrieved_at": null,
+      "evaluated_at": "2026-10-01T01:00:00Z",
+      "revision_verified": true,
+      "replacement_proven": false,
+      "expected_state": "UNKNOWN",
+      "expected_eligible": false,
+      "reason": "FRESHNESS_REQUIRED_NON_CURRENT"
+    },
+    {
+      "id": "malformed-retrieved-at",
+      "policy": "P1",
+      "retrieved_at": "2026/10/01 00:00:00",
+      "evaluated_at": "2026-10-01T01:00:00Z",
+      "revision_verified": true,
+      "replacement_proven": false,
+      "expected_state": "UNKNOWN",
+      "expected_eligible": false,
+      "reason": "FRESHNESS_REQUIRED_NON_CURRENT"
+    },
+    {
+      "id": "future-retrieved-at",
+      "policy": "P1",
+      "retrieved_at": "2026-10-02T00:00:01Z",
+      "evaluated_at": "2026-10-02T00:00:00Z",
+      "revision_verified": true,
+      "replacement_proven": false,
+      "expected_state": "UNKNOWN",
+      "expected_eligible": false,
+      "reason": "FRESHNESS_REQUIRED_NON_CURRENT"
+    },
+    {
+      "id": "untrusted-replacement-authority-refused",
+      "policy": "P1",
+      "retrieved_at": "2026-10-01T00:00:00Z",
+      "evaluated_at": "2026-10-01T01:00:00Z",
+      "revision_verified": true,
+      "replacement_proven": true,
+      "replacement_authority_verified": false,
+      "source_version": "v1",
+      "replacement_source_version": "v2",
+      "expected_state": "CURRENT",
+      "expected_eligible": true
+    },
+    {
+      "id": "untrusted-replacement-authority-absent",
+      "policy": "P1",
+      "retrieved_at": "2026-10-01T00:00:00Z",
+      "evaluated_at": "2026-10-01T01:00:00Z",
+      "revision_verified": true,
+      "replacement_proven": true,
+      "source_version": "v1",
+      "replacement_source_version": "v2",
+      "expected_state": "CURRENT",
+      "expected_eligible": true
+    },
+    {
+      "id": "replacement-wins-over-missing-input",
+      "policy": "P1",
+      "retrieved_at": null,
+      "evaluated_at": null,
+      "revision_verified": false,
+      "replacement_proven": true,
+      "source_version": "v4",
+      "replacement_source_version": "v5",
+      "expected_state": "SUPERSEDED",
+      "expected_eligible": false,
+      "reason": "FRESHNESS_REQUIRED_NON_CURRENT",
+      "replacement_authority_verified": true
+    },
+    {
+      "id": "historical-policy-preserves-stale",
+      "policy": "PH",
+      "retrieved_at": "2026-10-01T00:00:00Z",
+      "evaluated_at": "2026-10-02T00:00:01Z",
+      "revision_verified": true,
+      "replacement_proven": false,
+      "expected_state": "STALE",
+      "expected_eligible": true,
+      "claim_policy": {
+        "historical_evidence_allowed": true,
+        "historical_time_context_preserved": true
+      }
+    },
+    {
+      "id": "historical-policy-without-time-context-rejected",
+      "policy": "PH",
+      "retrieved_at": "2026-10-01T00:00:00Z",
+      "evaluated_at": "2026-10-02T00:00:01Z",
+      "revision_verified": true,
+      "replacement_proven": false,
+      "claim_policy": {
+        "historical_evidence_allowed": true,
+        "historical_time_context_preserved": false
+      },
+      "expected_state": "STALE",
+      "expected_eligible": false,
+      "reason": "HISTORICAL_CONTEXT_REQUIRED"
+    },
+    {
+      "id": "submicrosecond-boundary-floor",
+      "policy": "P1",
+      "retrieved_at": "2026-10-01T00:00:00.0000009Z",
+      "evaluated_at": "2026-10-02T00:00:01.0000000Z",
+      "revision_verified": true,
+      "replacement_proven": false,
+      "expected_state": "CURRENT",
+      "expected_eligible": true
+    },
+    {
+      "id": "historical-superseded-permitted",
+      "policy": "PH",
+      "retrieved_at": "2026-10-01T00:00:00Z",
+      "evaluated_at": "2026-10-01T01:00:00Z",
+      "revision_verified": true,
+      "replacement_proven": true,
+      "replacement_authority_verified": true,
+      "source_version": "v1",
+      "replacement_source_version": "v2",
+      "claim_policy": {
+        "historical_evidence_allowed": true,
+        "historical_time_context_preserved": true
+      },
+      "expected_state": "SUPERSEDED",
+      "expected_eligible": true
+    },
+    {
+      "id": "policy-setting-drift-unknown",
+      "policy": "P1",
+      "policy_override": {
+        "max_retrieval_age_seconds": 999999
+      },
+      "retrieved_at": "2026-10-01T00:00:00Z",
+      "evaluated_at": "2026-10-03T00:00:00Z",
+      "revision_verified": true,
+      "replacement_proven": false,
+      "expected_state": "UNKNOWN",
+      "expected_eligible": false,
+      "reason": "FRESHNESS_REQUIRED_NON_CURRENT"
+    }
+  ]
+}
