@@ -146,7 +146,9 @@ def main() -> None:
     ), "numeric boolean must not match the canonical policy"
 
     # P1 freshness applies to current claims only, not contextualized history.
-    historical = copy.deepcopy(document["cases"][2])
+    historical = copy.deepcopy(
+        next(case for case in document["cases"] if case["id"] == "age-boundary-stale")
+    )
     historical["claim_policy"] = {
         "historical_evidence_allowed": True,
         "historical_time_context_preserved": True,
