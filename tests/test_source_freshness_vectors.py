@@ -6,21 +6,34 @@ import copy
 import json
 import re
 from datetime import datetime, timezone
+from fractions import Fraction
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 VECTORS = ROOT / "tests" / "fixtures" / "source_freshness_vectors_v1.json"
-RFC3339_UTC = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?Z$")
+# RFC3339 permits fractional seconds beyond Python's six-digit datetime storage.
+# Preserve every accepted digit to avoid rounding away an age boundary.
+RFC3339_UTC = re.compile(
+    r"^(?P<whole>\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})(?:\.(?P<fraction>\d+))?Z$"
+)
 
 
-def parse_utc(value: object) -> datetime | None:
-    if not isinstance(value, str) or not RFC3339_UTC.fullmatch(value):
+def parse_utc(value: object) -> tuple[datetime, Fraction] | None:
+    if not isinstance(value, str):
+        return None
+    match = RFC3339_UTC.fullmatch(value)
+    if match is None:
+        return None
+    digits = match.group("fraction") or "0"
+    # Bound hostile timestamp size while supporting precision beyond microseconds.
+    if len(digits) > 1000:
         return None
     try:
-        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
-    except ValueError:
+        parsed = datetime.fromisoformat(match.group("whole") + "+00:00")
+        fraction = Fraction(int(digits), 10 ** len(digits))
+    except (ValueError, OverflowError):
         return None
-    return parsed if parsed.tzinfo == timezone.utc else None
+    return (parsed, fraction) if parsed.tzinfo == timezone.utc else None
 
 
 def classify(document: dict, case: dict) -> tuple[str, bool, str | None]:
@@ -83,7 +96,12 @@ def classify(document: dict, case: dict) -> tuple[str, bool, str | None]:
         ):
             state = "UNKNOWN"
         else:
-            age = int((evaluated - retrieved).total_seconds())
+            # Exact floor((evaluated - retrieved) / second), with no float
+            # rounding or truncation of sub-microsecond RFC3339 fractions.
+            whole = evaluated[0] - retrieved[0]
+            age = whole.days * 86400 + whole.seconds
+            if evaluated[1] < retrieved[1]:
+                age -= 1
             state = "CURRENT" if age <= max_age else "STALE"
 
     freshness_required = canonical["freshness_required_for_current_claims"]
