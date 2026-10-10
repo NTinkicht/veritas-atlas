@@ -61,7 +61,7 @@ class DriftEvidenceTests(unittest.TestCase):
             if mutation == "paused":
                 service["deploy_status"] = "paused"
             if mutation == "secret":
-                service["api_key"] = "untrusted"
+                service["api_key"] = "placeholder"
             with self.subTest(mutation=mutation), self.assertRaises(ValueError):
                 inspect(payload, now=NOW)
 
@@ -91,7 +91,7 @@ class DriftEvidenceTests(unittest.TestCase):
             with self.subTest(value=value), self.assertRaises(ValueError):
                 inspect(sample(main=value), now=NOW)
         payload = sample()
-        payload["authorization"] = True
+        payload["authorization"] = "placeholder"
         with self.assertRaises(ValueError):
             inspect(payload, now=NOW)
 
