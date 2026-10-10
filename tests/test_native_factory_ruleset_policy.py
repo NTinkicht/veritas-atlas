@@ -91,12 +91,57 @@ class RulesetPolicyTests(unittest.TestCase):
             ("required_approving_review_count",1),
             ("require_code_owner_review",True),
             ("require_last_push_approval",True),
-            ("require_extra_approval_for_unattributed_changes",True),
         ):
             with self.subTest(field=field):
                 r=base_ruleset()
                 r["rules"][0]["parameters"][field]=value
                 self.assert_policy(r,False)
+
+    def test_copilot_extra_approval_true_is_inert_with_zero_required_approvals(self):
+        r=base_ruleset()
+        r["rules"][0]["parameters"]["require_extra_approval_for_unattributed_changes"]=True
+        self.assert_policy(r,True)
+        # Turning on required reviews still fails, regardless of the flag.
+        r["rules"][0]["parameters"]["required_approving_review_count"]=1
+        self.assert_policy(r,False)
+
+    def test_copilot_extra_flag_requires_explicit_integer_zero(self):
+        for value in (None, False, True, "0", 0.0, [], {}, -1, 1):
+            with self.subTest(value=value):
+                r=base_ruleset()
+                r["rules"][0]["parameters"]["require_extra_approval_for_unattributed_changes"]=True
+                r["rules"][0]["parameters"]["required_approving_review_count"]=value
+                self.assert_policy(r,False)
+        r=base_ruleset()
+        r["rules"][0]["parameters"]["require_extra_approval_for_unattributed_changes"]=True
+        del r["rules"][0]["parameters"]["required_approving_review_count"]
+        self.assert_policy(r,False)
+
+    def test_copilot_extra_approval_flag_rejects_malformed_values(self):
+        for value in (None, 1, 0, "true", [], {}):
+            with self.subTest(value=value):
+                r=base_ruleset()
+                r["rules"][0]["parameters"]["require_extra_approval_for_unattributed_changes"]=value
+                self.assert_policy(r,False)
+
+    def test_companion_approval_switches_fail_closed_on_malformed_values(self):
+        # A zero required approval count does not excuse malformed or missing
+        # companion approval controls, even with the inert Copilot flag true.
+        for field in ("require_code_owner_review", "require_last_push_approval"):
+            for copilot_flag in (False, True):
+                for malformed in (None, 0, 1, "false", "true", [], {}):
+                    with self.subTest(field=field, flag=copilot_flag, value=malformed):
+                        r = base_ruleset()
+                        params = r["rules"][0]["parameters"]
+                        params["require_extra_approval_for_unattributed_changes"] = copilot_flag
+                        params[field] = malformed
+                        self.assert_policy(r, False)
+                with self.subTest(field=field, flag=copilot_flag, value="missing"):
+                    r = base_ruleset()
+                    params = r["rules"][0]["parameters"]
+                    params["require_extra_approval_for_unattributed_changes"] = copilot_flag
+                    del params[field]
+                    self.assert_policy(r, False)
 
     def test_required_reviewer_approval_dependency_is_forbidden(self):
         r=base_ruleset()
