@@ -118,7 +118,7 @@ class RulesetPolicyTests(unittest.TestCase):
         self.assert_policy(r,False)
 
     def test_copilot_extra_approval_flag_rejects_malformed_values(self):
-        for value in (1, 0, "true", [], {}):
+        for value in (None, 1, 0, "true", [], {}):
             with self.subTest(value=value):
                 r=base_ruleset()
                 r["rules"][0]["parameters"]["require_extra_approval_for_unattributed_changes"]=value

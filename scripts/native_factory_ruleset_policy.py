@@ -146,7 +146,10 @@ def strict_ruleset_enforces(
     copilot_extra_approval = pr_params.get(
         "require_extra_approval_for_unattributed_changes"
     )
-    if copilot_extra_approval is not None and type(copilot_extra_approval) is not bool:
+    if (
+        "require_extra_approval_for_unattributed_changes" in pr_params
+        and type(copilot_extra_approval) is not bool
+    ):
         return False
 
     # The Copilot exception is valid only for an explicitly reported integer
