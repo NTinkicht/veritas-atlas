@@ -68,6 +68,7 @@ class DriftEvidenceTests(unittest.TestCase):
     def test_stale_future_or_invalid_observation_is_denied(self):
         for stamp in (
             "2026-10-10T23:30:00Z",
+            "2026-10-11T00:01:00Z",  # exactly 60s ahead is rejected
             "2026-10-11T00:02:00Z",
             "2026-02-30T23:59:00Z",
             "2026-10-10T23:59:00+00:00",
