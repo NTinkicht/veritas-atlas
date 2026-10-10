@@ -160,9 +160,9 @@ def strict_ruleset_enforces(
         return False
 
     if (
-        pr_params.get("require_code_owner_review") is True
+        pr_params.get("require_code_owner_review") is not False
         or reviewer_approval_required
-        or pr_params.get("require_last_push_approval") is True
+        or pr_params.get("require_last_push_approval") is not False
         or pr_params.get("required_review_thread_resolution") is not True
     ):
         return False
