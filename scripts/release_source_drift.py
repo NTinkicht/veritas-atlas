@@ -10,6 +10,7 @@ import argparse
 import json
 import re
 from pathlib import Path
+from datetime import datetime, timezone, timedelta
 from typing import Any
 
 REPO = "NTinkicht/veritas-atlas"
@@ -18,19 +19,41 @@ SERVICES = {
     "web": "srv-dan1pqjtqb8s73a979tg",
 }
 SHA = re.compile(r"^[0-9a-f]{40}$")
+MAX_OBSERVATION_AGE = timedelta(minutes=15)
+MAX_CLOCK_SKEW = timedelta(seconds=60)
 SERVICE_FIELDS = frozenset({
     "service_id", "deployed_commit", "deploy_status",
     "auto_deploy", "auto_deploy_trigger",
 })
 
 
-def inspect(snapshot: Any) -> dict:
+def inspect(snapshot: Any, *, now: datetime | None = None) -> dict:
     if not isinstance(snapshot, dict) or set(snapshot) != {
-        "schema", "repository", "main_commit", "services",
+        "schema", "repository", "main_commit", "services", "observed_at",
     }:
         raise ValueError("RELEASE_SNAPSHOT_SCHEMA_INVALID")
     if snapshot["schema"] != "VERITAS_DEPLOY_DRIFT_V1" or snapshot["repository"] != REPO:
         raise ValueError("RELEASE_SNAPSHOT_TARGET_INVALID")
+    # This is only a *claimed observation timestamp* supplied alongside
+    # read-only provider metadata. The script cannot authenticate a Render
+    # or GitHub readback. Refuse replayed/future-dated snapshots anyway.
+    stamp = snapshot["observed_at"]
+    if not isinstance(stamp, str) or not re.fullmatch(
+        r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z", stamp
+    ):
+        raise ValueError("RELEASE_OBSERVATION_TIMESTAMP_INVALID")
+    try:
+        observed = datetime.strptime(stamp, "%Y-%m-%dT%H:%M:%SZ").replace(
+            tzinfo=timezone.utc
+        )
+    except ValueError as exc:
+        raise ValueError("RELEASE_OBSERVATION_TIMESTAMP_INVALID") from exc
+    current = datetime.now(timezone.utc) if now is None else now
+    if current.tzinfo is None:
+        raise ValueError("RELEASE_EVALUATION_CLOCK_INVALID")
+    age = current.astimezone(timezone.utc) - observed
+    if age > MAX_OBSERVATION_AGE or age < -MAX_CLOCK_SKEW:
+        raise ValueError("RELEASE_OBSERVATION_STALE_OR_FUTURE")
     target = snapshot["main_commit"]
     if not isinstance(target, str) or not SHA.fullmatch(target):
         raise ValueError("RELEASE_MAIN_SHA_INVALID")
@@ -61,7 +84,12 @@ def inspect(snapshot: Any) -> dict:
         "repository": REPO,
         "main_commit": target,
         "mode": "READ_ONLY",
-        "status": "SOURCE_MATCH_ONLY" if all(s["source_equal_to_main"] for s in out.values())
+        "observed_at": stamp,
+        "timestamp_window_valid": True,
+        # This offline equality check cannot prove provider authenticity:
+        # a replay with a forged new timestamp remains possible.
+        "provider_readback_authenticated": False,
+        "status": "SOURCE_MATCH_UNVERIFIED" if all(s["source_equal_to_main"] for s in out.values())
         else "DEPLOYED_SOURCE_DRIFT",
         "services": out,
         "deployments_triggered": 0,
