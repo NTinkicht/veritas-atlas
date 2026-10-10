@@ -105,6 +105,18 @@ class RulesetPolicyTests(unittest.TestCase):
         r["rules"][0]["parameters"]["required_approving_review_count"]=1
         self.assert_policy(r,False)
 
+    def test_copilot_extra_flag_requires_explicit_integer_zero(self):
+        for value in (None, False, True, "0", 0.0, [], {}, -1, 1):
+            with self.subTest(value=value):
+                r=base_ruleset()
+                r["rules"][0]["parameters"]["require_extra_approval_for_unattributed_changes"]=True
+                r["rules"][0]["parameters"]["required_approving_review_count"]=value
+                self.assert_policy(r,False)
+        r=base_ruleset()
+        r["rules"][0]["parameters"]["require_extra_approval_for_unattributed_changes"]=True
+        del r["rules"][0]["parameters"]["required_approving_review_count"]
+        self.assert_policy(r,False)
+
     def test_copilot_extra_approval_flag_rejects_malformed_values(self):
         for value in (1, 0, "true", [], {}):
             with self.subTest(value=value):

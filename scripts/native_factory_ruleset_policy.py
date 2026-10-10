@@ -149,9 +149,15 @@ def strict_ruleset_enforces(
     if copilot_extra_approval is not None and type(copilot_extra_approval) is not bool:
         return False
 
+    # The Copilot exception is valid only for an explicitly reported integer
+    # zero. Falsy/malformed data (null, false, missing, empty list) is not
+    # trusted evidence of GitHub's zero-required-approvals setting.
+    approval_count = pr_params.get("required_approving_review_count")
+    if type(approval_count) is not int or approval_count != 0:
+        return False
+
     if (
-        int(pr_params.get("required_approving_review_count") or 0) != 0
-        or pr_params.get("require_code_owner_review") is True
+        pr_params.get("require_code_owner_review") is True
         or reviewer_approval_required
         or pr_params.get("require_last_push_approval") is True
         or pr_params.get("required_review_thread_resolution") is not True
