@@ -91,11 +91,25 @@ class RulesetPolicyTests(unittest.TestCase):
             ("required_approving_review_count",1),
             ("require_code_owner_review",True),
             ("require_last_push_approval",True),
-            ("require_extra_approval_for_unattributed_changes",True),
         ):
             with self.subTest(field=field):
                 r=base_ruleset()
                 r["rules"][0]["parameters"][field]=value
+                self.assert_policy(r,False)
+
+    def test_copilot_extra_approval_true_is_inert_with_zero_required_approvals(self):
+        r=base_ruleset()
+        r["rules"][0]["parameters"]["require_extra_approval_for_unattributed_changes"]=True
+        self.assert_policy(r,True)
+        # Turning on required reviews still fails, regardless of the flag.
+        r["rules"][0]["parameters"]["required_approving_review_count"]=1
+        self.assert_policy(r,False)
+
+    def test_copilot_extra_approval_flag_rejects_malformed_values(self):
+        for value in (1, 0, "true", [], {}):
+            with self.subTest(value=value):
+                r=base_ruleset()
+                r["rules"][0]["parameters"]["require_extra_approval_for_unattributed_changes"]=value
                 self.assert_policy(r,False)
 
     def test_required_reviewer_approval_dependency_is_forbidden(self):

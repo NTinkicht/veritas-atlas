@@ -140,12 +140,20 @@ def strict_ruleset_enforces(
     except (TypeError, ValueError):
         return False
 
+    # GitHub's Copilot extra-approval preview setting is inert when the base
+    # required approval count is zero. Do not misclassify that default true
+    # value as human-review authority. Unknown field types still fail closed.
+    copilot_extra_approval = pr_params.get(
+        "require_extra_approval_for_unattributed_changes"
+    )
+    if copilot_extra_approval is not None and type(copilot_extra_approval) is not bool:
+        return False
+
     if (
         int(pr_params.get("required_approving_review_count") or 0) != 0
         or pr_params.get("require_code_owner_review") is True
         or reviewer_approval_required
         or pr_params.get("require_last_push_approval") is True
-        or pr_params.get("require_extra_approval_for_unattributed_changes") is True
         or pr_params.get("required_review_thread_resolution") is not True
     ):
         return False
