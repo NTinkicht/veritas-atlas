@@ -52,7 +52,7 @@ def inspect(snapshot: Any, *, now: datetime | None = None) -> dict:
     if current.tzinfo is None:
         raise ValueError("RELEASE_EVALUATION_CLOCK_INVALID")
     age = current.astimezone(timezone.utc) - observed
-    if age > MAX_OBSERVATION_AGE or age < -MAX_CLOCK_SKEW:
+    if age > MAX_OBSERVATION_AGE or age <= -MAX_CLOCK_SKEW:
         raise ValueError("RELEASE_OBSERVATION_STALE_OR_FUTURE")
     target = snapshot["main_commit"]
     if not isinstance(target, str) or not SHA.fullmatch(target):
