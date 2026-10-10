@@ -3,12 +3,14 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 import unittest
+from datetime import datetime, timezone
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 from release_source_drift import inspect, REPO, SERVICES
 
 OLD = "47bd085cb5e75d4b72acffc7a9e1e54300a61977"
 NEW = "3adb55ca908552a838a821a1a7fab0982cbba63a"
+NOW = datetime(2026, 10, 11, 0, 0, tzinfo=timezone.utc)
 
 
 def sample(main=NEW, deployed=OLD):
@@ -16,6 +18,7 @@ def sample(main=NEW, deployed=OLD):
         "schema": "VERITAS_DEPLOY_DRIFT_V1",
         "repository": REPO,
         "main_commit": main,
+        "observed_at": "2026-10-10T23:59:00Z",
         "services": {
             name: {
                 "service_id": service,
@@ -31,15 +34,17 @@ def sample(main=NEW, deployed=OLD):
 
 class DriftEvidenceTests(unittest.TestCase):
     def test_verified_old_release_is_reported_as_drift_and_never_approved(self):
-        result = inspect(sample())
+        result = inspect(sample(), now=NOW)
         self.assertEqual(result["status"], "DEPLOYED_SOURCE_DRIFT")
         self.assertEqual(result["deployments_triggered"], 0)
         self.assertFalse(result["release_authorized"])
         self.assertFalse(result["h8_credential_rollback_e2e_verified"])
 
     def test_matching_commits_are_not_a_deployment_approval(self):
-        result = inspect(sample(deployed=NEW))
-        self.assertEqual(result["status"], "SOURCE_MATCH_ONLY")
+        result = inspect(sample(deployed=NEW), now=NOW)
+        self.assertEqual(result["status"], "SOURCE_MATCH_UNVERIFIED")
+        self.assertTrue(result["timestamp_window_valid"])
+        self.assertFalse(result["provider_readback_authenticated"])
         self.assertFalse(result["release_authorized"])
         self.assertFalse(result["h7_writer_inventory_complete"])
 
@@ -58,16 +63,36 @@ class DriftEvidenceTests(unittest.TestCase):
             if mutation == "secret":
                 service["api_key"] = "untrusted"
             with self.subTest(mutation=mutation), self.assertRaises(ValueError):
-                inspect(payload)
+                inspect(payload, now=NOW)
+
+    def test_stale_future_or_invalid_observation_is_denied(self):
+        for stamp in (
+            "2026-10-10T23:30:00Z",
+            "2026-10-11T00:02:00Z",
+            "2026-02-30T23:59:00Z",
+            "2026-10-10T23:59:00+00:00",
+            None,
+        ):
+            payload = sample(main=NEW, deployed=NEW)
+            payload["observed_at"] = stamp
+            with self.subTest(stamp=stamp), self.assertRaises(ValueError):
+                inspect(payload, now=NOW)
+
+    def test_snapshot_cannot_claim_provider_verified_even_when_equal(self):
+        result = inspect(sample(main=NEW, deployed=NEW), now=NOW)
+        self.assertEqual(result["status"], "SOURCE_MATCH_UNVERIFIED")
+        self.assertFalse(result["release_authorized"])
+        self.assertFalse(result["provider_readback_authenticated"])
+        self.assertEqual(result["observed_at"], "2026-10-10T23:59:00Z")
 
     def test_reject_malformed_sha_or_extra_target(self):
         for value in ("short", "Z" * 40, 0):
             with self.subTest(value=value), self.assertRaises(ValueError):
-                inspect(sample(main=value))
+                inspect(sample(main=value), now=NOW)
         payload = sample()
         payload["authorization"] = True
         with self.assertRaises(ValueError):
-            inspect(payload)
+            inspect(payload, now=NOW)
 
 
 if __name__ == "__main__":
