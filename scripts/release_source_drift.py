@@ -191,11 +191,33 @@ def inspect_render_readback(
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Evaluate supplied Veritas deployment metadata only")
-    parser.add_argument("snapshot", type=Path)
+    parser = argparse.ArgumentParser(
+        description="Offline Veritas release source drift evaluation; no network or writes"
+    )
+    parser.add_argument("snapshot", nargs="?", type=Path)
+    parser.add_argument("--render-services", type=Path)
+    parser.add_argument("--render-deploys", type=Path)
+    parser.add_argument("--main-commit")
+    parser.add_argument("--observed-at")
     args = parser.parse_args()
+    provider_args = (
+        args.render_services, args.render_deploys,
+        args.main_commit, args.observed_at,
+    )
     try:
-        report = inspect(json.loads(args.snapshot.read_text(encoding="utf-8")))
+        if any(arg is not None for arg in provider_args):
+            if args.snapshot is not None or any(arg is None for arg in provider_args):
+                raise ValueError("RELEASE_INPUT_MODE_INVALID")
+            report = inspect_render_readback(
+                json.loads(args.render_services.read_text(encoding="utf-8")),
+                json.loads(args.render_deploys.read_text(encoding="utf-8")),
+                main_commit=args.main_commit,
+                observed_at=args.observed_at,
+            )
+        else:
+            if args.snapshot is None:
+                raise ValueError("RELEASE_INPUT_MODE_INVALID")
+            report = inspect(json.loads(args.snapshot.read_text(encoding="utf-8")))
     except (ValueError, OSError, UnicodeError) as exc:
         print(json.dumps({"status": "EVIDENCE_INVALID", "reason": str(exc)}, sort_keys=True))
         return 2
