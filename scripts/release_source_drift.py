@@ -99,6 +99,97 @@ def inspect(snapshot: Any, *, now: datetime | None = None) -> dict:
     }
 
 
+
+RENDER_SERVICE_NAMES = {
+    "api": "veritas-atlas-api-ntinkicht",
+    "web": "veritas-atlas-web-ntinkicht",
+}
+RENDER_REPO_URL = "https://github.com/" + REPO
+
+
+def inspect_render_readback(
+    service_records: Any,
+    deployments_by_service_id: Any,
+    *,
+    main_commit: str,
+    observed_at: str,
+    now: datetime | None = None,
+) -> dict:
+    """Normalize read-only Render metadata without contacting a provider.
+
+    The caller supplies separately retrieved GitHub main and Render responses.
+    This adapter cannot authenticate those responses: the resulting report
+    MUST retain provider_readback_authenticated=False and release_authorized=False.
+    Any absent/ambiguous target, auto-deploy drift, or newest non-live deploy
+    is rejected rather than silently falling back to older live history.
+    """
+    if not isinstance(service_records, list) or not isinstance(
+        deployments_by_service_id, dict
+    ) or set(deployments_by_service_id) != set(SERVICES.values()):
+        raise ValueError("RENDER_READBACK_INVENTORY_INVALID")
+
+    evidence = {}
+    for kind, service_id in SERVICES.items():
+        matching = [
+            entry
+            for entry in service_records
+            if isinstance(entry, dict) and entry.get("id") == service_id
+        ]
+        if len(matching) != 1:
+            raise ValueError("RENDER_SERVICE_IDENTITY_INVALID")
+        service = matching[0]
+        if (
+            service.get("name") != RENDER_SERVICE_NAMES[kind]
+            or service.get("repo") != RENDER_REPO_URL
+            or service.get("branch") != "main"
+            or service.get("autoDeploy") != "no"
+            or service.get("autoDeployTrigger") != "off"
+        ):
+            raise ValueError("RENDER_SERVICE_CONFIGURATION_DRIFT")
+
+        candidates = deployments_by_service_id[service_id]
+        if not isinstance(candidates, list) or not candidates:
+            raise ValueError("RENDER_DEPLOYMENT_READBACK_INVALID")
+        # Render lists deployments newest first. Refuse ambiguous ordering.
+        dates = []
+        for entry in candidates:
+            if not isinstance(entry, dict) or not isinstance(
+                entry.get("createdAt"), str
+            ):
+                raise ValueError("RENDER_DEPLOYMENT_READBACK_INVALID")
+            try:
+                date = datetime.fromisoformat(
+                    entry["createdAt"].replace("Z", "+00:00")
+                )
+            except ValueError as exc:
+                raise ValueError("RENDER_DEPLOYMENT_READBACK_INVALID") from exc
+            if date.tzinfo is None:
+                raise ValueError("RENDER_DEPLOYMENT_READBACK_INVALID")
+            dates.append(date)
+        if dates != sorted(dates, reverse=True):
+            raise ValueError("RENDER_DEPLOYMENT_ORDER_AMBIGUOUS")
+        latest = candidates[0]
+        sha = (latest.get("commit") or {}).get("id")
+        if latest.get("status") != "live" or not isinstance(sha, str):
+            raise ValueError("RENDER_DEPLOYMENT_NOT_LIVE")
+        evidence[kind] = {
+            "service_id": service_id,
+            "deployed_commit": sha,
+            "deploy_status": "live",
+            "auto_deploy": False,
+            "auto_deploy_trigger": "off",
+        }
+
+    snapshot = {
+        "schema": "VERITAS_DEPLOY_DRIFT_V1",
+        "repository": REPO,
+        "main_commit": main_commit,
+        "observed_at": observed_at,
+        "services": evidence,
+    }
+    return inspect(snapshot, now=now)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Evaluate supplied Veritas deployment metadata only")
     parser.add_argument("snapshot", type=Path)
