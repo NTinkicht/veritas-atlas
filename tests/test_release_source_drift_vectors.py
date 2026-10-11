@@ -152,6 +152,60 @@ class DriftEvidenceTests(unittest.TestCase):
                 json.loads(rejected.stdout)["reason"], "RELEASE_JSON_DUPLICATE_KEY"
             )
 
+    def test_cli_rejects_nonfinite_json_in_all_input_modes(self):
+        import json
+        import subprocess
+        import tempfile
+        runner = str(Path(__file__).resolve().parents[1] / "scripts" / "release_source_drift.py")
+        services, deployments = render_readback()
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            snapshot_path = root / "snapshot.json"
+            services_path = root / "services.json"
+            deployments_path = root / "deploys.json"
+            for token in ("NaN", "Infinity", "-Infinity"):
+                snapshot_path.write_text(
+                    json.dumps(sample()).replace(
+                        '"main_commit": "' + NEW + '"',
+                        '"main_commit": ' + token, 1,
+                    ), encoding="utf-8",
+                )
+                services_path.write_text(
+                    json.dumps(services).replace(
+                        '"branch": "main"', '"branch": ' + token, 1,
+                    ), encoding="utf-8",
+                )
+                deployments_path.write_text(json.dumps(deployments), encoding="utf-8")
+                cmd = [
+                    sys.executable, runner,
+                    "--render-services", str(services_path),
+                    "--render-deploys", str(deployments_path),
+                    "--main-commit", NEW,
+                    "--observed-at", datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+                ]
+                with self.subTest(token=token, mode="snapshot"):
+                    result = subprocess.run(
+                        [sys.executable, runner, str(snapshot_path)],
+                        capture_output=True, text=True, check=False,
+                    )
+                    self.assertEqual(result.returncode, 2, result.stdout)
+                    self.assertEqual(json.loads(result.stdout)["reason"], "RELEASE_JSON_NONFINITE_NUMBER")
+                with self.subTest(token=token, mode="services"):
+                    result = subprocess.run(cmd, capture_output=True, text=True, check=False)
+                    self.assertEqual(result.returncode, 2, result.stdout)
+                    self.assertEqual(json.loads(result.stdout)["reason"], "RELEASE_JSON_NONFINITE_NUMBER")
+                services_path.write_text(json.dumps(services), encoding="utf-8")
+                deployments_path.write_text(
+                    json.dumps(deployments).replace(
+                        '"status": "live"', '"status": ' + token, 1,
+                    ), encoding="utf-8",
+                )
+                with self.subTest(token=token, mode="deployments"):
+                    result = subprocess.run(cmd, capture_output=True, text=True, check=False)
+                    self.assertEqual(result.returncode, 2, result.stdout)
+                    self.assertEqual(json.loads(result.stdout)["reason"], "RELEASE_JSON_NONFINITE_NUMBER")
+
+
     def test_render_readback_reproduces_observed_staging_source_drift(self):
         services, deployments = render_readback()
         report = inspect_render_readback(
