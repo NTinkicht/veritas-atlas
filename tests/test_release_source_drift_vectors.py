@@ -178,7 +178,7 @@ class DriftEvidenceTests(unittest.TestCase):
             "missing_maintenance", "malformed_commit",
             "missing_deploy_id", "bad_deploy_id", "missing_started",
             "missing_finished", "reversed_timeline", "completion_before_created",
-            "completed_after_observed", "naive_finished",
+            "start_before_created", "completed_after_observed", "naive_finished",
         ):
             services, deployments = (
                 deepcopy(baseline_services), deepcopy(baseline_deployments)
@@ -236,6 +236,10 @@ class DriftEvidenceTests(unittest.TestCase):
             elif mutation == "completion_before_created":
                 deployments[api_id][0]["startedAt"] = "2026-09-19T05:25:00Z"
                 deployments[api_id][0]["finishedAt"] = "2026-09-19T05:25:30Z"
+            elif mutation == "start_before_created":
+                # A deploy cannot start before the provider says it was created,
+                # even if its completion timestamp is otherwise plausible.
+                deployments[api_id][0]["startedAt"] = "2026-09-19T05:25:59Z"
             elif mutation == "completed_after_observed":
                 deployments[api_id][0]["finishedAt"] = "2026-10-11T00:00:00Z"
             elif mutation == "naive_finished":

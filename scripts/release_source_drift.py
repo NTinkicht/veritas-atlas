@@ -217,6 +217,7 @@ def inspect_render_readback(
             started.tzinfo is None
             or finished.tzinfo is None
             or finished < started
+            or started < dates[0]
             or finished < dates[0]
             or finished > observed
         ):
