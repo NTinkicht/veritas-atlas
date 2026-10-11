@@ -53,9 +53,15 @@ def render_readback(deployed=OLD):
     ]
     deployments = {
         service_id: [{
+            "id": (
+                "dep-dan1pqrtqb8s73a97bag" if service_id == SERVICES["api"]
+                else "dep-dan1pqrtqb8s73a97b00"
+            ),
             "status": "live",
             "commit": {"id": deployed},
             "createdAt": "2026-09-19T05:26:03Z",
+            "startedAt": "2026-09-19T05:26:03Z",
+            "finishedAt": "2026-09-19T05:27:04Z",
         }]
         for service_id in SERVICES.values()
     }
@@ -124,6 +130,9 @@ class DriftEvidenceTests(unittest.TestCase):
             "out_of_order", "invalid_sha", "other_service",
             "suspended", "missing_suspension", "maintenance",
             "missing_maintenance", "malformed_commit",
+            "missing_deploy_id", "bad_deploy_id", "missing_started",
+            "missing_finished", "reversed_timeline", "completion_before_created",
+            "completed_after_observed", "naive_finished",
         ):
             services, deployments = (
                 deepcopy(baseline_services), deepcopy(baseline_deployments)
@@ -166,6 +175,23 @@ class DriftEvidenceTests(unittest.TestCase):
                 del services[0]["serviceDetails"]["maintenanceMode"]
             elif mutation == "malformed_commit":
                 deployments[api_id][0]["commit"] = "not-a-dict"
+            elif mutation == "missing_deploy_id":
+                del deployments[api_id][0]["id"]
+            elif mutation == "bad_deploy_id":
+                deployments[api_id][0]["id"] = "dep-invalid"
+            elif mutation == "missing_started":
+                del deployments[api_id][0]["startedAt"]
+            elif mutation == "missing_finished":
+                del deployments[api_id][0]["finishedAt"]
+            elif mutation == "reversed_timeline":
+                deployments[api_id][0]["finishedAt"] = "2026-09-19T05:25:00Z"
+            elif mutation == "completion_before_created":
+                deployments[api_id][0]["startedAt"] = "2026-09-19T05:25:00Z"
+                deployments[api_id][0]["finishedAt"] = "2026-09-19T05:25:30Z"
+            elif mutation == "completed_after_observed":
+                deployments[api_id][0]["finishedAt"] = "2026-10-11T00:00:00Z"
+            elif mutation == "naive_finished":
+                deployments[api_id][0]["finishedAt"] = "2026-09-19T05:27:04"
             with self.subTest(case=mutation), self.assertRaises(ValueError):
                 inspect_render_readback(
                     services, deployments, main_commit=NEW,
