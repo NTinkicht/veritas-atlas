@@ -106,6 +106,52 @@ class DriftEvidenceTests(unittest.TestCase):
                 json.loads(partial.stdout)["status"], "EVIDENCE_INVALID"
             )
 
+    def test_cli_rejects_duplicate_keys_in_both_input_modes(self):
+        import json
+        import subprocess
+        import tempfile
+        runner = str(Path(__file__).resolve().parents[1] / "scripts" / "release_source_drift.py")
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            snapshot_path = root / "snapshot.json"
+            duplicate_snapshot = json.dumps(sample()).replace(
+                '"repository":', '"repository": "untrusted", "repository":', 1
+            )
+            snapshot_path.write_text(duplicate_snapshot, encoding="utf-8")
+            rejected = subprocess.run(
+                [sys.executable, runner, str(snapshot_path)],
+                capture_output=True, text=True, check=False,
+            )
+            self.assertEqual(rejected.returncode, 2)
+            self.assertEqual(
+                json.loads(rejected.stdout)["reason"], "RELEASE_JSON_DUPLICATE_KEY"
+            )
+
+            services, deployments = render_readback()
+            services_path = root / "services.json"
+            deployments_path = root / "deploys.json"
+            services_path.write_text(
+                json.dumps(services).replace(
+                    '"name":', '"name": "untrusted", "name":', 1
+                ), encoding="utf-8",
+            )
+            deployments_path.write_text(json.dumps(deployments), encoding="utf-8")
+            rejected = subprocess.run(
+                [
+                    sys.executable, runner, "--render-services", str(services_path),
+                    "--render-deploys", str(deployments_path),
+                    "--main-commit", NEW,
+                    "--observed-at", datetime.now(timezone.utc).strftime(
+                        "%Y-%m-%dT%H:%M:%SZ"
+                    ),
+                ],
+                capture_output=True, text=True, check=False,
+            )
+            self.assertEqual(rejected.returncode, 2)
+            self.assertEqual(
+                json.loads(rejected.stdout)["reason"], "RELEASE_JSON_DUPLICATE_KEY"
+            )
+
     def test_render_readback_reproduces_observed_staging_source_drift(self):
         services, deployments = render_readback()
         report = inspect_render_readback(
@@ -127,7 +173,7 @@ class DriftEvidenceTests(unittest.TestCase):
         for mutation in (
             "missing_service", "duplicate_service", "wrong_repo",
             "auto_deploy", "missing_deploy", "newest_failed",
-            "out_of_order", "invalid_sha", "other_service",
+            "out_of_order", "tied_created_at", "invalid_sha", "other_service",
             "suspended", "missing_suspension", "maintenance",
             "missing_maintenance", "malformed_commit",
             "missing_deploy_id", "bad_deploy_id", "missing_started",
@@ -161,6 +207,8 @@ class DriftEvidenceTests(unittest.TestCase):
                     "createdAt": "2026-10-10T00:00:00Z",
                 })
                 # Keep oldest first: newest-first Render ordering must reject it.
+            elif mutation == "tied_created_at":
+                deployments[api_id].append(deepcopy(deployments[api_id][0]))
             elif mutation == "invalid_sha":
                 deployments[api_id][0]["commit"]["id"] = "missing"
             elif mutation == "other_service":

@@ -28,6 +28,16 @@ SERVICE_FIELDS = frozenset({
 })
 
 
+def reject_duplicate_keys(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    """Fail closed on ambiguous JSON object keys in external evidence."""
+    result: dict[str, Any] = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError("RELEASE_JSON_DUPLICATE_KEY")
+        result[key] = value
+    return result
+
+
 def inspect(snapshot: Any, *, now: datetime | None = None) -> dict:
     if not isinstance(snapshot, dict) or set(snapshot) != {
         "schema", "repository", "main_commit", "services", "observed_at",
@@ -183,7 +193,7 @@ def inspect_render_readback(
             if date.tzinfo is None:
                 raise ValueError("RENDER_DEPLOYMENT_READBACK_INVALID")
             dates.append(date)
-        if dates != sorted(dates, reverse=True):
+        if any(newer <= older for newer, older in zip(dates, dates[1:])):
             raise ValueError("RENDER_DEPLOYMENT_ORDER_AMBIGUOUS")
         latest = candidates[0]
         # A "live" status without a canonical deployment identity and a
@@ -252,15 +262,15 @@ def main() -> int:
             if args.snapshot is not None or any(arg is None for arg in provider_args):
                 raise ValueError("RELEASE_INPUT_MODE_INVALID")
             report = inspect_render_readback(
-                json.loads(args.render_services.read_text(encoding="utf-8")),
-                json.loads(args.render_deploys.read_text(encoding="utf-8")),
+                json.loads(args.render_services.read_text(encoding="utf-8"), object_pairs_hook=reject_duplicate_keys),
+                json.loads(args.render_deploys.read_text(encoding="utf-8"), object_pairs_hook=reject_duplicate_keys),
                 main_commit=args.main_commit,
                 observed_at=args.observed_at,
             )
         else:
             if args.snapshot is None:
                 raise ValueError("RELEASE_INPUT_MODE_INVALID")
-            report = inspect(json.loads(args.snapshot.read_text(encoding="utf-8")))
+            report = inspect(json.loads(args.snapshot.read_text(encoding="utf-8"), object_pairs_hook=reject_duplicate_keys))
     except (ValueError, OSError, UnicodeError) as exc:
         print(json.dumps({"status": "EVIDENCE_INVALID", "reason": str(exc)}, sort_keys=True))
         return 2
