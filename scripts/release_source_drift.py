@@ -164,6 +164,7 @@ def inspect_render_readback(
         raise ValueError("RENDER_READBACK_INVENTORY_INVALID")
 
     evidence = {}
+    seen_latest_deployment_ids: set[str] = set()
     for kind, service_id in SERVICES.items():
         matching = [
             entry
@@ -225,6 +226,11 @@ def inspect_render_readback(
         deploy_id = latest.get("id")
         if not isinstance(deploy_id, str) or not RENDER_DEPLOYMENT_ID.fullmatch(deploy_id):
             raise ValueError("RENDER_DEPLOYMENT_ID_INVALID")
+        # A single Render deployment cannot belong to two distinct services.
+        # Duplicated identity makes the offline evidence ambiguous.
+        if deploy_id in seen_latest_deployment_ids:
+            raise ValueError("RENDER_DEPLOYMENT_ID_DUPLICATE")
+        seen_latest_deployment_ids.add(deploy_id)
         started_raw = latest.get("startedAt")
         finished_raw = latest.get("finishedAt")
         if not isinstance(started_raw, str) or not isinstance(finished_raw, str):

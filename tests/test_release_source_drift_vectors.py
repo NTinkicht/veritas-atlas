@@ -276,7 +276,7 @@ class DriftEvidenceTests(unittest.TestCase):
             "out_of_order", "tied_created_at", "invalid_sha", "other_service",
             "suspended", "missing_suspension", "maintenance",
             "missing_maintenance", "malformed_commit",
-            "missing_deploy_id", "bad_deploy_id", "missing_started",
+            "missing_deploy_id", "bad_deploy_id", "duplicate_deploy_id", "missing_started",
             "missing_finished", "reversed_timeline", "completion_before_created",
             "start_before_created", "completed_after_observed", "naive_finished",
         ):
@@ -327,6 +327,9 @@ class DriftEvidenceTests(unittest.TestCase):
                 del deployments[api_id][0]["id"]
             elif mutation == "bad_deploy_id":
                 deployments[api_id][0]["id"] = "dep-invalid"
+            elif mutation == "duplicate_deploy_id":
+                # Two different Render services cannot share a deploy identity.
+                deployments[SERVICES["web"]][0]["id"] = deployments[api_id][0]["id"]
             elif mutation == "missing_started":
                 del deployments[api_id][0]["startedAt"]
             elif mutation == "missing_finished":
