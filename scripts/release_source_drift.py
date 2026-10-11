@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import re
 from pathlib import Path
 from datetime import datetime, timezone, timedelta
@@ -43,12 +44,21 @@ def reject_nonfinite_json_constant(value: str) -> None:
     raise ValueError("RELEASE_JSON_NONFINITE_NUMBER")
 
 
+def parse_finite_json_float(value: str) -> float:
+    """Reject valid JSON exponent literals that overflow Python floats."""
+    number = float(value)
+    if not math.isfinite(number):
+        raise ValueError("RELEASE_JSON_NONFINITE_NUMBER")
+    return number
+
+
 def parse_evidence_json(path: Path) -> Any:
     """Fail closed on ambiguous keys and NaN/infinite numbers."""
     return json.loads(
         path.read_text(encoding="utf-8"),
         object_pairs_hook=reject_duplicate_keys,
         parse_constant=reject_nonfinite_json_constant,
+        parse_float=parse_finite_json_float,
     )
 
 
