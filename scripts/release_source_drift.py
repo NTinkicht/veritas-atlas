@@ -19,6 +19,7 @@ SERVICES = {
     "web": "srv-dan1pqjtqb8s73a979tg",
 }
 SHA = re.compile(r"^[0-9a-f]{40}$")
+RENDER_DEPLOYMENT_ID = re.compile(r"^dep-[a-z0-9]{20}$")
 MAX_OBSERVATION_AGE = timedelta(minutes=15)
 MAX_CLOCK_SKEW = timedelta(seconds=60)
 SERVICE_FIELDS = frozenset({
@@ -185,6 +186,31 @@ def inspect_render_readback(
         if dates != sorted(dates, reverse=True):
             raise ValueError("RENDER_DEPLOYMENT_ORDER_AMBIGUOUS")
         latest = candidates[0]
+        # A "live" status without a canonical deployment identity and a
+        # completed timeline is incomplete provider evidence.
+        deploy_id = latest.get("id")
+        if not isinstance(deploy_id, str) or not RENDER_DEPLOYMENT_ID.fullmatch(deploy_id):
+            raise ValueError("RENDER_DEPLOYMENT_ID_INVALID")
+        started_raw = latest.get("startedAt")
+        finished_raw = latest.get("finishedAt")
+        if not isinstance(started_raw, str) or not isinstance(finished_raw, str):
+            raise ValueError("RENDER_DEPLOYMENT_TIMELINE_INVALID")
+        try:
+            started = datetime.fromisoformat(started_raw.replace("Z", "+00:00"))
+            finished = datetime.fromisoformat(finished_raw.replace("Z", "+00:00"))
+            observed = datetime.strptime(observed_at, "%Y-%m-%dT%H:%M:%SZ").replace(
+                tzinfo=timezone.utc
+            )
+        except ValueError as exc:
+            raise ValueError("RENDER_DEPLOYMENT_TIMELINE_INVALID") from exc
+        if (
+            started.tzinfo is None
+            or finished.tzinfo is None
+            or finished < started
+            or finished < dates[0]
+            or finished > observed
+        ):
+            raise ValueError("RENDER_DEPLOYMENT_TIMELINE_INVALID")
         commit = latest.get("commit")
         sha = commit.get("id") if isinstance(commit, dict) else None
         if latest.get("status") != "live" or not isinstance(sha, str):
