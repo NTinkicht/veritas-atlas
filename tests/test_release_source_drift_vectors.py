@@ -44,6 +44,10 @@ def render_readback(deployed=OLD):
             "branch": "main",
             "autoDeploy": "no",
             "autoDeployTrigger": "off",
+            "suspended": "not_suspended",
+            "serviceDetails": (
+                {"maintenanceMode": {"enabled": False}} if kind == "api" else {}
+            ),
         }
         for kind, service_id in SERVICES.items()
     ]
@@ -118,6 +122,8 @@ class DriftEvidenceTests(unittest.TestCase):
             "missing_service", "duplicate_service", "wrong_repo",
             "auto_deploy", "missing_deploy", "newest_failed",
             "out_of_order", "invalid_sha", "other_service",
+            "suspended", "missing_suspension", "maintenance",
+            "missing_maintenance", "malformed_commit",
         ):
             services, deployments = (
                 deepcopy(baseline_services), deepcopy(baseline_deployments)
@@ -150,6 +156,16 @@ class DriftEvidenceTests(unittest.TestCase):
                 deployments[api_id][0]["commit"]["id"] = "missing"
             elif mutation == "other_service":
                 deployments["unrecognized"] = []
+            elif mutation == "suspended":
+                services[0]["suspended"] = "suspended"
+            elif mutation == "missing_suspension":
+                del services[0]["suspended"]
+            elif mutation == "maintenance":
+                services[0]["serviceDetails"]["maintenanceMode"]["enabled"] = True
+            elif mutation == "missing_maintenance":
+                del services[0]["serviceDetails"]["maintenanceMode"]
+            elif mutation == "malformed_commit":
+                deployments[api_id][0]["commit"] = "not-a-dict"
             with self.subTest(case=mutation), self.assertRaises(ValueError):
                 inspect_render_readback(
                     services, deployments, main_commit=NEW,
