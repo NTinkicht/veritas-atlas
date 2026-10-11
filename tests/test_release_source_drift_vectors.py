@@ -6,7 +6,7 @@ import unittest
 from datetime import datetime, timezone
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
-from release_source_drift import inspect, REPO, SERVICES
+from release_source_drift import inspect, inspect_render_readback, REPO, SERVICES
 
 OLD = "47bd085cb5e75d4b72acffc7a9e1e54300a61977"
 NEW = "3adb55ca908552a838a821a1a7fab0982cbba63a"
@@ -32,7 +32,108 @@ def sample(main=NEW, deployed=OLD):
     }
 
 
+
+def render_readback(deployed=OLD):
+    # Public, nonsecret metadata structure observed from Render on 2026-10-11.
+    services = [
+        {
+            "id": service_id,
+            "name": "veritas-atlas-api-ntinkicht" if kind == "api"
+                    else "veritas-atlas-web-ntinkicht",
+            "repo": "https://github.com/" + REPO,
+            "branch": "main",
+            "autoDeploy": "no",
+            "autoDeployTrigger": "off",
+        }
+        for kind, service_id in SERVICES.items()
+    ]
+    deployments = {
+        service_id: [{
+            "status": "live",
+            "commit": {"id": deployed},
+            "createdAt": "2026-09-19T05:26:03Z",
+        }]
+        for service_id in SERVICES.values()
+    }
+    return services, deployments
+
+
 class DriftEvidenceTests(unittest.TestCase):
+    def test_render_readback_reproduces_observed_staging_source_drift(self):
+        services, deployments = render_readback()
+        report = inspect_render_readback(
+            services, deployments, main_commit=NEW,
+            observed_at="2026-10-10T23:59:00Z", now=NOW,
+        )
+        self.assertEqual(report["status"], "DEPLOYED_SOURCE_DRIFT")
+        self.assertEqual(
+            {r["deployed_commit"] for r in report["services"].values()},
+            {OLD},
+        )
+        self.assertFalse(report["provider_readback_authenticated"])
+        self.assertFalse(report["release_authorized"])
+        self.assertEqual(report["deployments_triggered"], 0)
+
+    def test_render_readback_blocks_bad_inventory_and_newest_nonlive_deploy(self):
+        from copy import deepcopy
+        baseline_services, baseline_deployments = render_readback()
+        for mutation in (
+            "missing_service", "duplicate_service", "wrong_repo",
+            "auto_deploy", "missing_deploy", "newest_failed",
+            "out_of_order", "invalid_sha", "other_service",
+        ):
+            services, deployments = (
+                deepcopy(baseline_services), deepcopy(baseline_deployments)
+            )
+            api_id = SERVICES["api"]
+            if mutation == "missing_service":
+                services = [s for s in services if s["id"] != api_id]
+            elif mutation == "duplicate_service":
+                services.append(deepcopy(services[0]))
+            elif mutation == "wrong_repo":
+                services[0]["repo"] = "https://github.com/other/repo"
+            elif mutation == "auto_deploy":
+                services[0]["autoDeploy"] = "yes"
+            elif mutation == "missing_deploy":
+                deployments[api_id] = []
+            elif mutation == "newest_failed":
+                deployments[api_id].insert(0, {
+                    "status": "build_failed",
+                    "commit": {"id": NEW},
+                    "createdAt": "2026-10-11T00:00:00Z",
+                })
+            elif mutation == "out_of_order":
+                deployments[api_id].append({
+                    "status": "live",
+                    "commit": {"id": OLD},
+                    "createdAt": "2026-10-10T00:00:00Z",
+                })
+                deployments[api_id].reverse()
+            elif mutation == "invalid_sha":
+                deployments[api_id][0]["commit"]["id"] = "missing"
+            elif mutation == "other_service":
+                deployments["unrecognized"] = []
+            with self.subTest(case=mutation), self.assertRaises(ValueError):
+                inspect_render_readback(
+                    services, deployments, main_commit=NEW,
+                    observed_at="2026-10-10T23:59:00Z", now=NOW,
+                )
+
+    def test_render_readback_matching_source_is_still_not_release_permission(self):
+        services, deployments = render_readback(deployed=NEW)
+        result = inspect_render_readback(
+            services, deployments, main_commit=NEW,
+            observed_at="2026-10-10T23:59:00Z", now=NOW,
+        )
+        self.assertEqual(result["status"], "SOURCE_MATCH_UNVERIFIED")
+        self.assertFalse(result["provider_readback_authenticated"])
+        self.assertFalse(result["release_authorized"])
+        with self.assertRaises(ValueError):
+            inspect_render_readback(
+                services, deployments, main_commit=NEW,
+                observed_at="2026-10-10T23:30:00Z", now=NOW,
+            )
+
     def test_verified_old_release_is_reported_as_drift_and_never_approved(self):
         result = inspect(sample(), now=NOW)
         self.assertEqual(result["status"], "DEPLOYED_SOURCE_DRIFT")
