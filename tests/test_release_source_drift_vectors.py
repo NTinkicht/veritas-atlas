@@ -108,7 +108,7 @@ class DriftEvidenceTests(unittest.TestCase):
                     "commit": {"id": OLD},
                     "createdAt": "2026-10-10T00:00:00Z",
                 })
-                deployments[api_id].reverse()
+                # Keep oldest first: newest-first Render ordering must reject it.
             elif mutation == "invalid_sha":
                 deployments[api_id][0]["commit"]["id"] = "missing"
             elif mutation == "other_service":
