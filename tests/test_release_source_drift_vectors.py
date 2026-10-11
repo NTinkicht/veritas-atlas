@@ -59,6 +59,43 @@ def render_readback(deployed=OLD):
 
 
 class DriftEvidenceTests(unittest.TestCase):
+    def test_render_cli_offline_files_and_partial_mode_fail_closed(self):
+        import json
+        import subprocess
+        import tempfile
+        services, deployments = render_readback()
+        runner = str(Path(__file__).resolve().parents[1] / "scripts" / "release_source_drift.py")
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            services_file = root / "services.json"
+            deploys_file = root / "deploys.json"
+            services_file.write_text(json.dumps(services), encoding="utf-8")
+            deploys_file.write_text(json.dumps(deployments), encoding="utf-8")
+            cmd = [
+                sys.executable, runner,
+                "--render-services", str(services_file),
+                "--render-deploys", str(deploys_file),
+                "--main-commit", NEW,
+                "--observed-at", datetime.now(timezone.utc).strftime(
+                    "%Y-%m-%dT%H:%M:%SZ"
+                ),
+            ]
+            accepted = subprocess.run(cmd, capture_output=True, text=True, check=False)
+            self.assertEqual(accepted.returncode, 0, accepted.stderr + accepted.stdout)
+            report = json.loads(accepted.stdout)
+            self.assertEqual(report["status"], "DEPLOYED_SOURCE_DRIFT")
+            self.assertFalse(report["provider_readback_authenticated"])
+            self.assertFalse(report["release_authorized"])
+            self.assertEqual(report["deployments_triggered"], 0)
+
+            partial = subprocess.run(
+                cmd[:4] + cmd[6:], capture_output=True, text=True, check=False
+            )
+            self.assertEqual(partial.returncode, 2)
+            self.assertEqual(
+                json.loads(partial.stdout)["status"], "EVIDENCE_INVALID"
+            )
+
     def test_render_readback_reproduces_observed_staging_source_drift(self):
         services, deployments = render_readback()
         report = inspect_render_readback(
