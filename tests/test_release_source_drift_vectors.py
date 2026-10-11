@@ -40,6 +40,20 @@ class DriftEvidenceTests(unittest.TestCase):
         self.assertFalse(result["release_authorized"])
         self.assertFalse(result["h8_credential_rollback_e2e_verified"])
 
+    def test_mixed_service_sources_fail_closed_independently(self):
+        # One current service cannot conceal another service still on an old SHA.
+        payload = sample()
+        payload["services"]["api"]["deployed_commit"] = NEW
+        result = inspect(payload, now=NOW)
+        self.assertEqual(result["status"], "DEPLOYED_SOURCE_DRIFT")
+        self.assertTrue(result["services"]["api"]["source_equal_to_main"])
+        self.assertFalse(result["services"]["web"]["source_equal_to_main"])
+        self.assertEqual(result["services"]["api"]["deployed_commit"], NEW)
+        self.assertEqual(result["services"]["web"]["deployed_commit"], OLD)
+        self.assertEqual(result["deployments_triggered"], 0)
+        self.assertFalse(result["provider_readback_authenticated"])
+        self.assertFalse(result["release_authorized"])
+
     def test_matching_commits_are_not_a_deployment_approval(self):
         result = inspect(sample(deployed=NEW), now=NOW)
         self.assertEqual(result["status"], "SOURCE_MATCH_UNVERIFIED")
