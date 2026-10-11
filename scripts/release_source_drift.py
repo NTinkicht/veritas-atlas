@@ -146,6 +146,22 @@ def inspect_render_readback(
             or service.get("autoDeployTrigger") != "off"
         ):
             raise ValueError("RENDER_SERVICE_CONFIGURATION_DRIFT")
+        # A historic successful deploy is not evidence that its service is
+        # currently running. Render reports suspension separately from deploy.
+        if service.get("suspended") != "not_suspended":
+            raise ValueError("RENDER_SERVICE_SUSPENDED_OR_UNKNOWN")
+        details = service.get("serviceDetails")
+        if kind == "api":
+            if (
+                not isinstance(details, dict)
+                or not isinstance(details.get("maintenanceMode"), dict)
+                or details["maintenanceMode"].get("enabled") is not False
+            ):
+                raise ValueError("RENDER_SERVICE_MAINTENANCE_OR_UNKNOWN")
+        elif isinstance(details, dict) and "maintenanceMode" in details:
+            mode = details["maintenanceMode"]
+            if not isinstance(mode, dict) or mode.get("enabled") is not False:
+                raise ValueError("RENDER_SERVICE_MAINTENANCE_OR_UNKNOWN")
 
         candidates = deployments_by_service_id[service_id]
         if not isinstance(candidates, list) or not candidates:
@@ -169,7 +185,8 @@ def inspect_render_readback(
         if dates != sorted(dates, reverse=True):
             raise ValueError("RENDER_DEPLOYMENT_ORDER_AMBIGUOUS")
         latest = candidates[0]
-        sha = (latest.get("commit") or {}).get("id")
+        commit = latest.get("commit")
+        sha = commit.get("id") if isinstance(commit, dict) else None
         if latest.get("status") != "live" or not isinstance(sha, str):
             raise ValueError("RENDER_DEPLOYMENT_NOT_LIVE")
         evidence[kind] = {
