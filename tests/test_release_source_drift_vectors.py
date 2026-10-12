@@ -6,7 +6,7 @@ import unittest
 from datetime import datetime, timezone
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
-from release_source_drift import inspect, inspect_render_readback, REPO, SERVICES
+from release_source_drift import inspect, inspect_render_readback, parse_evidence_json, MAX_EVIDENCE_BYTES, REPO, SERVICES
 
 OLD = "47bd085cb5e75d4b72acffc7a9e1e54300a61977"
 NEW = "3adb55ca908552a838a821a1a7fab0982cbba63a"
@@ -69,6 +69,22 @@ def render_readback(deployed=OLD):
 
 
 class DriftEvidenceTests(unittest.TestCase):
+    def test_provider_json_size_bound_accepts_limit_and_rejects_one_byte_more(self):
+        import json
+        import tempfile
+        payload = json.dumps(sample()).encode("utf-8")
+        with tempfile.TemporaryDirectory() as folder:
+            evidence = Path(folder) / "provider.json"
+            evidence.write_bytes(payload + b" " * (MAX_EVIDENCE_BYTES - len(payload)))
+            self.assertEqual(
+                parse_evidence_json(evidence)["schema"], "VERITAS_DEPLOY_DRIFT_V1"
+            )
+            with evidence.open("ab") as handle:
+                handle.write(b" ")
+            with self.assertRaisesRegex(ValueError, "RELEASE_JSON_TOO_LARGE"):
+                parse_evidence_json(evidence)
+
+
     def test_render_cli_offline_files_and_partial_mode_fail_closed(self):
         import json
         import subprocess

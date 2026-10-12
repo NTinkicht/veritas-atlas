@@ -23,6 +23,7 @@ SHA = re.compile(r"^[0-9a-f]{40}$")
 RENDER_DEPLOYMENT_ID = re.compile(r"^dep-[a-z0-9]{20}$")
 MAX_OBSERVATION_AGE = timedelta(minutes=15)
 MAX_CLOCK_SKEW = timedelta(seconds=60)
+MAX_EVIDENCE_BYTES = 1024 * 1024  # Bound untrusted provider snapshots before decoding.
 SERVICE_FIELDS = frozenset({
     "service_id", "deployed_commit", "deploy_status",
     "auto_deploy", "auto_deploy_trigger",
@@ -54,8 +55,14 @@ def parse_finite_json_float(value: str) -> float:
 
 def parse_evidence_json(path: Path) -> Any:
     """Fail closed on ambiguous keys and NaN/infinite numbers."""
+    # Reading unbounded provider metadata can exhaust the runner before any
+    # schema or freshness validation. Refuse oversized input before decoding.
+    with path.open("rb") as evidence:
+        raw = evidence.read(MAX_EVIDENCE_BYTES + 1)
+    if len(raw) > MAX_EVIDENCE_BYTES:
+        raise ValueError("RELEASE_JSON_TOO_LARGE")
     return json.loads(
-        path.read_text(encoding="utf-8"),
+        raw.decode("utf-8"),
         object_pairs_hook=reject_duplicate_keys,
         parse_constant=reject_nonfinite_json_constant,
         parse_float=parse_finite_json_float,
