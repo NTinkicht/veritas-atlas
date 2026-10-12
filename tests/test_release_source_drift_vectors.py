@@ -231,14 +231,14 @@ class DriftEvidenceTests(unittest.TestCase):
                     "--main-commit", NEW,
                     "--observed-at", datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
                 ]
-                with self.subTest(token=token, mode="snapshot"):
+                with self.subTest(number_literal=token, mode="snapshot"):
                     result = subprocess.run(
                         [sys.executable, runner, str(snapshot_path)],
                         capture_output=True, text=True, check=False,
                     )
                     self.assertEqual(result.returncode, 2, result.stdout)
                     self.assertEqual(json.loads(result.stdout)["reason"], "RELEASE_JSON_NONFINITE_NUMBER")
-                with self.subTest(token=token, mode="services"):
+                with self.subTest(number_literal=token, mode="services"):
                     result = subprocess.run(cmd, capture_output=True, text=True, check=False)
                     self.assertEqual(result.returncode, 2, result.stdout)
                     self.assertEqual(json.loads(result.stdout)["reason"], "RELEASE_JSON_NONFINITE_NUMBER")
@@ -248,7 +248,7 @@ class DriftEvidenceTests(unittest.TestCase):
                         '"status": "live"', '"status": ' + token, 1,
                     ), encoding="utf-8",
                 )
-                with self.subTest(token=token, mode="deployments"):
+                with self.subTest(number_literal=token, mode="deployments"):
                     result = subprocess.run(cmd, capture_output=True, text=True, check=False)
                     self.assertEqual(result.returncode, 2, result.stdout)
                     self.assertEqual(json.loads(result.stdout)["reason"], "RELEASE_JSON_NONFINITE_NUMBER")
@@ -287,7 +287,7 @@ class DriftEvidenceTests(unittest.TestCase):
                     ("snapshot", [sys.executable, runner, str(snapshot_path)]),
                     ("services", cmd),
                 ):
-                    with self.subTest(token=token, mode=mode):
+                    with self.subTest(number_literal=token, mode=mode):
                         result = subprocess.run(command, capture_output=True, text=True, check=False)
                         self.assertEqual(result.returncode, 2, result.stdout)
                         self.assertEqual(json.loads(result.stdout)["reason"], "RELEASE_JSON_NONFINITE_NUMBER")
@@ -295,7 +295,7 @@ class DriftEvidenceTests(unittest.TestCase):
                 deployments_path.write_text(json.dumps(deployments).replace(
                     '"status": "live"', '"status": ' + token, 1,
                 ), encoding="utf-8")
-                with self.subTest(token=token, mode="deployments"):
+                with self.subTest(number_literal=token, mode="deployments"):
                     result = subprocess.run(cmd, capture_output=True, text=True, check=False)
                     self.assertEqual(result.returncode, 2, result.stdout)
                     self.assertEqual(json.loads(result.stdout)["reason"], "RELEASE_JSON_NONFINITE_NUMBER")
