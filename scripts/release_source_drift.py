@@ -194,10 +194,15 @@ def inspect_render_readback(
                 or details["maintenanceMode"].get("enabled") is not False
             ):
                 raise ValueError("RENDER_SERVICE_MAINTENANCE_OR_UNKNOWN")
-        elif isinstance(details, dict) and "maintenanceMode" in details:
-            mode = details["maintenanceMode"]
-            if not isinstance(mode, dict) or mode.get("enabled") is not False:
+        else:
+            # Missing or malformed web service details cannot prove maintenance
+            # is disabled. Accept the observed empty object, not unknown types.
+            if not isinstance(details, dict):
                 raise ValueError("RENDER_SERVICE_MAINTENANCE_OR_UNKNOWN")
+            if "maintenanceMode" in details:
+                mode = details["maintenanceMode"]
+                if not isinstance(mode, dict) or mode.get("enabled") is not False:
+                    raise ValueError("RENDER_SERVICE_MAINTENANCE_OR_UNKNOWN")
 
         candidates = deployments_by_service_id[service_id]
         if not isinstance(candidates, list) or not candidates:

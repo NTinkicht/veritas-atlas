@@ -275,7 +275,8 @@ class DriftEvidenceTests(unittest.TestCase):
             "auto_deploy", "missing_deploy", "newest_failed",
             "out_of_order", "tied_created_at", "invalid_sha", "other_service",
             "suspended", "missing_suspension", "maintenance",
-            "missing_maintenance", "malformed_commit",
+            "missing_maintenance", "web_details_missing", "web_details_malformed",
+            "web_maintenance_enabled", "malformed_commit",
             "missing_deploy_id", "bad_deploy_id", "duplicate_deploy_id", "missing_started",
             "missing_finished", "reversed_timeline", "completion_before_created",
             "start_before_created", "completed_after_observed", "naive_finished",
@@ -321,6 +322,12 @@ class DriftEvidenceTests(unittest.TestCase):
                 services[0]["serviceDetails"]["maintenanceMode"]["enabled"] = True
             elif mutation == "missing_maintenance":
                 del services[0]["serviceDetails"]["maintenanceMode"]
+            elif mutation == "web_details_missing":
+                del services[1]["serviceDetails"]
+            elif mutation == "web_details_malformed":
+                services[1]["serviceDetails"] = None
+            elif mutation == "web_maintenance_enabled":
+                services[1]["serviceDetails"]["maintenanceMode"] = {"enabled": True}
             elif mutation == "malformed_commit":
                 deployments[api_id][0]["commit"] = "not-a-dict"
             elif mutation == "missing_deploy_id":
