@@ -53,6 +53,36 @@ def parse_finite_json_float(value: str) -> float:
     return number
 
 
+MAX_JSON_NESTING = 256  # Explicit bound independent of Python recursion settings.
+
+
+def reject_excessive_json_nesting(raw: bytes) -> None:
+    """Bound JSON structural nesting; quoted brackets are ordinary text.
+
+    Scan only the already size-bounded bytes. JSON decoding is still the
+    authority for syntax, escaped strings, matching delimiters and schema.
+    """
+    depth = 0
+    quoted = False
+    escaped = False
+    for byte in raw:
+        if quoted:
+            if escaped:
+                escaped = False
+            elif byte == 92:  # Backslash escapes the following byte.
+                escaped = True
+            elif byte == 34:  # Closing double quote.
+                quoted = False
+        elif byte == 34:
+            quoted = True
+        elif byte in (91, 123):  # '[' or '{'
+            depth += 1
+            if depth > MAX_JSON_NESTING:
+                raise ValueError("RELEASE_JSON_NESTING_TOO_DEEP")
+        elif byte in (93, 125):  # ']' or '}'
+            depth -= 1
+
+
 def parse_evidence_json(path: Path) -> Any:
     """Fail closed on ambiguous keys and NaN/infinite numbers."""
     # Reading unbounded provider metadata can exhaust the runner before any
@@ -61,6 +91,7 @@ def parse_evidence_json(path: Path) -> Any:
         raw = evidence.read(MAX_EVIDENCE_BYTES + 1)
     if len(raw) > MAX_EVIDENCE_BYTES:
         raise ValueError("RELEASE_JSON_TOO_LARGE")
+    reject_excessive_json_nesting(raw)
     try:
         return json.loads(
             raw.decode("utf-8"),
