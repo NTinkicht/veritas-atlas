@@ -85,6 +85,38 @@ class DriftEvidenceTests(unittest.TestCase):
                 parse_evidence_json(evidence)
 
 
+    def test_deep_json_is_a_structured_refusal_in_both_cli_modes(self):
+        import json
+        import subprocess
+        import tempfile
+
+        runner = str(Path(__file__).resolve().parents[1] / "scripts" / "release_source_drift.py")
+        nested = "[" * 3000 + "0" + "]" * 3000
+        with tempfile.TemporaryDirectory() as folder:
+            evidence = Path(folder) / "deep.json"
+            evidence.write_text(nested, encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "RELEASE_JSON_NESTING_TOO_DEEP"):
+                parse_evidence_json(evidence)
+            commands = (
+                [sys.executable, runner, str(evidence)],
+                [
+                    sys.executable, runner,
+                    "--render-services", str(evidence),
+                    "--render-deploys", str(evidence),
+                    "--main-commit", NEW,
+                    "--observed-at", NOW.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                ],
+            )
+            for cmd in commands:
+                with self.subTest(mode="snapshot" if len(cmd) == 3 else "provider"):
+                    result = subprocess.run(cmd, capture_output=True, text=True, check=False)
+                    self.assertEqual(result.returncode, 2, result.stderr)
+                    self.assertEqual(json.loads(result.stdout), {
+                        "status": "EVIDENCE_INVALID",
+                        "reason": "RELEASE_JSON_NESTING_TOO_DEEP",
+                    })
+                    self.assertNotIn("Traceback", result.stderr)
+
     def test_render_cli_offline_files_and_partial_mode_fail_closed(self):
         import json
         import subprocess

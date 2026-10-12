@@ -61,12 +61,16 @@ def parse_evidence_json(path: Path) -> Any:
         raw = evidence.read(MAX_EVIDENCE_BYTES + 1)
     if len(raw) > MAX_EVIDENCE_BYTES:
         raise ValueError("RELEASE_JSON_TOO_LARGE")
-    return json.loads(
-        raw.decode("utf-8"),
-        object_pairs_hook=reject_duplicate_keys,
-        parse_constant=reject_nonfinite_json_constant,
-        parse_float=parse_finite_json_float,
-    )
+    try:
+        return json.loads(
+            raw.decode("utf-8"),
+            object_pairs_hook=reject_duplicate_keys,
+            parse_constant=reject_nonfinite_json_constant,
+            parse_float=parse_finite_json_float,
+        )
+    except RecursionError as exc:
+        # Deep but byte-bounded JSON must not crash the offline CLI.
+        raise ValueError("RELEASE_JSON_NESTING_TOO_DEEP") from exc
 
 
 def inspect(snapshot: Any, *, now: datetime | None = None) -> dict:
