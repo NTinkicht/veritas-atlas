@@ -1,5 +1,6 @@
 import io
 import json
+import urllib.error
 import unittest
 import zipfile
 from unittest import mock
@@ -265,7 +266,7 @@ class ExternalReviewGateTests(unittest.TestCase):
     def test_automated_dispatch_requires_exact_signed_source_artifact(self):
         api, archive = self._auto_bundle()
         with mock.patch.object(g, "public_json", side_effect=api), \
-             mock.patch.object(g.subprocess, "check_output", return_value=archive):
+             mock.patch.object(g, "_download_host_proof", return_value=archive):
             self.assertTrue(g.external_mistral_pass(
                 repo=self.repo, pr=self.pr, head=self.head, base=self.base,
                 authors={"chatgpt"},
@@ -277,7 +278,7 @@ class ExternalReviewGateTests(unittest.TestCase):
             return source, run, artifacts, proof, event, report
         api, archive = self._auto_bundle(mutate=tamper)
         with mock.patch.object(g, "public_json", side_effect=api), \
-             mock.patch.object(g.subprocess, "check_output", return_value=archive):
+             mock.patch.object(g, "_download_host_proof", return_value=archive):
             self.assertFalse(g.external_mistral_pass(
                 repo=self.repo, pr=self.pr, head=self.head, base=self.base,
                 authors={"chatgpt"},
@@ -289,7 +290,7 @@ class ExternalReviewGateTests(unittest.TestCase):
             return source, run, artifacts, proof, event, report
         api, archive = self._auto_bundle(mutate=tamper)
         with mock.patch.object(g, "public_json", side_effect=api), \
-             mock.patch.object(g.subprocess, "check_output", return_value=archive):
+             mock.patch.object(g, "_download_host_proof", return_value=archive):
             self.assertFalse(g.external_mistral_pass(
                 repo=self.repo, pr=self.pr, head=self.head, base=self.base,
                 authors={"chatgpt"},
@@ -300,7 +301,7 @@ class ExternalReviewGateTests(unittest.TestCase):
             return source, run, artifacts, proof, "issue_comment", report
         api, archive = self._auto_bundle(mutate=tamper)
         with mock.patch.object(g, "public_json", side_effect=api), \
-             mock.patch.object(g.subprocess, "check_output", return_value=archive):
+             mock.patch.object(g, "_download_host_proof", return_value=archive):
             self.assertFalse(g.external_mistral_pass(
                 repo=self.repo, pr=self.pr, head=self.head, base=self.base,
                 authors={"chatgpt"},
@@ -312,7 +313,7 @@ class ExternalReviewGateTests(unittest.TestCase):
             return source, run, artifacts, proof, event, report
         api, archive = self._auto_bundle(mutate=tamper)
         with mock.patch.object(g, "public_json", side_effect=api), \
-             mock.patch.object(g.subprocess, "check_output", return_value=archive):
+             mock.patch.object(g, "_download_host_proof", return_value=archive):
             self.assertFalse(g.external_mistral_pass(
                 repo=self.repo, pr=self.pr, head=self.head, base=self.base,
                 authors={"chatgpt"},
@@ -324,7 +325,7 @@ class ExternalReviewGateTests(unittest.TestCase):
             return source, run, artifacts, proof, event, report
         api, archive = self._auto_bundle(mutate=tamper)
         with mock.patch.object(g, "public_json", side_effect=api), \
-             mock.patch.object(g.subprocess, "check_output", return_value=archive):
+             mock.patch.object(g, "_download_host_proof", return_value=archive):
             self.assertFalse(g.external_mistral_pass(
                 repo=self.repo, pr=self.pr, head=self.head, base=self.base,
                 authors={"chatgpt"},
@@ -336,7 +337,7 @@ class ExternalReviewGateTests(unittest.TestCase):
             return source, run, artifacts, proof, event, report
         api, archive = self._auto_bundle(mutate=tamper)
         with mock.patch.object(g, "public_json", side_effect=api), \
-             mock.patch.object(g.subprocess, "check_output", return_value=archive):
+             mock.patch.object(g, "_download_host_proof", return_value=archive):
             self.assertFalse(g.external_mistral_pass(
                 repo=self.repo, pr=self.pr, head=self.head, base=self.base,
                 authors={"chatgpt"},
@@ -345,11 +346,56 @@ class ExternalReviewGateTests(unittest.TestCase):
     def test_automated_dispatch_rejects_modified_proof_zip(self):
         api, archive = self._auto_bundle()
         with mock.patch.object(g, "public_json", side_effect=api), \
-             mock.patch.object(g.subprocess, "check_output", return_value=b"not a zip"):
+             mock.patch.object(g, "_download_host_proof", return_value=b"not a zip"):
             self.assertFalse(g.external_mistral_pass(
                 repo=self.repo, pr=self.pr, head=self.head, base=self.base,
                 authors={"chatgpt"},
             ))
+
+
+    def test_host_reader_refuses_missing_scoped_credentials(self):
+        with mock.patch.dict(g.os.environ, {"ONECOMPANY_ACTIONS_READ_TOKEN": ""}):
+            with mock.patch.object(g.urllib.request, "build_opener") as transport:
+                self.assertIsNone(g._download_host_proof(999))
+                transport.assert_not_called()
+
+    def test_host_reader_fails_on_external_redirect_before_unsigned_get(self):
+        from email.message import Message
+        headers = Message()
+        headers["Location"] = "https://evil.example.test/steal"
+        redirect = urllib.error.HTTPError(
+            "https://api.github.com/repos/NTinkicht/OneCompany/actions/artifacts/999/zip",
+            302, "Found", headers, None,
+        )
+        opener = mock.Mock()
+        opener.open.side_effect = redirect
+        with mock.patch.dict(g.os.environ, {"ONECOMPANY_ACTIONS_READ_TOKEN": "host-read-only"}), \
+             mock.patch.object(g.urllib.request, "build_opener", return_value=opener), \
+             mock.patch.object(g.urllib.request, "urlopen") as unsigned_get:
+            self.assertIsNone(g._download_host_proof(999))
+            unsigned_get.assert_not_called()
+        sent = opener.open.call_args.args[0]
+        self.assertEqual(sent.get_header("Authorization"), "Bearer host-read-only")
+
+    def test_host_token_is_removed_on_allowlisted_artifact_redirect(self):
+        from email.message import Message
+        headers = Message()
+        headers["Location"] = "https://mybucket.blob.core.windows.net/signed-object?sig=test"
+        redirect = urllib.error.HTTPError(
+            "https://api.github.com/repos/NTinkicht/OneCompany/actions/artifacts/999/zip",
+            302, "Found", headers, None,
+        )
+        opener = mock.Mock()
+        opener.open.side_effect = redirect
+        stream = mock.MagicMock()
+        stream.__enter__.return_value.read.return_value = b"zip data"
+        with mock.patch.dict(g.os.environ, {"ONECOMPANY_ACTIONS_READ_TOKEN": "host-read-only"}), \
+             mock.patch.object(g.urllib.request, "build_opener", return_value=opener), \
+             mock.patch.object(g.urllib.request, "urlopen", return_value=stream) as unsigned_get:
+            self.assertEqual(g._download_host_proof(999), b"zip data")
+            request = unsigned_get.call_args.args[0]
+            self.assertIsNone(request.get_header("Authorization"))
+            self.assertEqual(request.full_url, headers["Location"])
 
 
 if __name__ == "__main__":

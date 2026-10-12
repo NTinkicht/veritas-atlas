@@ -6,7 +6,8 @@ import io
 import json
 import os
 import re
-import subprocess
+import urllib.error
+import urllib.parse
 import urllib.request
 import zipfile
 
@@ -78,6 +79,60 @@ PROOF_FILE = "onecompany-external-dispatch-proof.json"
 MAX_PROOF_BYTES = 1_000_000
 
 
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, request, fp, code, msg, headers, newurl):
+        return None
+
+
+def _download_host_proof(artifact_id: int) -> bytes | None:
+    """OneCompany Actions:read only. Never forward its token to signed storage."""
+    token = os.environ.get("ONECOMPANY_ACTIONS_READ_TOKEN", "")
+    if not token or not isinstance(artifact_id, int) or artifact_id < 1:
+        return None
+    opener = urllib.request.build_opener(_NoRedirect)
+    endpoint = (
+        f"https://api.github.com/repos/{HOST_REPO}/actions/artifacts/"
+        f"{artifact_id}/zip"
+    )
+    request = urllib.request.Request(endpoint, headers={
+        "Authorization": f"Bearer {token}",
+        "Accept": "application/vnd.github+json",
+        "User-Agent": "veritas-trusted-evidence-reader",
+    })
+    try:
+        with opener.open(request, timeout=20) as response:
+            # No redirect (e.g. an API returning the archive directly).
+            return response.read(MAX_PROOF_BYTES + 1)
+    except urllib.error.HTTPError as response:
+        if response.code not in (302, 303, 307, 308):
+            return None
+        location = response.headers.get("Location") or ""
+    except (OSError, ValueError):
+        return None
+
+    signed = urllib.parse.urlsplit(location)
+    host = (signed.hostname or "").lower()
+    allowed = (
+        host.endswith(".blob.core.windows.net")
+        or host.endswith(".actions.githubusercontent.com")
+        or host == "pipelines.actions.githubusercontent.com"
+    )
+    if not (
+        signed.scheme == "https" and allowed and signed.username is None
+        and signed.password is None and signed.port in (None, 443)
+    ):
+        return None
+    # The host-specific bearer is deliberately NOT included on this request.
+    unsigned = urllib.request.Request(
+        location, headers={"User-Agent": "veritas-trusted-evidence-reader"}
+    )
+    try:
+        with urllib.request.urlopen(unsigned, timeout=20) as response:
+            return response.read(MAX_PROOF_BYTES + 1)
+    except (OSError, ValueError):
+        return None
+
+
 def _trusted_auto_dispatch(
     comment: dict, *, dispatch_id: int, repo: str, pr: int,
     head: str, base: str,
@@ -118,11 +173,8 @@ def _trusted_auto_dispatch(
         ]
         if len(matches) != 1:
             return False
-        raw = subprocess.check_output(
-            ["gh", "api", f"repos/{HOST_REPO}/actions/artifacts/{matches[0]['id']}/zip"],
-            stderr=subprocess.DEVNULL, timeout=30,
-        )
-        if not 0 < len(raw) <= MAX_PROOF_BYTES:
+        raw = _download_host_proof(matches[0]["id"])
+        if raw is None or not 0 < len(raw) <= MAX_PROOF_BYTES:
             return False
         with zipfile.ZipFile(io.BytesIO(raw)) as archive:
             if archive.namelist() != [PROOF_FILE]:
@@ -148,7 +200,6 @@ def _trusted_auto_dispatch(
         }
         return sum(source == expected for source in proof["sources"]) == 1
     except (OSError, ValueError, TypeError, KeyError, UnicodeError,
-            subprocess.CalledProcessError, subprocess.TimeoutExpired,
             zipfile.BadZipFile, json.JSONDecodeError):
         return False
 
