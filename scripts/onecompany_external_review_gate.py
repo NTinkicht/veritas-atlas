@@ -133,6 +133,16 @@ def _download_host_proof(artifact_id: int) -> bytes | None:
         return None
 
 
+def _reject_duplicate_proof_keys(pairs: list[tuple[str, object]]) -> dict:
+    """Reject ambiguous JSON proof fields, including identical duplicates."""
+    fields = {}
+    for name, value in pairs:
+        if name in fields:
+            raise ValueError("DUPLICATE_PROOF_KEY")
+        fields[name] = value
+    return fields
+
+
 def _trusted_auto_dispatch(
     comment: dict, *, dispatch_id: int, repo: str, pr: int,
     head: str, base: str,
@@ -181,7 +191,7 @@ def _trusted_auto_dispatch(
                 return False
             if archive.getinfo(PROOF_FILE).file_size > MAX_PROOF_BYTES:
                 return False
-            proof = json.loads(archive.read(PROOF_FILE).decode("utf-8"))
+            proof = json.loads(archive.read(PROOF_FILE).decode("utf-8"), object_pairs_hook=_reject_duplicate_proof_keys)
         if (
             type(proof) is not dict
             or proof.get("version") != 1
