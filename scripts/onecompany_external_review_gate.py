@@ -2,10 +2,14 @@
 """Verify OneCompany-hosted external Mistral evidence for Veritas."""
 from __future__ import annotations
 
+import io
 import json
 import os
 import re
+import urllib.error
+import urllib.parse
 import urllib.request
+import zipfile
 
 HOST_REPO = "NTinkicht/OneCompany"
 HOST_ISSUE = 130
@@ -66,7 +70,159 @@ def parse_dispatch(body: str) -> tuple[str, int, str, str, frozenset[str]]:
     return repo, pr, head, base, authors
 
 
-def _trusted_run(run_id: int, dispatch_id: int) -> dict | None:
+
+AUTO_MARKER = re.compile(r"<!-- ONECOMPANY_L4_AUTO_DISPATCH_V1 run=([1-9][0-9]{0,19}) -->")
+DISPATCH_WORKFLOW = ".github/workflows/onecompany-mistral-external-dispatch.yml"
+DISPATCH_WORKFLOW_NAME = "OneCompany L4 External Review Auto Dispatch"
+PROOF_ARTIFACT_NAME = "onecompany-external-dispatch-proof"
+PROOF_FILE = "onecompany-external-dispatch-proof.json"
+MAX_PROOF_BYTES = 1_000_000
+
+
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, request, fp, code, msg, headers, newurl):
+        return None
+
+
+def _download_host_proof(artifact_id: int) -> bytes | None:
+    """OneCompany Actions:read only. Never forward its token to signed storage."""
+    if not isinstance(artifact_id, int) or artifact_id < 1:
+        return None
+    try:
+        # A scoped environment reference, never a literal credential.
+        token = os.environ["ONECOMPANY_ACTIONS_READ_TOKEN"]
+    except KeyError:
+        return None
+    if not token:
+        return None
+    opener = urllib.request.build_opener(_NoRedirect)
+    endpoint = (
+        f"https://api.github.com/repos/{HOST_REPO}/actions/artifacts/"
+        f"{artifact_id}/zip"
+    )
+    request = urllib.request.Request(endpoint, headers={
+        "Accept": "application/vnd.github+json",
+        "User-Agent": "veritas-trusted-evidence-reader",
+    })
+    # Keep the scoped bearer on the host API request only. The subsequent
+    # signed-storage request remains uncredentialed, including redirects.
+    request.add_header("Authorization", f"Bearer {token}")
+    try:
+        with opener.open(request, timeout=20) as response:
+            # No redirect (e.g. an API returning the archive directly).
+            return response.read(MAX_PROOF_BYTES + 1)
+    except urllib.error.HTTPError as response:
+        if response.code not in (302, 303, 307, 308):
+            return None
+        location = response.headers.get("Location") or ""
+    except (OSError, ValueError):
+        return None
+
+    signed = urllib.parse.urlsplit(location)
+    host = (signed.hostname or "").lower()
+    allowed = (
+        host.endswith(".blob.core.windows.net")
+        or host.endswith(".actions.githubusercontent.com")
+        or host == "pipelines.actions.githubusercontent.com"
+    )
+    if not (
+        signed.scheme == "https" and allowed and signed.username is None
+        and signed.password is None and signed.port in (None, 443)
+    ):
+        return None
+    # The host-specific bearer is deliberately NOT included on this request.
+    unsigned = urllib.request.Request(
+        location, headers={"User-Agent": "veritas-trusted-evidence-reader"}
+    )
+    try:
+        with urllib.request.urlopen(unsigned, timeout=20) as response:
+            return response.read(MAX_PROOF_BYTES + 1)
+    except (OSError, ValueError):
+        return None
+
+
+def _reject_duplicate_proof_keys(pairs: list[tuple[str, object]]) -> dict:
+    """Reject ambiguous JSON proof fields, including identical duplicates."""
+    fields = {}
+    for name, value in pairs:
+        if name in fields:
+            raise ValueError("DUPLICATE_PROOF_KEY")
+        fields[name] = value
+    return fields
+
+
+def _trusted_auto_dispatch(
+    comment: dict, *, dispatch_id: int, repo: str, pr: int,
+    head: str, base: str,
+) -> bool:
+    """Authenticate a bot-authored source against the completed main run and
+    run-scoped immutable source artifact. Never trust the source marker alone.
+    """
+    try:
+        body = str(comment.get("body") or "")
+        markers = AUTO_MARKER.findall(body)
+        if len(markers) != 1:
+            return False
+        run_id = int(markers[0])
+        run = public_json(f"repos/{HOST_REPO}/actions/runs/{run_id}")
+        path, sep, ref = str(run.get("path") or "").partition("@")
+        if not (
+            run.get("id") == run_id
+            and run.get("name") == DISPATCH_WORKFLOW_NAME
+            and path == DISPATCH_WORKFLOW
+            and (not sep or ref == "main")
+            and run.get("head_branch") == "main"
+            and run.get("event") in {"schedule", "workflow_dispatch"}
+            and run.get("status") == "completed"
+            and run.get("conclusion") == "success"
+            and (run.get("head_repository") or {}).get("full_name") == HOST_REPO
+            and str(run.get("created_at") or "") <= str(comment.get("created_at") or "")
+        ):
+            return False
+        artifacts = public_json(
+            f"repos/{HOST_REPO}/actions/runs/{run_id}/artifacts?per_page=100"
+        )
+        matches = [
+            item for item in artifacts.get("artifacts", [])
+            if isinstance(item, dict)
+            and item.get("name") == PROOF_ARTIFACT_NAME
+            and item.get("expired") is False
+            and type(item.get("id")) is int and item["id"] > 0
+        ]
+        if len(matches) != 1:
+            return False
+        raw = _download_host_proof(matches[0]["id"])
+        if raw is None or not 0 < len(raw) <= MAX_PROOF_BYTES:
+            return False
+        with zipfile.ZipFile(io.BytesIO(raw)) as archive:
+            if archive.namelist() != [PROOF_FILE]:
+                return False
+            if archive.getinfo(PROOF_FILE).file_size > MAX_PROOF_BYTES:
+                return False
+            proof = json.loads(archive.read(PROOF_FILE).decode("utf-8"), object_pairs_hook=_reject_duplicate_proof_keys)
+        if (
+            type(proof) is not dict
+            or proof.get("version") != 1
+            or proof.get("run_id") != run_id
+            or type(proof.get("sources")) is not list
+            or not 1 <= len(proof["sources"]) <= 6
+        ):
+            return False
+        expected = {
+            "comment_id": dispatch_id,
+            "body": body,
+            "repo": repo,
+            "pr": pr,
+            "head": head,
+            "base": base,
+        }
+        return sum(source == expected for source in proof["sources"]) == 1
+    except (OSError, ValueError, TypeError, KeyError, UnicodeError,
+            zipfile.BadZipFile, json.JSONDecodeError):
+        return False
+
+
+def _trusted_run(run_id: int, dispatch_id: int, *, expected_event: str) -> dict | None:
     run = public_json(f"repos/{HOST_REPO}/actions/runs/{run_id}")
     workflow_path = str(run.get("path") or "")
     workflow_file, separator, workflow_ref = workflow_path.partition("@")
@@ -76,7 +232,7 @@ def _trusted_run(run_id: int, dispatch_id: int) -> dict | None:
         and workflow_file == WORKFLOW_PATH
         and (not separator or workflow_ref == "main")
         and run.get("head_branch") == "main"
-        and run.get("event") == "issue_comment"
+        and run.get("event") == expected_event
         and run.get("status") == "completed"
         and run.get("conclusion") in {"success", "failure"}
         and (run.get("head_repository") or {}).get("full_name") == HOST_REPO
@@ -96,10 +252,23 @@ def _trusted_dispatch(
 ) -> dict | None:
     comment = public_json(f"repos/{HOST_REPO}/issues/comments/{dispatch_id}")
     if (
-        (comment.get("user") or {}).get("login") != "NTinkicht"
-        or comment.get("created_at") != comment.get("updated_at")
+        comment.get("created_at") != comment.get("updated_at")
         or not str(comment.get("issue_url") or "").endswith(f"/repos/{HOST_REPO}/issues/{HOST_ISSUE}")
     ):
+        return None
+    actor = (comment.get("user") or {}).get("login")
+    body = str(comment.get("body") or "")
+    if actor == "NTinkicht":
+        # Owner-triggered legacy review cannot claim auto-dispatch identity.
+        if AUTO_MARKER.search(body):
+            return None
+    elif actor == "github-actions[bot]":
+        if not _trusted_auto_dispatch(
+            comment, dispatch_id=dispatch_id, repo=repo, pr=pr,
+            head=head, base=base,
+        ):
+            return None
+    else:
         return None
     try:
         d_repo, d_pr, d_head, d_base, d_authors = parse_dispatch(str(comment.get("body") or ""))
@@ -181,7 +350,14 @@ def external_mistral_status(
                     continue
                 if str(dispatch.get("created_at")) > str(comment.get("created_at")):
                     continue
-                run = _trusted_run(int(run_id), int(dispatch_id))
+                run = _trusted_run(
+                    int(run_id), int(dispatch_id),
+                    expected_event=(
+                        "repository_dispatch"
+                        if (dispatch.get("user") or {}).get("login") == "github-actions[bot]"
+                        else "issue_comment"
+                    ),
+                )
                 if run is None:
                     continue
                 conclusion = str(run.get("conclusion") or "")

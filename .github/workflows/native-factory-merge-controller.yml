@@ -37,4 +37,7 @@ jobs:
       - name: Reconcile exact-head merge gates from trusted main
         env:
           GH_TOKEN: ${{ github.token }}
+          # Credential is configured separately by the owner, scoped to
+          # OneCompany Actions:read only (no repository write privilege).
+          ONECOMPANY_ACTIONS_READ_TOKEN: ${{ secrets.ONECOMPANY_ACTIONS_READ_TOKEN }}
         run: python scripts/native_factory_merge.py
