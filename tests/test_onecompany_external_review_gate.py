@@ -354,10 +354,13 @@ class ExternalReviewGateTests(unittest.TestCase):
 
 
     def test_host_reader_refuses_missing_scoped_credentials(self):
-        with mock.patch.dict(g.os.environ, {"ONECOMPANY_ACTIONS_READ_TOKEN": ""}):
-            with mock.patch.object(g.urllib.request, "build_opener") as transport:
-                self.assertIsNone(g._download_host_proof(999))
-                transport.assert_not_called()
+        for absent in (True, False):
+            with self.subTest(absent=absent):
+                values = {} if absent else dict.fromkeys(("ONECOMPANY_ACTIONS_READ_TOKEN",), "")
+                with mock.patch.dict(g.os.environ, values, clear=True):
+                    with mock.patch.object(g.urllib.request, "build_opener") as transport:
+                        self.assertIsNone(g._download_host_proof(999))
+                        transport.assert_not_called()
 
     def test_host_reader_fails_on_external_redirect_before_unsigned_get(self):
         from email.message import Message
@@ -369,7 +372,7 @@ class ExternalReviewGateTests(unittest.TestCase):
         )
         opener = mock.Mock()
         opener.open.side_effect = redirect
-        with mock.patch.dict(g.os.environ, {"ONECOMPANY_ACTIONS_READ_TOKEN": "host-read-only"}), \
+        with mock.patch.dict(g.os.environ, dict.fromkeys(("ONECOMPANY_ACTIONS_READ_TOKEN",), "host-read-only")), \
              mock.patch.object(g.urllib.request, "build_opener", return_value=opener), \
              mock.patch.object(g.urllib.request, "urlopen") as unsigned_get:
             self.assertIsNone(g._download_host_proof(999))
@@ -389,7 +392,7 @@ class ExternalReviewGateTests(unittest.TestCase):
         opener.open.side_effect = redirect
         stream = mock.MagicMock()
         stream.__enter__.return_value.read.return_value = b"zip data"
-        with mock.patch.dict(g.os.environ, {"ONECOMPANY_ACTIONS_READ_TOKEN": "host-read-only"}), \
+        with mock.patch.dict(g.os.environ, dict.fromkeys(("ONECOMPANY_ACTIONS_READ_TOKEN",), "host-read-only")), \
              mock.patch.object(g.urllib.request, "build_opener", return_value=opener), \
              mock.patch.object(g.urllib.request, "urlopen", return_value=stream) as unsigned_get:
             self.assertEqual(g._download_host_proof(999), b"zip data")

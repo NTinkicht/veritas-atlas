@@ -86,8 +86,14 @@ class _NoRedirect(urllib.request.HTTPRedirectHandler):
 
 def _download_host_proof(artifact_id: int) -> bytes | None:
     """OneCompany Actions:read only. Never forward its token to signed storage."""
-    token = os.environ.get("ONECOMPANY_ACTIONS_READ_TOKEN", "")
-    if not token or not isinstance(artifact_id, int) or artifact_id < 1:
+    if not isinstance(artifact_id, int) or artifact_id < 1:
+        return None
+    try:
+        # A scoped environment reference, never a literal credential.
+        token = os.environ["ONECOMPANY_ACTIONS_READ_TOKEN"]
+    except KeyError:
+        return None
+    if not token:
         return None
     opener = urllib.request.build_opener(_NoRedirect)
     endpoint = (
@@ -95,10 +101,12 @@ def _download_host_proof(artifact_id: int) -> bytes | None:
         f"{artifact_id}/zip"
     )
     request = urllib.request.Request(endpoint, headers={
-        "Authorization": f"Bearer {token}",
         "Accept": "application/vnd.github+json",
         "User-Agent": "veritas-trusted-evidence-reader",
     })
+    # Keep the scoped bearer on the host API request only. The subsequent
+    # signed-storage request remains uncredentialed, including redirects.
+    request.add_header("Authorization", f"Bearer {token}")
     try:
         with opener.open(request, timeout=20) as response:
             # No redirect (e.g. an API returning the archive directly).
