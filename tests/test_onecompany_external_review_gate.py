@@ -1,4 +1,8 @@
+import io
+import json
+import urllib.error
 import unittest
+import zipfile
 from unittest import mock
 
 import sys
@@ -199,6 +203,202 @@ class ExternalReviewGateTests(unittest.TestCase):
                 repo=self.repo, pr=self.pr, head=self.head, base=self.base,
                 authors={"codex"},
             ))
+
+
+    def _auto_bundle(self, *, mutate=None):
+        dispatcher_run = 9001
+        body = (
+            "@mistral-vibe\nMISTRAL_EXTERNAL_REVIEW_V1\n"
+            f"repo: {self.repo}\npr: {self.pr}\n"
+            f"head_sha: {self.head}\nbase_sha: {self.base}\n"
+            "material_authors: chatgpt\n"
+            f"<!-- ONECOMPANY_L4_AUTO_DISPATCH_V1 run={dispatcher_run} -->\n"
+        )
+        source = {
+            "id": self.dispatch_id,
+            "user": {"login": "github-actions[bot]"},
+            "created_at": "2026-09-27T12:00:00Z",
+            "updated_at": "2026-09-27T12:00:00Z",
+            "issue_url": f"https://api.github.com/repos/{g.HOST_REPO}/issues/{g.HOST_ISSUE}",
+            "body": body,
+        }
+        dispatcher = {
+            "id": dispatcher_run,
+            "name": g.DISPATCH_WORKFLOW_NAME,
+            "path": g.DISPATCH_WORKFLOW,
+            "head_repository": {"full_name": g.HOST_REPO},
+            "head_branch": "main",
+            "event": "schedule",
+            "status": "completed",
+            "conclusion": "success",
+            "created_at": "2026-09-27T11:59:00Z",
+        }
+        artifacts = {"artifacts": [
+            {"id": 999, "name": g.PROOF_ARTIFACT_NAME, "expired": False},
+        ]}
+        proof = {"version": 1, "run_id": dispatcher_run, "sources": [
+            {"comment_id": self.dispatch_id, "body": body, "repo": self.repo,
+             "pr": self.pr, "head": self.head, "base": self.base},
+        ]}
+        event = "repository_dispatch"
+        report = self.report
+        if mutate is not None:
+            source, dispatcher, artifacts, proof, event, report = mutate(
+                source, dispatcher, artifacts, proof, event, report
+            )
+        pack = io.BytesIO()
+        with zipfile.ZipFile(pack, "w") as archive:
+            archive.writestr(g.PROOF_FILE, json.dumps(proof))
+        def fake(route):
+            if route.startswith(f"repos/{g.HOST_REPO}/issues/{g.HOST_ISSUE}/comments"):
+                return [report]
+            if route == f"repos/{g.HOST_REPO}/issues/comments/{self.dispatch_id}":
+                return source
+            if route == f"repos/{g.HOST_REPO}/actions/runs/{dispatcher_run}":
+                return dispatcher
+            if route == f"repos/{g.HOST_REPO}/actions/runs/{dispatcher_run}/artifacts?per_page=100":
+                return artifacts
+            if route == f"repos/{g.HOST_REPO}/actions/runs/{self.run_id}":
+                return dict(self.fake_api(route), event=event)
+            raise AssertionError(route)
+        return fake, pack.getvalue()
+
+    def test_automated_dispatch_requires_exact_signed_source_artifact(self):
+        api, archive = self._auto_bundle()
+        with mock.patch.object(g, "public_json", side_effect=api), \
+             mock.patch.object(g, "_download_host_proof", return_value=archive):
+            self.assertTrue(g.external_mistral_pass(
+                repo=self.repo, pr=self.pr, head=self.head, base=self.base,
+                authors={"chatgpt"},
+            ))
+
+    def test_automated_dispatch_fails_on_forged_artifact_source(self):
+        def tamper(source, run, artifacts, proof, event, report):
+            proof["sources"][0]["head"] = "d" * 40
+            return source, run, artifacts, proof, event, report
+        api, archive = self._auto_bundle(mutate=tamper)
+        with mock.patch.object(g, "public_json", side_effect=api), \
+             mock.patch.object(g, "_download_host_proof", return_value=archive):
+            self.assertFalse(g.external_mistral_pass(
+                repo=self.repo, pr=self.pr, head=self.head, base=self.base,
+                authors={"chatgpt"},
+            ))
+
+    def test_automated_dispatch_fails_on_wrong_dispatcher_identity(self):
+        def tamper(source, run, artifacts, proof, event, report):
+            run["event"] = "pull_request"
+            return source, run, artifacts, proof, event, report
+        api, archive = self._auto_bundle(mutate=tamper)
+        with mock.patch.object(g, "public_json", side_effect=api), \
+             mock.patch.object(g, "_download_host_proof", return_value=archive):
+            self.assertFalse(g.external_mistral_pass(
+                repo=self.repo, pr=self.pr, head=self.head, base=self.base,
+                authors={"chatgpt"},
+            ))
+
+    def test_automated_dispatch_fails_on_review_event_mismatch(self):
+        def tamper(source, run, artifacts, proof, event, report):
+            return source, run, artifacts, proof, "issue_comment", report
+        api, archive = self._auto_bundle(mutate=tamper)
+        with mock.patch.object(g, "public_json", side_effect=api), \
+             mock.patch.object(g, "_download_host_proof", return_value=archive):
+            self.assertFalse(g.external_mistral_pass(
+                repo=self.repo, pr=self.pr, head=self.head, base=self.base,
+                authors={"chatgpt"},
+            ))
+
+    def test_automated_dispatch_rejects_missing_proof_artifact(self):
+        def tamper(source, run, artifacts, proof, event, report):
+            artifacts["artifacts"] = []
+            return source, run, artifacts, proof, event, report
+        api, archive = self._auto_bundle(mutate=tamper)
+        with mock.patch.object(g, "public_json", side_effect=api), \
+             mock.patch.object(g, "_download_host_proof", return_value=archive):
+            self.assertFalse(g.external_mistral_pass(
+                repo=self.repo, pr=self.pr, head=self.head, base=self.base,
+                authors={"chatgpt"},
+            ))
+
+    def test_automated_dispatch_rejects_modified_source_comment(self):
+        def tamper(source, run, artifacts, proof, event, report):
+            source["updated_at"] = "2026-09-27T12:01:00Z"
+            return source, run, artifacts, proof, event, report
+        api, archive = self._auto_bundle(mutate=tamper)
+        with mock.patch.object(g, "public_json", side_effect=api), \
+             mock.patch.object(g, "_download_host_proof", return_value=archive):
+            self.assertFalse(g.external_mistral_pass(
+                repo=self.repo, pr=self.pr, head=self.head, base=self.base,
+                authors={"chatgpt"},
+            ))
+
+    def test_automated_dispatch_rejects_wrong_publisher(self):
+        def tamper(source, run, artifacts, proof, event, report):
+            source["user"] = {"login": "untrusted-agent"}
+            return source, run, artifacts, proof, event, report
+        api, archive = self._auto_bundle(mutate=tamper)
+        with mock.patch.object(g, "public_json", side_effect=api), \
+             mock.patch.object(g, "_download_host_proof", return_value=archive):
+            self.assertFalse(g.external_mistral_pass(
+                repo=self.repo, pr=self.pr, head=self.head, base=self.base,
+                authors={"chatgpt"},
+            ))
+
+    def test_automated_dispatch_rejects_modified_proof_zip(self):
+        api, archive = self._auto_bundle()
+        with mock.patch.object(g, "public_json", side_effect=api), \
+             mock.patch.object(g, "_download_host_proof", return_value=b"not a zip"):
+            self.assertFalse(g.external_mistral_pass(
+                repo=self.repo, pr=self.pr, head=self.head, base=self.base,
+                authors={"chatgpt"},
+            ))
+
+
+    def test_host_reader_refuses_missing_scoped_credentials(self):
+        for absent in (True, False):
+            with self.subTest(absent=absent):
+                values = {} if absent else dict.fromkeys(("ONECOMPANY_ACTIONS_READ_TOKEN",), "")
+                with mock.patch.dict(g.os.environ, values, clear=True):
+                    with mock.patch.object(g.urllib.request, "build_opener") as transport:
+                        self.assertIsNone(g._download_host_proof(999))
+                        transport.assert_not_called()
+
+    def test_host_reader_fails_on_external_redirect_before_unsigned_get(self):
+        from email.message import Message
+        headers = Message()
+        headers["Location"] = "https://evil.example.test/steal"
+        redirect = urllib.error.HTTPError(
+            "https://api.github.com/repos/NTinkicht/OneCompany/actions/artifacts/999/zip",
+            302, "Found", headers, None,
+        )
+        opener = mock.Mock()
+        opener.open.side_effect = redirect
+        with mock.patch.dict(g.os.environ, dict.fromkeys(("ONECOMPANY_ACTIONS_READ_TOKEN",), "host-read-only")), \
+             mock.patch.object(g.urllib.request, "build_opener", return_value=opener), \
+             mock.patch.object(g.urllib.request, "urlopen") as unsigned_get:
+            self.assertIsNone(g._download_host_proof(999))
+            unsigned_get.assert_not_called()
+        sent = opener.open.call_args.args[0]
+        self.assertEqual(sent.get_header("Authorization"), "Bearer host-read-only")
+
+    def test_host_token_is_removed_on_allowlisted_artifact_redirect(self):
+        from email.message import Message
+        headers = Message()
+        headers["Location"] = "https://mybucket.blob.core.windows.net/signed-object?sig=test"
+        redirect = urllib.error.HTTPError(
+            "https://api.github.com/repos/NTinkicht/OneCompany/actions/artifacts/999/zip",
+            302, "Found", headers, None,
+        )
+        opener = mock.Mock()
+        opener.open.side_effect = redirect
+        stream = mock.MagicMock()
+        stream.__enter__.return_value.read.return_value = b"zip data"
+        with mock.patch.dict(g.os.environ, dict.fromkeys(("ONECOMPANY_ACTIONS_READ_TOKEN",), "host-read-only")), \
+             mock.patch.object(g.urllib.request, "build_opener", return_value=opener), \
+             mock.patch.object(g.urllib.request, "urlopen", return_value=stream) as unsigned_get:
+            self.assertEqual(g._download_host_proof(999), b"zip data")
+            request = unsigned_get.call_args.args[0]
+            self.assertIsNone(request.get_header("Authorization"))
+            self.assertEqual(request.full_url, headers["Location"])
 
 
 if __name__ == "__main__":
