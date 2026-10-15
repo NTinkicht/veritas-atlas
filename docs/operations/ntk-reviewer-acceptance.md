@@ -11,3 +11,5 @@ effect.
   it with no human approval click once required CI and that review are in place.
 
 Reviewer: `.github/ntk-reviewer/review.py` in NTinkicht/OneCompany.
+- **H-3:** a new push after an approval must dismiss that approval (stale-review
+  dismissal), and the reviewer must approve the new exact head before merge.
