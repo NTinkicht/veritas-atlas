@@ -184,6 +184,21 @@ RENDER_SERVICE_NAMES = {
 RENDER_REPO_URL = "https://github.com/" + REPO
 
 
+def unwrap_render_record(entry: Any, key: str) -> Any:
+    """Accept Render list-endpoint records in their documented envelope.
+
+    List services returns ``{"service": {...}, "cursor": ...}`` and list deploys
+    returns ``{"deploy": {...}, "cursor": ...}``. A bare record is accepted too.
+    An envelope with any other field, or a non-object payload, is not unwrapped,
+    so it fails the caller's own identity checks (fail closed).
+    """
+    if isinstance(entry, dict) and key in entry:
+        if set(entry) <= {key, "cursor"} and isinstance(entry[key], dict):
+            return entry[key]
+        return None
+    return entry
+
+
 def inspect_render_readback(
     service_records: Any,
     deployments_by_service_id: Any,
@@ -205,6 +220,7 @@ def inspect_render_readback(
     ) or set(deployments_by_service_id) != set(SERVICES.values()):
         raise ValueError("RENDER_READBACK_INVENTORY_INVALID")
 
+    service_records = [unwrap_render_record(e, "service") for e in service_records]
     evidence = {}
     seen_latest_deployment_ids: set[str] = set()
     for kind, service_id in SERVICES.items():
@@ -249,6 +265,7 @@ def inspect_render_readback(
         candidates = deployments_by_service_id[service_id]
         if not isinstance(candidates, list) or not candidates:
             raise ValueError("RENDER_DEPLOYMENT_READBACK_INVALID")
+        candidates = [unwrap_render_record(e, "deploy") for e in candidates]
         # Render lists deployments newest first. Refuse ambiguous ordering.
         dates = []
         for entry in candidates:

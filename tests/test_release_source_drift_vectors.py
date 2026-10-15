@@ -408,6 +408,52 @@ class DriftEvidenceTests(unittest.TestCase):
                     observed_at="2026-10-10T23:59:00Z", now=NOW,
                 )
 
+    def test_render_readback_accepts_documented_list_envelopes(self):
+        services, deployments = render_readback()
+        wrapped_services = [{"service": s, "cursor": f"c{i}"} for i, s in enumerate(services)]
+        wrapped_deploys = {
+            sid: [{"deploy": d, "cursor": "x"} for d in entries]
+            for sid, entries in deployments.items()
+        }
+        flat = inspect_render_readback(
+            services, deployments, main_commit=NEW,
+            observed_at="2026-10-10T23:59:00Z", now=NOW,
+        )
+        for svc, dep in ((wrapped_services, deployments), (services, wrapped_deploys),
+                         (wrapped_services, wrapped_deploys)):
+            with self.subTest(services_wrapped=svc is wrapped_services,
+                              deploys_wrapped=dep is wrapped_deploys):
+                report = inspect_render_readback(
+                    svc, dep, main_commit=NEW,
+                    observed_at="2026-10-10T23:59:00Z", now=NOW,
+                )
+                self.assertEqual(report, flat)
+                self.assertFalse(report["release_authorized"])
+
+    def test_render_readback_rejects_malformed_list_envelopes(self):
+        services, deployments = render_readback()
+        bad_service_envelopes = (
+            {"service": services[0], "cursor": "c", "extra": 1},
+            {"service": "not-an-object", "cursor": "c"},
+            {"service": None},
+        )
+        for bad in bad_service_envelopes:
+            with self.subTest(service_envelope=bad), self.assertRaises(ValueError):
+                inspect_render_readback(
+                    [bad, services[1]], deployments, main_commit=NEW,
+                    observed_at="2026-10-10T23:59:00Z", now=NOW,
+                )
+        sid = SERVICES["api"]
+        for bad in ({"deploy": deployments[sid][0], "cursor": "c", "extra": 1},
+                    {"deploy": []}):
+            broken = dict(deployments)
+            broken[sid] = [bad]
+            with self.subTest(deploy_envelope=bad), self.assertRaises(ValueError):
+                inspect_render_readback(
+                    services, broken, main_commit=NEW,
+                    observed_at="2026-10-10T23:59:00Z", now=NOW,
+                )
+
     def test_render_readback_matching_source_is_still_not_release_permission(self):
         services, deployments = render_readback(deployed=NEW)
         result = inspect_render_readback(
