@@ -1,6 +1,6 @@
 # ntk-reviewer acceptance record (Veritas Atlas)
 
-This file exists to run acceptance tests H-1 and H-2 for the simplified review
+This file exists to run acceptance tests H-1, H-2 and H-3 for the simplified review
 architecture: a documentation-only change, with no code, workflow or deployment
 effect.
 
