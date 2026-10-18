@@ -25,6 +25,6 @@ _No independently admitted, dependency-ready implementation work unit at this ch
 - **#45 WU-L5-FRESHNESS** - source-freshness contract present on main.
 - **#50 WU-L5-PROVENANCE-VECTORS** - vector artifact and `tests/test_evidence_provenance_vectors.py` present on main.
 - **#52 WU-L5-CITATION-VECTORS** - citation vectors and `tests/test_citation_integrity_vectors.py` present on main.
-- **#57 WU-L5-FRESHNESS-VECTORS** - executable versioned freshness vectors and deterministic tests delivered through independently reviewed and merged PR #59; issue #57 is closed.
+- **#57 WU-L5-FRESHNESS-VECTORS** - completed classification vectors via PR #59; the separately added query-time search vectors in this planning PR are not yet an implemented search API.
 
 Snapshot reconciled against GitHub main `3644ee7f21f22b4c928c432b8e784480737b74b2` and issues #10, #12 and #57 on 2026-10-10. No staging release or production migration is authorized by this queue file.
