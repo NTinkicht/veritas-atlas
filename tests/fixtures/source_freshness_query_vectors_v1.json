@@ -1,0 +1,185 @@
+{
+  "schema_version": "source-freshness-query-v1",
+  "contract": "docs/architecture/SOURCE_FRESHNESS_CONTRACT.md",
+  "source_classification_fixture": "tests/fixtures/source_freshness_vectors_v1.json",
+  "note": "New additive deterministic query projection acceptance vectors; does not reclassify closed WU-L5-FRESHNESS-VECTORS #57 as an implemented search API. API/UI integration must be separately verified under VER-P0-09 and P0-17.",
+  "records": [
+    {
+      "id": "edge",
+      "retrieved_at": "2026-10-01T00:00:00Z",
+      "indexed_state": "CURRENT",
+      "category": "court",
+      "policy": "P1"
+    },
+    {
+      "id": "later",
+      "retrieved_at": "2026-10-01T01:00:00Z",
+      "indexed_state": "CURRENT",
+      "category": "court",
+      "policy": "P1"
+    },
+    {
+      "id": "recent",
+      "retrieved_at": "2026-10-02T00:00:00Z",
+      "indexed_state": "CURRENT",
+      "category": "registry",
+      "policy": "P1"
+    }
+  ],
+  "cases": [
+    {
+      "id": "current-max-inclusive",
+      "evaluated_at": "2026-10-02T00:00:00Z",
+      "freshness_filter": "CURRENT",
+      "expected_ids": [
+        "edge",
+        "later",
+        "recent"
+      ],
+      "expected_total": 3,
+      "expected_facets": {
+        "court": 2,
+        "registry": 1
+      }
+    },
+    {
+      "id": "current-next-second",
+      "evaluated_at": "2026-10-02T00:00:01Z",
+      "freshness_filter": "CURRENT",
+      "cache_previous_ids": [
+        "edge",
+        "later",
+        "recent"
+      ],
+      "expected_ids": [
+        "later",
+        "recent"
+      ],
+      "expected_total": 2,
+      "expected_facets": {
+        "court": 1,
+        "registry": 1
+      }
+    },
+    {
+      "id": "fresh-page-before-expiry",
+      "evaluated_at": "2026-10-02T00:00:00Z",
+      "freshness_filter": "CURRENT",
+      "page_size": 1,
+      "page_index": 0,
+      "expected_ids": [
+        "edge"
+      ],
+      "expected_total": 3,
+      "expected_facets": {
+        "court": 2,
+        "registry": 1
+      }
+    },
+    {
+      "id": "next-page-after-boundary-must-refilter",
+      "evaluated_at": "2026-10-02T00:00:01Z",
+      "freshness_filter": "CURRENT",
+      "page_size": 1,
+      "page_index": 0,
+      "cursor_from_previous_timestamp": "2026-10-02T00:00:00Z",
+      "expected_ids": [
+        "later"
+      ],
+      "expected_total": 2,
+      "expected_facets": {
+        "court": 1,
+        "registry": 1
+      }
+    },
+    {
+      "id": "second-page-after-boundary",
+      "evaluated_at": "2026-10-02T00:00:01Z",
+      "freshness_filter": "CURRENT",
+      "page_size": 1,
+      "page_index": 1,
+      "cursor_from_previous_timestamp": "2026-10-02T00:00:00Z",
+      "expected_ids": [
+        "recent"
+      ],
+      "expected_total": 2,
+      "expected_facets": {
+        "court": 1,
+        "registry": 1
+      }
+    },
+    {
+      "id": "revision-proof-missing",
+      "evaluated_at": "2026-10-02T00:00:01Z",
+      "freshness_filter": "CURRENT",
+      "revision_unverified_ids": [
+        "later"
+      ],
+      "expected_ids": [
+        "recent"
+      ],
+      "expected_total": 1,
+      "expected_facets": {
+        "registry": 1
+      }
+    },
+    {
+      "id": "positively-superseded",
+      "evaluated_at": "2026-10-02T00:00:01Z",
+      "freshness_filter": "CURRENT",
+      "superseded_ids": [
+        "recent"
+      ],
+      "expected_ids": [
+        "later"
+      ],
+      "expected_total": 1,
+      "expected_facets": {
+        "court": 1
+      }
+    },
+    {
+      "id": "policy-version-changed",
+      "evaluated_at": "2026-10-02T00:00:01Z",
+      "freshness_filter": "CURRENT",
+      "policy_version_override": "unverified-new-policy",
+      "expected_ids": [],
+      "expected_total": 0,
+      "expected_facets": {}
+    },
+    {
+      "id": "broad-search-honest-freshness-badges",
+      "evaluated_at": "2026-10-02T00:00:01Z",
+      "freshness_filter": null,
+      "expected_ids": [
+        "edge",
+        "later",
+        "recent"
+      ],
+      "expected_total": 3,
+      "expected_facets": {
+        "court": 2,
+        "registry": 1
+      },
+      "expected_states": {
+        "edge": "STALE",
+        "later": "CURRENT",
+        "recent": "CURRENT"
+      }
+    },
+    {
+      "id": "stale-cache-cannot-override-policy",
+      "evaluated_at": "2026-10-02T00:00:01Z",
+      "freshness_filter": "CURRENT",
+      "cache_previous_ids": [
+        "edge",
+        "later",
+        "recent"
+      ],
+      "policy_version_override": "unsupported",
+      "expected_ids": [],
+      "expected_total": 0,
+      "expected_facets": {}
+    }
+  ]
+}
