@@ -23,15 +23,10 @@ public sealed class JwtTokenService
         var secret = RuntimeSecurity.ResolveJwtSecret(
             _configuration,
             _environment.EnvironmentName);
-        var issuer = _configuration["Auth:Jwt:Issuer"] ?? "VeritasAtlas";
-        var audience = _configuration["Auth:Jwt:Audience"] ?? "VeritasAtlasUsers";
-        var expiresMinutes = int.TryParse(
-            _configuration["Auth:Jwt:ExpiresMinutes"],
-            out var parsedMinutes)
-            ? parsedMinutes
-            : 480;
-
-        var expiresAtUtc = DateTime.UtcNow.AddMinutes(expiresMinutes);
+        var issuer = RuntimeSecurity.ResolveJwtIssuer(_configuration);
+        var audience = RuntimeSecurity.ResolveJwtAudience(_configuration);
+        var expiresAtUtc = DateTime.UtcNow.Add(
+            RuntimeSecurity.ResolveJwtLifetime(_configuration));
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secret));
         var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
 
