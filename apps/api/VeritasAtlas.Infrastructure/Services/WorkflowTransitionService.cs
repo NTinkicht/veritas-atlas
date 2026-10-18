@@ -81,7 +81,7 @@ public class WorkflowTransitionService
     public async Task<(Guid Id, string Status)> PreparePublicationAsync(Guid caseId, CancellationToken ct)
     {
         var c = await GetCase(caseId, ct);
-        c.Status = CaseStatus.InReview;
+        c.Status = WorkflowIntegrityService.StatusAfterPreparePublication(c.Status);
         await _db.SaveChangesAsync(ct);
         await UpdateCaseSnapshotAsync(c.Id, c.Status.ToString(), ct);
         return (c.Id, c.Status.ToString());

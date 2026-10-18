@@ -1,4 +1,5 @@
 using Microsoft.VisualStudio.TestTools.UnitTesting;
+using VeritasAtlas.Domain.Enums;
 using VeritasAtlas.Infrastructure.Services;
 
 namespace VeritasAtlas.Api.Tests;
@@ -47,9 +48,9 @@ public sealed class WorkflowRoleNegativeVectorsTests
     // Statuses that must never publish: no review has started or it was rejected.
     private static readonly string[] UnreviewedPublicationSources = { "Open", "Draft", "Rejected" };
 
-    // InReview -> Published and OnHold -> Published are currently allowed by the
-    // policy without an approval step. That is deliberately NOT asserted either way
-    // here: it is a publication-authorization decision for the owner (see PR #70).
+    // Statuses where review is pending or suspended without a recorded approval:
+    // publishing from them would skip ApproveCase (owner decision on PR #70).
+    private static readonly string[] UnapprovedReviewSources = { "InReview", "OnHold" };
 
     private readonly WorkflowIntegrityService _policy = new();
 
@@ -174,12 +175,83 @@ public sealed class WorkflowRoleNegativeVectorsTests
             _policy.EnsureTransitionAllowed("Case", source, "Published");
         }
 
-        foreach (var source in UnreviewedPublicationSources)
+        foreach (var source in UnreviewedPublicationSources.Concat(UnapprovedReviewSources))
         {
             Assert.ThrowsExactly<InvalidOperationException>(
                 () => _policy.EnsureTransitionAllowed("Case", source, "Published"),
                 $"Case must not publish from '{source}'.");
         }
+    }
+
+    [TestMethod]
+    public void PublicationCannotSkipApprovalFromReviewOrHold()
+    {
+        Assert.ThrowsExactly<InvalidOperationException>(() =>
+            _policy.EnsureTransitionAllowed("Case", "InReview", "Published"));
+        Assert.ThrowsExactly<InvalidOperationException>(() =>
+            _policy.EnsureTransitionAllowed("Case", "OnHold", "Published"));
+        Assert.ThrowsExactly<InvalidOperationException>(() =>
+            _policy.EnsureTransitionAllowed("Case", " inreview ", "published"));
+    }
+
+    [TestMethod]
+    public void PreparePublicationKeepsApprovalAndNeverGrantsIt()
+    {
+        Assert.AreEqual(
+            CaseStatus.Approved,
+            WorkflowIntegrityService.StatusAfterPreparePublication(CaseStatus.Approved));
+
+        foreach (var source in Enum.GetValues<CaseStatus>().Where(status => status != CaseStatus.Approved))
+        {
+            var prepared = WorkflowIntegrityService.StatusAfterPreparePublication(source);
+            Assert.AreEqual(CaseStatus.InReview, prepared, $"Preparing from '{source}' must not grant approval.");
+            Assert.ThrowsExactly<InvalidOperationException>(
+                () => _policy.EnsureTransitionAllowed("Case", prepared.ToString(), "Published"),
+                $"A case prepared from '{source}' must not publish.");
+        }
+
+        // Approve -> prepare -> publish remains possible.
+        var approvedPrepared = WorkflowIntegrityService.StatusAfterPreparePublication(CaseStatus.Approved);
+        _policy.EnsureTransitionAllowed("Case", approvedPrepared.ToString(), "Published");
+    }
+
+    [TestMethod]
+    [DataRow("")]
+    [DataRow("   ")]
+    [DataRow("DeleteCase")]
+    [DataRow("PublishCaseAsAdmin")]
+    [DataRow("Publish Case")]
+    public void UnknownActionsFailClosedForEveryRole(string action)
+    {
+        foreach (var role in AllRoles)
+        {
+            Assert.ThrowsExactly<UnauthorizedAccessException>(
+                () => _policy.EnsureRoleAllowed(action, role),
+                $"Unknown action '{action}' must fail closed for '{role}'.");
+        }
+    }
+
+    [TestMethod]
+    [DataRow("")]
+    [DataRow("   ")]
+    [DataRow("Publication")]
+    [DataRow("Cases")]
+    [DataRow("Evidence")]
+    public void UnknownEntityTypesFailClosed(string entityType)
+    {
+        Assert.ThrowsExactly<InvalidOperationException>(() =>
+            _policy.EnsureTransitionAllowed(entityType, "Approved", "Published"));
+        Assert.ThrowsExactly<InvalidOperationException>(() =>
+            _policy.EnsureTransitionAllowed(entityType, null, "InReview"));
+    }
+
+    [TestMethod]
+    public void EveryGovernedEntityTypeIsKnown()
+    {
+        CollectionAssert.AreEquivalent(
+            new[] { "Case", "Claim", "Contradiction", "Review" },
+            _policy.GetRules().Keys.ToArray(),
+            "Governed entity types changed; update the transition vectors deliberately.");
     }
 
     [TestMethod]
