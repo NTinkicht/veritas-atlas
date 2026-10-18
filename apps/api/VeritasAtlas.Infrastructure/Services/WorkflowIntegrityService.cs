@@ -1,3 +1,5 @@
+using VeritasAtlas.Domain.Enums;
+
 namespace VeritasAtlas.Infrastructure.Services;
 
 public sealed class WorkflowIntegrityService
@@ -9,11 +11,13 @@ public sealed class WorkflowIntegrityService
             {
                 ["Open"] = new[] { "InReview" },
                 ["Draft"] = new[] { "InReview" },
-                ["InReview"] = new[] { "Approved", "Rejected", "ReadyForPublication", "Published", "OnHold" },
+                // Publication requires a recorded approval: InReview and OnHold
+                // (reachable from InReview) must not publish directly.
+                ["InReview"] = new[] { "Approved", "Rejected", "ReadyForPublication", "OnHold" },
                 ["Approved"] = new[] { "InReview", "ReadyForPublication", "Published", "OnHold" },
                 ["Rejected"] = new[] { "InReview" },
                 ["ReadyForPublication"] = new[] { "Published", "OnHold" },
-                ["OnHold"] = new[] { "ReadyForPublication", "InReview", "Published" },
+                ["OnHold"] = new[] { "ReadyForPublication", "InReview" },
                 ["Published"] = new[] { "Published" }
             },
             ["Claim"] = new(StringComparer.OrdinalIgnoreCase)
@@ -59,9 +63,10 @@ public sealed class WorkflowIntegrityService
     {
         var normalizedRole = string.IsNullOrWhiteSpace(role) ? "anonymous" : role.Trim().ToLowerInvariant();
 
-        if (!RolePolicies.TryGetValue(actionName, out var roles))
+        // Unknown or ungoverned actions fail closed.
+        if (string.IsNullOrWhiteSpace(actionName) || !RolePolicies.TryGetValue(actionName, out var roles))
         {
-            return;
+            throw new UnauthorizedAccessException($"Action '{actionName}' is not governed by a role policy.");
         }
 
         if (!roles.Contains(normalizedRole, StringComparer.OrdinalIgnoreCase))
@@ -74,9 +79,10 @@ public sealed class WorkflowIntegrityService
     {
         var current = string.IsNullOrWhiteSpace(currentStatus) ? "Open" : currentStatus.Trim();
 
-        if (!AllowedTransitions.TryGetValue(entityType, out var map))
+        // Unknown entity types fail closed.
+        if (string.IsNullOrWhiteSpace(entityType) || !AllowedTransitions.TryGetValue(entityType, out var map))
         {
-            return;
+            throw new InvalidOperationException($"No transition rules are defined for entity type '{entityType}'.");
         }
 
         if (!map.TryGetValue(current, out var allowed))
@@ -89,6 +95,14 @@ public sealed class WorkflowIntegrityService
             throw new InvalidOperationException($"{entityType} cannot transition from '{current}' to '{nextStatus}'.");
         }
     }
+
+    /// <summary>
+    /// Status persisted by PreparePublication. There is no persisted
+    /// ReadyForPublication status, so an approved case keeps its approval;
+    /// any other source stays in review and cannot publish.
+    /// </summary>
+    public static CaseStatus StatusAfterPreparePublication(CaseStatus current)
+        => current == CaseStatus.Approved ? CaseStatus.Approved : CaseStatus.InReview;
 
     public IReadOnlyDictionary<string, IReadOnlyDictionary<string, string[]>> GetRules()
     {
