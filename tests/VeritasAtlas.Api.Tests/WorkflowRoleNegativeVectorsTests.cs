@@ -38,12 +38,18 @@ public sealed class WorkflowRoleNegativeVectorsTests
         "Open", "Draft", "InReview", "Approved", "Rejected", "ReadyForPublication", "OnHold", "Published",
     };
 
-    // Statuses from which a case may become Published: each one is reachable only
-    // after the case has entered review. Unreviewed or rejected cases are excluded.
-    private static readonly string[] ReviewedPublicationSources =
+    // Statuses that may publish: each one implies an approval decision.
+    private static readonly string[] ApprovedPublicationSources =
     {
-        "InReview", "Approved", "ReadyForPublication", "OnHold", "Published",
+        "Approved", "ReadyForPublication", "Published",
     };
+
+    // Statuses that must never publish: no review has started or it was rejected.
+    private static readonly string[] UnreviewedPublicationSources = { "Open", "Draft", "Rejected" };
+
+    // InReview -> Published and OnHold -> Published are currently allowed by the
+    // policy without an approval step. That is deliberately NOT asserted either way
+    // here: it is a publication-authorization decision for the owner (see PR #70).
 
     private readonly WorkflowIntegrityService _policy = new();
 
@@ -161,27 +167,25 @@ public sealed class WorkflowRoleNegativeVectorsTests
     }
 
     [TestMethod]
-    public void PublishedIsReachableOnlyFromReviewedStatuses()
+    public void ApprovedStatusesCanPublishAndUnreviewedStatusesCannot()
     {
-        foreach (var source in CaseStatuses)
+        foreach (var source in ApprovedPublicationSources)
         {
-            if (ReviewedPublicationSources.Contains(source))
-            {
-                _policy.EnsureTransitionAllowed("Case", source, "Published");
-            }
-            else
-            {
-                Assert.ThrowsExactly<InvalidOperationException>(
-                    () => _policy.EnsureTransitionAllowed("Case", source, "Published"),
-                    $"Case must not publish from '{source}'.");
-            }
+            _policy.EnsureTransitionAllowed("Case", source, "Published");
+        }
+
+        foreach (var source in UnreviewedPublicationSources)
+        {
+            Assert.ThrowsExactly<InvalidOperationException>(
+                () => _policy.EnsureTransitionAllowed("Case", source, "Published"),
+                $"Case must not publish from '{source}'.");
         }
     }
 
     [TestMethod]
     public void UnreviewedCasesCanOnlyEnterReview()
     {
-        foreach (var source in new[] { "Open", "Draft", "Rejected" })
+        foreach (var source in UnreviewedPublicationSources)
         {
             foreach (var target in CaseStatuses)
             {
