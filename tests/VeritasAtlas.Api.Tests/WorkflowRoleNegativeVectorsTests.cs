@@ -44,5 +44,7 @@ public sealed class WorkflowRoleNegativeVectorsTests
             _policy.EnsureTransitionAllowed("Case", "Open", "Published"));
         Assert.ThrowsExactly<InvalidOperationException>(() =>
             _policy.EnsureTransitionAllowed("Case", "Draft", "Published"));
+        Assert.ThrowsExactly<InvalidOperationException>(() =>
+            _policy.EnsureTransitionAllowed("Case", "Rejected", "Published"));
     }
 }
