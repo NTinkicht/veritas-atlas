@@ -46,9 +46,11 @@ public class AuthController : ControllerBase
             return InvalidCredentials();
         }
 
+        // Reserve the attempt atomically before any credential check, so
+        // concurrent requests for one account cannot exceed the threshold.
         // Locked accounts are refused even with the right password; unknown
         // usernames lock identically, so this is not an enumeration oracle.
-        if (_attemptGuard.IsLockedOut(request.Username))
+        if (!_attemptGuard.TryReserveAttempt(request.Username))
         {
             return StatusCode(StatusCodes.Status429TooManyRequests, new AuthErrorResponse(
                 "login_temporarily_locked",
@@ -62,7 +64,7 @@ public class AuthController : ControllerBase
             : _bootstrapAuthenticator.Validate(request.Username, request.Password);
         if (user is null)
         {
-            _attemptGuard.RecordFailure(request.Username);
+            // The reserved attempt already counts as this failure.
             return InvalidCredentials();
         }
 

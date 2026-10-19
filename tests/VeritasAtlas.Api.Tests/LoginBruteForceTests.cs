@@ -102,10 +102,70 @@ public sealed class LoginBruteForceTests
     {
         var clock = new ManualClock();
         var guard = new LoginAttemptGuard(clock);
-        for (var i = 0; i < LoginAttemptGuard.MaxFailures - 1; i++) guard.RecordFailure("x");
+        for (var i = 0; i < LoginAttemptGuard.MaxFailures - 1; i++) guard.TryReserveAttempt("x");
         clock.Advance(LoginAttemptGuard.FailureWindow);
-        guard.RecordFailure("x");
+        Assert.IsTrue(guard.TryReserveAttempt("x"));
         Assert.IsFalse(guard.IsLockedOut("x"), "old failures start a fresh window");
+    }
+
+    [TestMethod]
+    public void ConcurrentAttemptsForOneAccountCannotExceedThreshold()
+    {
+        var (controller, _) = Controller();
+        const int requests = 64;
+        var statuses = new int[requests];
+        using var start = new ManualResetEventSlim();
+        var workers = Enumerable.Range(0, requests).Select(i => Task.Run(() =>
+        {
+            start.Wait();
+            statuses[i] = StatusOf(controller.Login(new("operator1", "wrong-" + i)));
+        })).ToArray();
+        start.Set();
+        Task.WaitAll(workers);
+
+        Assert.AreEqual(LoginAttemptGuard.MaxFailures,
+            statuses.Count(x => x == StatusCodes.Status401Unauthorized),
+            "only MaxFailures credential checks may run in one window");
+        Assert.AreEqual(requests - LoginAttemptGuard.MaxFailures,
+            statuses.Count(x => x == StatusCodes.Status429TooManyRequests));
+        AssertStatus(HttpStatusCode.TooManyRequests, controller.Login(new("operator1", "password123")));
+    }
+
+    [TestMethod]
+    public void RotatingUnknownUsernamesCannotGrowMemoryBeyondCap()
+    {
+        var clock = new ManualClock();
+        var guard = new LoginAttemptGuard(clock, maxTrackedAccounts: 100);
+        for (var i = 0; i < 1_000; i++)
+        {
+            Assert.IsTrue(guard.TryReserveAttempt("spray-" + i));
+            Assert.IsTrue(guard.TrackedAccountCount <= 100);
+        }
+        Assert.AreEqual(100, guard.TrackedAccountCount);
+    }
+
+    [TestMethod]
+    public void ExpiredRecordsAreSweptBeforeLiveOnesAreEvicted()
+    {
+        var clock = new ManualClock();
+        var guard = new LoginAttemptGuard(clock, maxTrackedAccounts: 10);
+        for (var i = 0; i < LoginAttemptGuard.MaxFailures; i++) guard.TryReserveAttempt("victim");
+        clock.Advance(TimeSpan.FromMinutes(10));
+        for (var i = 0; i < 8; i++) guard.TryReserveAttempt("live-" + i);
+        guard.TryReserveAttempt("fresh-0");
+        Assert.AreEqual(10, guard.TrackedAccountCount, "table is full");
+        Assert.IsTrue(guard.IsLockedOut("victim"));
+        clock.Advance(TimeSpan.FromMinutes(6));
+        // victim's window is over, live-* still have 9 minutes: the full table
+        // sweeps the expired record instead of evicting a live one.
+        guard.TryReserveAttempt("fresh-1");
+        Assert.AreEqual(10, guard.TrackedAccountCount);
+        Assert.IsFalse(guard.IsLockedOut("victim"));
+        for (var i = 0; i < LoginAttemptGuard.MaxFailures - 1; i++)
+        {
+            Assert.IsTrue(guard.TryReserveAttempt("live-0"));
+        }
+        Assert.IsFalse(guard.TryReserveAttempt("live-0"), "live record kept its earlier attempt");
     }
 
     [TestMethod]
@@ -235,11 +295,14 @@ public sealed class LoginBruteForceTests
         return (controller, clock);
     }
 
-    private static void AssertStatus(HttpStatusCode expected, ActionResult<LoginResponse> result)
-    {
-        var actual = result.Result is IStatusCodeActionResult status
+    private static int StatusOf(ActionResult<LoginResponse> result) =>
+        result.Result is IStatusCodeActionResult status
             ? status.StatusCode ?? StatusCodes.Status200OK
             : StatusCodes.Status200OK;
+
+    private static void AssertStatus(HttpStatusCode expected, ActionResult<LoginResponse> result)
+    {
+        var actual = StatusOf(result);
         Assert.AreEqual((int)expected, actual);
         if (expected == HttpStatusCode.OK)
         {
