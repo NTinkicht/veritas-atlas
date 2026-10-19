@@ -1,8 +1,6 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using VeritasAtlas.Api.Infrastructure.Health;
-using Microsoft.IdentityModel.Tokens;
-using System.Text;
 using Microsoft.AspNetCore.RateLimiting;
 using VeritasAtlas.Api.Infrastructure.Auth;
 using VeritasAtlas.Infrastructure.Extensions;
@@ -55,19 +53,12 @@ builder.Services.AddVeritasAtlasInfrastructure(builder.Configuration);
 ProductionBootstrapAuthenticator.ValidateConfiguration(
     builder.Configuration, builder.Environment.EnvironmentName);
 
-var jwtSecret = RuntimeSecurity.ResolveJwtSecret(
+// Resolve (and fail closed on) JWT secret, lifetime and validation settings
+// at startup rather than at the first login.
+var tokenValidationParameters = RuntimeSecurity.CreateTokenValidationParameters(
     builder.Configuration,
     builder.Environment.EnvironmentName);
-
-var jwtIssuer =
-    builder.Configuration["Auth:Jwt:Issuer"]
-    ?? "VeritasAtlas";
-
-var jwtAudience =
-    builder.Configuration["Auth:Jwt:Audience"]
-    ?? "VeritasAtlasUsers";
-
-var signingKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecret));
+_ = RuntimeSecurity.ResolveJwtLifetime(builder.Configuration);
 
 builder.Services
     .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
@@ -77,17 +68,7 @@ builder.Services
         options.SaveToken = true;
         options.MapInboundClaims = true;
 
-        options.TokenValidationParameters = new TokenValidationParameters
-        {
-            ValidateIssuer = true,
-            ValidIssuer = jwtIssuer,
-            ValidateAudience = true,
-            ValidAudience = jwtAudience,
-            ValidateIssuerSigningKey = true,
-            IssuerSigningKey = signingKey,
-            ValidateLifetime = true,
-            ClockSkew = TimeSpan.Zero
-        };
+        options.TokenValidationParameters = tokenValidationParameters;
     });
 
 builder.Services.AddAuthorization();
