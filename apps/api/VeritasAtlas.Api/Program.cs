@@ -21,16 +21,13 @@ builder.Services.AddHealthChecks()
 
 builder.Services.AddSingleton<DevUserStore>();
 builder.Services.AddSingleton<ProductionBootstrapAuthenticator>();
+builder.Services.AddSingleton(TimeProvider.System);
+builder.Services.AddSingleton<LoginAttemptGuard>();
 builder.Services.AddRateLimiter(options =>
 {
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
-    options.AddFixedWindowLimiter("auth-login", limiter =>
-    {
-        limiter.PermitLimit = 6;
-        limiter.Window = TimeSpan.FromMinutes(1);
-        limiter.QueueLimit = 0;
-        limiter.AutoReplenishment = true;
-    });
+    // Per-client window: one client cannot lock every user out of login.
+    options.AddPolicy(LoginRateLimiting.PolicyName, LoginRateLimiting.Partition);
 });
 builder.Services.AddSingleton<JwtTokenService>();
 builder.Services.AddScoped<AuthRequestContext>();
