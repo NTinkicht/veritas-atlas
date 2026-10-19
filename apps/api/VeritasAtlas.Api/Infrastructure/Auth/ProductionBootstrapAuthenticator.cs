@@ -32,7 +32,7 @@ public sealed class ProductionBootstrapAuthenticator
                 "Non-development staging requires an Auth:Bootstrap:Username " +
                 "and a unique Auth:Bootstrap:Password of at least 20 characters.");
         }
-        if (string.Equals(username, "admin1", StringComparison.OrdinalIgnoreCase)
+        if (DevUserStore.IsFixtureUsername(username)
             || string.Equals(password, "password123", StringComparison.Ordinal))
         {
             throw new InvalidOperationException(
@@ -43,6 +43,7 @@ public sealed class ProductionBootstrapAuthenticator
     public DevUserRecord? Validate(string username, string password)
     {
         if (string.IsNullOrEmpty(_username) || string.IsNullOrEmpty(_password)) return null;
+        if (username is null || password is null) return null;
         var supplied = SHA256.HashData(Encoding.UTF8.GetBytes(password));
         var expected = SHA256.HashData(Encoding.UTF8.GetBytes(_password));
         var samePassword = CryptographicOperations.FixedTimeEquals(supplied, expected);

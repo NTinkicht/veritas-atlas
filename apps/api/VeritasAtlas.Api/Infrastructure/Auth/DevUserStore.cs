@@ -10,6 +10,13 @@ public sealed class DevUserStore
         new("admin1", "password123", "admin")
     };
 
+    /// <summary>True for any development fixture identity, which must never
+    /// be usable outside Development.</summary>
+    public static bool IsFixtureUsername(string? username) =>
+        username is not null
+        && Users.Any(x => string.Equals(
+            x.Username, username.Trim(), StringComparison.OrdinalIgnoreCase));
+
     public DevUserRecord? Validate(string username, string password)
     {
         return Users.FirstOrDefault(x =>
