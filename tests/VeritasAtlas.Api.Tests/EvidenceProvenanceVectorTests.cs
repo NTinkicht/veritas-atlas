@@ -151,4 +151,30 @@ public sealed class EvidenceProvenanceVectorTests
         var error = Assert.ThrowsExactly<ProvenanceException>(() => EvidenceProvenance.NormalizeSourceUri(raw));
         Assert.AreEqual(code, error.Code);
     }
+
+    // Every C0 control, DEL and every C1 control (U+0080-U+009F) fails closed
+    // wherever it appears: host, path, query and fragment.
+    [TestMethod]
+    public void RejectsEveryC0DelAndC1ControlCharacterInEveryUriPart()
+    {
+        var controls = Enumerable.Range(0x00, 0x20).Concat(Enumerable.Range(0x7f, 0x21)).ToArray();
+        Assert.AreEqual(65, controls.Length);
+        Assert.IsTrue(controls.Contains(0x80) && controls.Contains(0x85) && controls.Contains(0x9f));
+        foreach (var code in controls)
+        {
+            var c = (char)code;
+            foreach (var raw in new[]
+                     {
+                         $"https://exa{c}mple.com/r",
+                         $"https://example.com/r{c}x",
+                         $"https://example.com/r?q={c}",
+                         $"https://example.com/r#f{c}",
+                     })
+            {
+                var error = Assert.ThrowsExactly<ProvenanceException>(
+                    () => EvidenceProvenance.NormalizeSourceUri(raw), $"U+{code:X4} in {raw.Replace(c, '?')}");
+                Assert.AreEqual("malformed_source_uri", error.Code);
+            }
+        }
+    }
 }
