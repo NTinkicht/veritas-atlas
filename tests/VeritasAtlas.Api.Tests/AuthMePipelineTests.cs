@@ -5,22 +5,20 @@ using System.Security.Claims;
 using System.Text;
 using System.Text.Json;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
-using Microsoft.AspNetCore.TestHost;
-using Microsoft.Extensions.Configuration;
+using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
-using VeritasAtlas.Api.Controllers;
 using VeritasAtlas.Api.Infrastructure.Auth;
 
 namespace VeritasAtlas.Api.Tests;
 
 /// <summary>
-/// VER-P0-02: exercise the real JWT bearer middleware, authorization filter,
-/// and production AuthController.Me action over an in-memory HTTP transport.
-/// Only synthetic tokens are used; no database, external listener or login.
+/// VER-P0-02: exercise the real API entry point (Program.cs), its JWT bearer
+/// middleware, authorization filter and AuthController.Me action over an
+/// in-memory HTTP transport. Only synthetic tokens are used; no database,
+/// external listener or login.
 /// </summary>
 [TestClass]
 public sealed class AuthMePipelineTests
@@ -32,7 +30,7 @@ public sealed class AuthMePipelineTests
     public async Task MissingBearerReturnsUnauthorized()
     {
         await using var app = await StartApiAsync();
-        using var client = app.GetTestClient();
+        using var client = app.CreateClient();
 
         using var response = await client.GetAsync("/api/v1/auth/me");
 
@@ -49,7 +47,7 @@ public sealed class AuthMePipelineTests
     public async Task InvalidBearerReturnsUnauthorizedThroughHttpPipeline(string vector)
     {
         await using var app = await StartApiAsync();
-        using var client = app.GetTestClient();
+        using var client = app.CreateClient();
         var bearer = vector switch
         {
             "expired" => Sign(expired: true),
@@ -75,7 +73,7 @@ public sealed class AuthMePipelineTests
     public async Task ValidSignedReviewerTokenReturnsExpectedIdentityThroughHttpPipeline()
     {
         await using var app = await StartApiAsync();
-        using var client = app.GetTestClient();
+        using var client = app.CreateClient();
         var bearer = app.Services.GetRequiredService<JwtTokenService>()
             .CreateToken("synthetic-reviewer", "reviewer").Token;
         using var request = new HttpRequestMessage(HttpMethod.Get, "/api/v1/auth/me");
@@ -96,44 +94,35 @@ public sealed class AuthMePipelineTests
         Assert.IsFalse(body.Contains(SigningSecret, StringComparison.Ordinal), "signing secret must not appear");
     }
 
-    private static async Task<WebApplication> StartApiAsync()
+    private static Task<ApiFactory> StartApiAsync()
     {
-        // Isolate just the production controller and authentication pipeline:
-        // the real Program also starts database-backed services not needed here.
-        var builder = WebApplication.CreateBuilder(new WebApplicationOptions
-        {
-            EnvironmentName = "Production"
-        });
-        builder.WebHost.UseTestServer();
-        builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
-        {
-            ["Auth:Jwt:Secret"] = SigningSecret
-        });
-        builder.Services.AddControllers().AddApplicationPart(typeof(AuthController).Assembly);
-        builder.Services.AddHttpContextAccessor();
-        builder.Services.AddSingleton<DevUserStore>();
-        builder.Services.AddSingleton<ProductionBootstrapAuthenticator>();
-        builder.Services.AddSingleton<TimeProvider>(TimeProvider.System);
-        builder.Services.AddSingleton<LoginAttemptGuard>();
-        builder.Services.AddSingleton<JwtTokenService>();
-        builder.Services.AddScoped<AuthRequestContext>();
-        builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-            .AddJwtBearer(options =>
-            {
-                options.RequireHttpsMetadata = true;
-                options.MapInboundClaims = true;
-                options.TokenValidationParameters = RuntimeSecurity.CreateTokenValidationParameters(
-                    builder.Configuration, builder.Environment.EnvironmentName);
-            });
-        builder.Services.AddAuthorization();
+        var factory = new ApiFactory();
+        // Building the client boots the host, so a startup failure surfaces here.
+        _ = factory.Server;
+        return Task.FromResult(factory);
+    }
 
-        var app = builder.Build();
-        app.UseRouting();
-        app.UseAuthentication();
-        app.UseAuthorization();
-        app.MapControllers();
-        await app.StartAsync();
-        return app;
+    /// <summary>
+    /// Boots the real <c>apps/api/VeritasAtlas.Api/Program.cs</c> entry point
+    /// (its services, middleware order, JWT bearer options and controllers) in
+    /// the Production environment. Only configuration is supplied: a synthetic
+    /// signing secret, synthetic bootstrap credentials and an unreachable
+    /// connection string that the /auth/me path never opens.
+    /// </summary>
+    private sealed class ApiFactory : WebApplicationFactory<Program>
+    {
+        protected override void ConfigureWebHost(IWebHostBuilder builder)
+        {
+            builder.UseEnvironment("Production");
+            // UseSetting (not ConfigureAppConfiguration) so values are visible
+            // to the eager configuration reads Program performs before Build().
+            builder.UseSetting("Auth:Jwt:Secret", SigningSecret);
+            builder.UseSetting("Auth:Bootstrap:Username", "synthetic-bootstrap-operator");
+            builder.UseSetting("Auth:Bootstrap:Password", "synthetic-bootstrap-password-not-real-0001");
+            builder.UseSetting(
+                "ConnectionStrings:DefaultConnection",
+                "Host=127.0.0.1;Port=1;Database=unused;Username=unused;Password=unused");
+        }
     }
 
     private static string Sign(
