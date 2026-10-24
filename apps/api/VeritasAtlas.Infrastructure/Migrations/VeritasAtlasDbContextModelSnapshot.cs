@@ -742,6 +742,41 @@ namespace VeritasAtlas.Infrastructure.Migrations
                         });
                 });
 
+            modelBuilder.Entity("VeritasAtlas.Infrastructure.Persistence.TenantSourceRegistryEntry", b =>
+                {
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("CanonicalKey")
+                        .IsRequired()
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)")
+                        .HasColumnName("canonical_key");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.HasKey("TenantId", "Id")
+                        .HasName("pk_tenant_source_registry_entries");
+
+                    b.HasIndex("TenantId", "CanonicalKey")
+                        .IsUnique()
+                        .HasDatabaseName("ux_tenant_source_registry_entries_tenant_canonical_key");
+
+                    b.ToTable("tenant_source_registry_entries", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_tenant_source_registry_entries_canonical_key_not_blank", "length(btrim(canonical_key)) > 0");
+
+                            t.HasCheckConstraint("ck_tenant_source_registry_entries_tenant_id_not_empty", "tenant_id <> '00000000-0000-0000-0000-000000000000'::uuid");
+                        });
+                });
+
             modelBuilder.Entity("VeritasAtlas.Domain.Entities.AgentRun", b =>
                 {
                     b.HasOne("VeritasAtlas.Domain.Entities.Case", "Case")
