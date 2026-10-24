@@ -43,6 +43,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IAccessTokenRevocationStore, EfAccessTokenRevocationStore>();
         services.AddScoped<ITenantSourceRegistry, EfTenantSourceRegistry>();
         services.AddScoped<ITenantRawRetrievalLedger, EfTenantRawRetrievalLedger>();
+        services.AddScoped<ITenantFetchAttemptLedger, EfTenantFetchAttemptLedger>();
 
         return services;
     }

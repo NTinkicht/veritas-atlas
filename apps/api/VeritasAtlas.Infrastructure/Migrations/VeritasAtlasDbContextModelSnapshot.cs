@@ -742,6 +742,92 @@ namespace VeritasAtlas.Infrastructure.Migrations
                         });
                 });
 
+            modelBuilder.Entity("VeritasAtlas.Infrastructure.Persistence.TenantFetchAttempt", b =>
+                {
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("AttemptKey")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("attempt_key");
+
+                    b.Property<DateTime>("AttemptedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("attempted_at_utc");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<string>("FailureClass")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("failure_class");
+
+                    b.Property<int?>("HttpStatus")
+                        .HasColumnType("integer")
+                        .HasColumnName("http_status");
+
+                    b.Property<string>("Outcome")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("outcome");
+
+                    b.Property<Guid?>("RawRetrievalId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("raw_retrieval_id");
+
+                    b.Property<string>("RequestedUri")
+                        .IsRequired()
+                        .HasMaxLength(2048)
+                        .HasColumnType("character varying(2048)")
+                        .HasColumnName("requested_uri");
+
+                    b.Property<Guid>("SourceEntryId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("source_entry_id");
+
+                    b.HasKey("TenantId", "Id")
+                        .HasName("pk_tenant_fetch_attempts");
+
+                    b.HasIndex("TenantId", "AttemptKey")
+                        .IsUnique()
+                        .HasDatabaseName("ux_tenant_fetch_attempts_tenant_attempt_key");
+
+                    b.HasIndex("TenantId", "SourceEntryId", "AttemptedAtUtc")
+                        .HasDatabaseName("ix_tenant_fetch_attempts_tenant_source_attempted_at");
+
+                    b.HasIndex("TenantId", "SourceEntryId", "RawRetrievalId")
+                        .HasDatabaseName("ix_tenant_fetch_attempts_tenant_source_raw_retrieval");
+
+                    b.ToTable("tenant_fetch_attempts", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_tenant_fetch_attempts_attempt_key_not_blank", "length(btrim(attempt_key)) > 0");
+
+                            t.HasCheckConstraint("ck_tenant_fetch_attempts_failure_class", "failure_class IS NULL OR failure_class IN ('network', 'timeout', 'http_status', 'size_limit', 'policy_denied')");
+
+                            t.HasCheckConstraint("ck_tenant_fetch_attempts_http_status_failure_has_status", "failure_class IS DISTINCT FROM 'http_status' OR http_status IS NOT NULL");
+
+                            t.HasCheckConstraint("ck_tenant_fetch_attempts_http_status_range", "http_status IS NULL OR http_status BETWEEN 100 AND 599");
+
+                            t.HasCheckConstraint("ck_tenant_fetch_attempts_outcome", "outcome IN ('succeeded', 'failed')");
+
+                            t.HasCheckConstraint("ck_tenant_fetch_attempts_outcome_shape", "(outcome = 'succeeded' AND raw_retrieval_id IS NOT NULL AND failure_class IS NULL) OR (outcome = 'failed' AND raw_retrieval_id IS NULL AND failure_class IS NOT NULL)");
+
+                            t.HasCheckConstraint("ck_tenant_fetch_attempts_requested_uri_not_blank", "length(btrim(requested_uri)) > 0");
+
+                            t.HasCheckConstraint("ck_tenant_fetch_attempts_tenant_id_not_empty", "tenant_id <> '00000000-0000-0000-0000-000000000000'::uuid");
+                        });
+                });
+
             modelBuilder.Entity("VeritasAtlas.Infrastructure.Persistence.TenantRawRetrieval", b =>
                 {
                     b.Property<Guid>("TenantId")
@@ -799,6 +885,9 @@ namespace VeritasAtlas.Infrastructure.Migrations
 
                     b.HasKey("TenantId", "Id")
                         .HasName("pk_tenant_raw_retrievals");
+
+                    b.HasAlternateKey("TenantId", "SourceEntryId", "Id")
+                        .HasName("ak_tenant_raw_retrievals_tenant_source_entry_id");
 
                     b.HasIndex("TenantId", "IdempotencyKey")
                         .IsUnique()
@@ -1159,6 +1248,23 @@ namespace VeritasAtlas.Infrastructure.Migrations
 
                     b.Navigation("Text")
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("VeritasAtlas.Infrastructure.Persistence.TenantFetchAttempt", b =>
+                {
+                    b.HasOne("VeritasAtlas.Infrastructure.Persistence.TenantSourceRegistryEntry", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "SourceEntryId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_tenant_fetch_attempts_tenant_source_entry");
+
+                    b.HasOne("VeritasAtlas.Infrastructure.Persistence.TenantRawRetrieval", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "SourceEntryId", "RawRetrievalId")
+                        .HasPrincipalKey("TenantId", "SourceEntryId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_tenant_fetch_attempts_tenant_source_raw_retrieval");
                 });
 
             modelBuilder.Entity("VeritasAtlas.Infrastructure.Persistence.TenantRawRetrieval", b =>

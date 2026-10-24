@@ -171,12 +171,19 @@ public sealed class TenantRawRetrievalLedgerTests
                      "UPDATE tenant_raw_retrievals SET final_uri = 'https://evil.test/'",
                      "UPDATE tenant_raw_retrievals SET evidence_reference = NULL",
                      "DELETE FROM tenant_raw_retrievals",
-                     "TRUNCATE tenant_raw_retrievals"
+                     // Since #89 tenant_fetch_attempts references this table, so a
+                     // plain TRUNCATE is refused before the trigger (asserted below);
+                     // CASCADE reaches the trigger of both tables and is refused too.
+                     "TRUNCATE tenant_raw_retrievals CASCADE"
                  })
         {
             var error = await Assert.ThrowsExactlyAsync<PostgresException>(() => db.Database.ExecuteSqlRawAsync(mutation));
             Assert.AreEqual("55000", error.SqlState, mutation);
         }
+
+        var plainTruncate = await Assert.ThrowsExactlyAsync<PostgresException>(
+            () => db.Database.ExecuteSqlRawAsync("TRUNCATE tenant_raw_retrievals"));
+        Assert.AreEqual("0A000", plainTruncate.SqlState, "TRUNCATE of a table referenced by a foreign key");
 
         // The source of a recorded retrieval cannot be deleted either.
         await Assert.ThrowsExactlyAsync<PostgresException>(() => db.Database.ExecuteSqlInterpolatedAsync(
