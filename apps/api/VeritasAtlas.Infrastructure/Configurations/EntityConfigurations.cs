@@ -874,3 +874,70 @@ public sealed class TenantSourceRegistryEntryConfiguration : IEntityTypeConfigur
             .HasDatabaseName("ux_tenant_source_registry_entries_tenant_canonical_key");
     }
 }
+
+public sealed class TenantRawRetrievalConfiguration : IEntityTypeConfiguration<VeritasAtlas.Infrastructure.Persistence.TenantRawRetrieval>
+{
+    public void Configure(EntityTypeBuilder<VeritasAtlas.Infrastructure.Persistence.TenantRawRetrieval> builder)
+    {
+        builder.ToTable("tenant_raw_retrievals", table =>
+        {
+            table.HasCheckConstraint(
+                "ck_tenant_raw_retrievals_tenant_id_not_empty",
+                "tenant_id <> '00000000-0000-0000-0000-000000000000'::uuid");
+            table.HasCheckConstraint(
+                "ck_tenant_raw_retrievals_idempotency_key_not_blank",
+                "length(btrim(idempotency_key)) > 0");
+            table.HasCheckConstraint(
+                "ck_tenant_raw_retrievals_final_uri_not_blank",
+                "length(btrim(final_uri)) > 0");
+            table.HasCheckConstraint(
+                "ck_tenant_raw_retrievals_content_sha256_matches_bytes",
+                "content_sha256 = encode(sha256(raw_bytes), 'hex')");
+            table.HasCheckConstraint(
+                "ck_tenant_raw_retrievals_byte_length_matches_bytes",
+                "byte_length = octet_length(raw_bytes)");
+            table.HasCheckConstraint(
+                "ck_tenant_raw_retrievals_no_pre_parser_evidence_reference",
+                "evidence_reference IS NULL");
+        });
+
+        builder.HasKey(x => new { x.TenantId, x.Id })
+            .HasName("pk_tenant_raw_retrievals");
+
+        builder.Property(x => x.TenantId).HasColumnName("tenant_id").IsRequired();
+        builder.Property(x => x.Id).HasColumnName("id").ValueGeneratedNever().IsRequired();
+        builder.Property(x => x.SourceEntryId).HasColumnName("source_entry_id").IsRequired();
+        builder.Property(x => x.IdempotencyKey)
+            .HasColumnName("idempotency_key")
+            .HasMaxLength(VeritasAtlas.Application.Interfaces.TenantRawRetrievalLimits.MaxIdempotencyKeyLength)
+            .IsRequired();
+        builder.Property(x => x.FinalUri)
+            .HasColumnName("final_uri")
+            .HasMaxLength(VeritasAtlas.Application.Interfaces.TenantRawRetrievalLimits.MaxFinalUriLength)
+            .IsRequired();
+        builder.Property(x => x.RawBytes).HasColumnName("raw_bytes").HasColumnType("bytea").IsRequired();
+        builder.Property(x => x.ContentSha256)
+            .HasColumnName("content_sha256")
+            .HasMaxLength(64)
+            .IsFixedLength()
+            .IsRequired();
+        builder.Property(x => x.ByteLength).HasColumnName("byte_length").IsRequired();
+        builder.Property(x => x.EvidenceReference).HasColumnName("evidence_reference").HasMaxLength(128);
+        builder.Property(x => x.RetrievedAtUtc).HasColumnName("retrieved_at_utc").IsRequired();
+        builder.Property(x => x.CreatedAtUtc).HasColumnName("created_at_utc").IsRequired();
+
+        builder.HasIndex(x => new { x.TenantId, x.IdempotencyKey })
+            .IsUnique()
+            .HasDatabaseName("ux_tenant_raw_retrievals_tenant_idempotency_key");
+        builder.HasIndex(x => new { x.TenantId, x.SourceEntryId })
+            .HasDatabaseName("ix_tenant_raw_retrievals_tenant_source_entry");
+
+        // Composite key: a retrieval can only point at its own tenant's source.
+        builder.HasOne<VeritasAtlas.Infrastructure.Persistence.TenantSourceRegistryEntry>()
+            .WithMany()
+            .HasForeignKey(x => new { x.TenantId, x.SourceEntryId })
+            .HasPrincipalKey(x => new { x.TenantId, x.Id })
+            .HasConstraintName("fk_tenant_raw_retrievals_tenant_source_entry")
+            .OnDelete(DeleteBehavior.Restrict);
+    }
+}
