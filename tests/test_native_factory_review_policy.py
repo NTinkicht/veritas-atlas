@@ -135,6 +135,32 @@ class NativeFactoryReviewPolicyTests(unittest.TestCase):
         self.assertIn('"docs/FIRST_RENDER_STAGING_DEPLOYMENT.md"', text)
         self.assertIn('"docs/operations/onecompany-adoption/docs/VERITAS-H"', text)
 
+    def test_coderabbit_approval_authority_is_retired(self):
+        import ast
+        tree = ast.parse(
+            (ROOT / "scripts/native_factory_merge.py").read_text(encoding="utf-8"))
+        assigned = {
+            node.targets[0].id: node.value
+            for node in tree.body
+            if isinstance(node, ast.Assign)
+            and len(node.targets) == 1
+            and isinstance(node.targets[0], ast.Name)
+        }
+
+        def literal_set(name):
+            call = assigned[name]
+            self.assertEqual(call.func.id, "frozenset")
+            return set(ast.literal_eval(call.args[0]))
+
+        self.assertNotIn("coderabbitai[bot]", literal_set("AUTHORIZED_REVIEWERS"))
+        self.assertIn("coderabbitai[bot]", literal_set("RETIRED_REVIEWERS"))
+        finding_authors = ast.unparse(assigned["FINDING_COMMENT_AUTHORS"])
+        self.assertIn("RETIRED_REVIEWERS", finding_authors)
+        self.assertEqual(
+            ast.literal_eval(assigned["ACTOR_ALIASES"])["coderabbitai[bot]"],
+            "coderabbit",
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
