@@ -1,4 +1,5 @@
-﻿import { API_BASE_URL } from "./client";
+﻿import { getAuthHeaders } from "./httpAuth";
+import { API_BASE_URL } from "./client";
 
 export type CreateSourceRequest = {
   name: string;
@@ -24,6 +25,7 @@ export async function createSource(
     method: "POST",
     headers: {
       "Content-Type": "application/json",
+      ...getAuthHeaders(),
     },
     body: JSON.stringify(request),
   });

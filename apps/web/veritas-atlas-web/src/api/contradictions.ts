@@ -12,11 +12,11 @@ export type CreateContradictionRequest = {
 };
 
 export async function getContradictions(page = 1, pageSize = 20): Promise<PagedResponse<ContradictionItem>> {
-  return apiGet<PagedResponse<ContradictionItem>>(`/api/v1/contradictions?page=${page}&pageSize=${pageSize}`, false);
+  return apiGet<PagedResponse<ContradictionItem>>(`/api/v1/contradictions?page=${page}&pageSize=${pageSize}`);
 }
 
 export async function getContradictionById(id: string): Promise<ContradictionItem> {
-  return apiGet<ContradictionItem>(`/api/v1/contradictions/${id}`, false);
+  return apiGet<ContradictionItem>(`/api/v1/contradictions/${id}`);
 }
 
 export async function createContradiction(request: CreateContradictionRequest): Promise<ContradictionItem> {

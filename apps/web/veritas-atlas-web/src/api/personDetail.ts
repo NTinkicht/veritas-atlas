@@ -1,4 +1,5 @@
-﻿import { apiGet, API_BASE_URL } from "./client";
+﻿import { getAuthHeaders } from "./httpAuth";
+import { apiGet, API_BASE_URL } from "./client";
 
 export type PersonDetailResponse = {
   id: string;
@@ -34,6 +35,7 @@ export async function addAliasToPerson(
     method: "POST",
     headers: {
       "Content-Type": "application/json",
+      ...getAuthHeaders(),
     },
     body: JSON.stringify(request),
   });

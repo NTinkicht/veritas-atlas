@@ -1,3 +1,4 @@
+import { getAuthHeaders } from "./httpAuth";
 export type CaseExplorerItem = {
   id: string;
   status: string;
@@ -14,7 +15,7 @@ export type CaseExplorerResponse = {
 };
 
 export async function getCaseExplorer(page = 1, pageSize = 50): Promise<CaseExplorerResponse> {
-  const response = await fetch(`/api/v1/cases?page=${page}&pageSize=${pageSize}`);
+  const response = await fetch(`/api/v1/cases?page=${page}&pageSize=${pageSize}`, { headers: getAuthHeaders() });
 
   if (!response.ok) {
     const text = await response.text();

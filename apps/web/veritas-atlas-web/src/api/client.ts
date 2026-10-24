@@ -1,4 +1,5 @@
-﻿export const API_BASE_URL =
+﻿import { getAuthHeaders } from "./httpAuth";
+export const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL ?? "https://localhost:7091";
 
 export async function apiGet<T>(path: string): Promise<T> {
@@ -6,6 +7,7 @@ export async function apiGet<T>(path: string): Promise<T> {
     method: "GET",
     headers: {
       "Content-Type": "application/json",
+      ...getAuthHeaders(),
     },
   });
 
