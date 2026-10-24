@@ -715,6 +715,33 @@ namespace VeritasAtlas.Infrastructure.Migrations
                     b.ToTable("statements", (string)null);
                 });
 
+            modelBuilder.Entity("VeritasAtlas.Infrastructure.Persistence.RevokedAccessToken", b =>
+                {
+                    b.Property<string>("JtiSha256")
+                        .HasMaxLength(64)
+                        .HasColumnType("character(64)")
+                        .HasColumnName("jti_sha256")
+                        .IsFixedLength();
+
+                    b.Property<DateTime>("ExpiresAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expires_at_utc");
+
+                    b.Property<DateTime>("RevokedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("revoked_at_utc");
+
+                    b.HasKey("JtiSha256");
+
+                    b.HasIndex("ExpiresAtUtc")
+                        .HasDatabaseName("ix_revoked_access_tokens_expires_at_utc");
+
+                    b.ToTable("revoked_access_tokens", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_revoked_access_tokens_jti_sha256_hex", "jti_sha256 ~ '^[0-9a-f]{64}$'");
+                        });
+                });
+
             modelBuilder.Entity("VeritasAtlas.Domain.Entities.AgentRun", b =>
                 {
                     b.HasOne("VeritasAtlas.Domain.Entities.Case", "Case")

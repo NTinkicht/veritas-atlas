@@ -5,10 +5,12 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.TestHost;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using VeritasAtlas.Api.Infrastructure.Auth;
+using VeritasAtlas.Application.Interfaces;
 
 namespace VeritasAtlas.Api.Tests;
 
@@ -172,6 +174,11 @@ public sealed class DefaultAuthenticatedEndpointTests
             builder.UseSetting(
                 "ConnectionStrings:DefaultConnection",
                 "Host=127.0.0.1;Port=1;Database=unused;Username=unused;Password=unused");
+            // No database here: an in-memory revocation list stands in for the
+            // PostgreSQL store (VER-P0-02, #79); without it every valid bearer
+            // is rejected because the revocation check fails closed.
+            builder.ConfigureTestServices(services =>
+                services.AddSingleton<IAccessTokenRevocationStore, InMemoryAccessTokenRevocationStore>());
         }
     }
 }

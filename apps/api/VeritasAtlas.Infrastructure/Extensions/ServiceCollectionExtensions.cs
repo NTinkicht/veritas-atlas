@@ -40,6 +40,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IAgentRunService, AgentRunService>();
         services.AddScoped<IReviewService, ReviewService>();
         services.AddScoped<IPublicationService, PublicationService>();
+        services.AddScoped<IAccessTokenRevocationStore, EfAccessTokenRevocationStore>();
 
         return services;
     }

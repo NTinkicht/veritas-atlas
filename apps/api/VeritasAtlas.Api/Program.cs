@@ -70,6 +70,11 @@ builder.Services
         options.MapInboundClaims = true;
 
         options.TokenValidationParameters = tokenValidationParameters;
+        // VER-P0-02 (#79): server-revocable sessions on every endpoint.
+        options.Events = new JwtBearerEvents
+        {
+            OnTokenValidated = AccessTokenRevocation.ValidateAsync
+        };
     });
 
 // VER-P0-02: deny by default. Every endpoint requires an authenticated
