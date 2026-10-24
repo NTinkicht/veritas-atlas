@@ -74,8 +74,10 @@ public static class EvidenceProvenance
     public static string NormalizeSourceUri(string? raw)
     {
         if (string.IsNullOrEmpty(raw)) throw new ProvenanceException("missing_source_uri");
-        // Whitespace and control characters are never silently stripped.
-        if (raw.Any(c => c <= ' ' || c == '\u007f')) throw new ProvenanceException("malformed_source_uri");
+        // Whitespace and control characters (C0, DEL, C1 and Unicode whitespace)
+        // anywhere in the URI are rejected, never silently stripped or kept.
+        if (raw.Any(c => char.IsControl(c) || char.IsWhiteSpace(c)))
+            throw new ProvenanceException("malformed_source_uri");
 
         var colon = raw.IndexOf(':');
         if (colon <= 0 || !SchemePattern.IsMatch(raw[..colon]))
