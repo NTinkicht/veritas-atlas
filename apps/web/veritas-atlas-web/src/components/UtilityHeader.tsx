@@ -1,13 +1,23 @@
 import { useNavigate } from "react-router-dom";
-import { clearAccessToken, getAccessToken } from "../api/httpAuth";
+import { getAccessToken } from "../api/httpAuth";
+import { useLogout } from "../hooks/useAuth";
 
 export function UtilityHeader() {
   const navigate = useNavigate();
   const isLoggedIn = !!getAccessToken();
+  const revokeSession = useLogout();
 
-  function logout() {
-    clearAccessToken();
-    navigate("/login");
+  // VER-P0-02 (#79): ending or switching a session revokes the bearer
+  // server-side before it is dropped locally (useLogout always clears it).
+  async function endSession() {
+    try {
+      await revokeSession();
+    } catch {
+      // The local token is already cleared; an expired or revoked bearer
+      // rejected by the server needs no further action here.
+    } finally {
+      navigate("/login");
+    }
   }
 
   return (
@@ -21,8 +31,10 @@ export function UtilityHeader() {
         </div>
 
         <div className="action-row">
-          <button onClick={() => navigate("/login")}>{isLoggedIn ? "Switch Account" : "Log In"}</button>
-          <button onClick={logout} disabled={!isLoggedIn}>Log Out</button>
+          <button onClick={() => (isLoggedIn ? void endSession() : navigate("/login"))}>
+            {isLoggedIn ? "Switch Account" : "Log In"}
+          </button>
+          <button onClick={() => void endSession()} disabled={!isLoggedIn}>Log Out</button>
         </div>
       </div>
     </section>
