@@ -24,6 +24,7 @@ public sealed class VeritasAtlasDbContext : DbContext
     public DbSet<Review> Reviews => Set<Review>();
     public DbSet<Publication> Publications => Set<Publication>();
     public DbSet<RevokedAccessToken> RevokedAccessTokens => Set<RevokedAccessToken>();
+    public DbSet<TenantSourceRegistryEntry> TenantSourceRegistryEntries => Set<TenantSourceRegistryEntry>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -41,6 +42,7 @@ public sealed class VeritasAtlasDbContext : DbContext
         modelBuilder.ApplyConfiguration(new ReviewConfiguration());
         modelBuilder.ApplyConfiguration(new PublicationConfiguration());
         modelBuilder.ApplyConfiguration(new RevokedAccessTokenConfiguration());
+        modelBuilder.ApplyConfiguration(new TenantSourceRegistryEntryConfiguration());
 
         base.OnModelCreating(modelBuilder);
     }

@@ -18,7 +18,8 @@ public sealed class JwtTokenService
         _environment = environment;
     }
 
-    public (string Token, DateTime ExpiresAtUtc) CreateToken(string username, string role)
+    public (string Token, DateTime ExpiresAtUtc) CreateToken(
+        string username, string role, Guid? tenantId = null)
     {
         var secret = RuntimeSecurity.ResolveJwtSecret(
             _configuration,
@@ -41,6 +42,13 @@ public sealed class JwtTokenService
             new(JwtRegisteredClaimNames.Jti, Convert.ToHexStringLower(
                 System.Security.Cryptography.RandomNumberGenerator.GetBytes(32)))
         };
+
+        // VER-P0-03 (#82): the organization tenant is a signed claim; it is
+        // omitted (never defaulted) when the identity has no tenant.
+        if (tenantId is { } tenant && tenant != Guid.Empty)
+        {
+            claims.Add(new Claim(TenantClaim.Type, tenant.ToString("D")));
+        }
 
         var token = new JwtSecurityToken(
             issuer: issuer,

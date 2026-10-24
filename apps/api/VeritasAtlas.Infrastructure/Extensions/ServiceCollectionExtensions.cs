@@ -41,6 +41,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IReviewService, ReviewService>();
         services.AddScoped<IPublicationService, PublicationService>();
         services.AddScoped<IAccessTokenRevocationStore, EfAccessTokenRevocationStore>();
+        services.AddScoped<ITenantSourceRegistry, EfTenantSourceRegistry>();
 
         return services;
     }

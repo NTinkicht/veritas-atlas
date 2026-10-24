@@ -833,3 +833,44 @@ public sealed class RevokedAccessTokenConfiguration : IEntityTypeConfiguration<V
             .HasDatabaseName("ix_revoked_access_tokens_expires_at_utc");
     }
 }
+
+public sealed class TenantSourceRegistryEntryConfiguration : IEntityTypeConfiguration<VeritasAtlas.Infrastructure.Persistence.TenantSourceRegistryEntry>
+{
+    public void Configure(EntityTypeBuilder<VeritasAtlas.Infrastructure.Persistence.TenantSourceRegistryEntry> builder)
+    {
+        builder.ToTable("tenant_source_registry_entries", table =>
+        {
+            table.HasCheckConstraint(
+                "ck_tenant_source_registry_entries_tenant_id_not_empty",
+                "tenant_id <> '00000000-0000-0000-0000-000000000000'::uuid");
+            table.HasCheckConstraint(
+                "ck_tenant_source_registry_entries_canonical_key_not_blank",
+                "length(btrim(canonical_key)) > 0");
+        });
+
+        builder.HasKey(x => new { x.TenantId, x.Id })
+            .HasName("pk_tenant_source_registry_entries");
+
+        builder.Property(x => x.TenantId)
+            .HasColumnName("tenant_id")
+            .IsRequired();
+
+        builder.Property(x => x.Id)
+            .HasColumnName("id")
+            .ValueGeneratedNever()
+            .IsRequired();
+
+        builder.Property(x => x.CanonicalKey)
+            .HasColumnName("canonical_key")
+            .HasMaxLength(VeritasAtlas.Application.Interfaces.TenantSourceRegistryLimits.MaxCanonicalKeyLength)
+            .IsRequired();
+
+        builder.Property(x => x.CreatedAtUtc)
+            .HasColumnName("created_at_utc")
+            .IsRequired();
+
+        builder.HasIndex(x => new { x.TenantId, x.CanonicalKey })
+            .IsUnique()
+            .HasDatabaseName("ux_tenant_source_registry_entries_tenant_canonical_key");
+    }
+}
