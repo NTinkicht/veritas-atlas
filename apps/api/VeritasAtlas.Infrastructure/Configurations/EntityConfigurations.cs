@@ -932,12 +932,96 @@ public sealed class TenantRawRetrievalConfiguration : IEntityTypeConfiguration<V
         builder.HasIndex(x => new { x.TenantId, x.SourceEntryId })
             .HasDatabaseName("ix_tenant_raw_retrievals_tenant_source_entry");
 
+        // Target of the fetch-attempt link (#89): a successful attempt can only
+        // point at a retrieval of the same tenant and the same source.
+        builder.HasAlternateKey(x => new { x.TenantId, x.SourceEntryId, x.Id })
+            .HasName("ak_tenant_raw_retrievals_tenant_source_entry_id");
+
         // Composite key: a retrieval can only point at its own tenant's source.
         builder.HasOne<VeritasAtlas.Infrastructure.Persistence.TenantSourceRegistryEntry>()
             .WithMany()
             .HasForeignKey(x => new { x.TenantId, x.SourceEntryId })
             .HasPrincipalKey(x => new { x.TenantId, x.Id })
             .HasConstraintName("fk_tenant_raw_retrievals_tenant_source_entry")
+            .OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
+public sealed class TenantFetchAttemptConfiguration : IEntityTypeConfiguration<VeritasAtlas.Infrastructure.Persistence.TenantFetchAttempt>
+{
+    public void Configure(EntityTypeBuilder<VeritasAtlas.Infrastructure.Persistence.TenantFetchAttempt> builder)
+    {
+        builder.ToTable("tenant_fetch_attempts", table =>
+        {
+            table.HasCheckConstraint(
+                "ck_tenant_fetch_attempts_tenant_id_not_empty",
+                "tenant_id <> '00000000-0000-0000-0000-000000000000'::uuid");
+            table.HasCheckConstraint(
+                "ck_tenant_fetch_attempts_attempt_key_not_blank",
+                "length(btrim(attempt_key)) > 0");
+            table.HasCheckConstraint(
+                "ck_tenant_fetch_attempts_requested_uri_not_blank",
+                "length(btrim(requested_uri)) > 0");
+            table.HasCheckConstraint(
+                "ck_tenant_fetch_attempts_outcome",
+                "outcome IN ('succeeded', 'failed')");
+            table.HasCheckConstraint(
+                "ck_tenant_fetch_attempts_failure_class",
+                "failure_class IS NULL OR failure_class IN ('network', 'timeout', 'http_status', 'size_limit', 'policy_denied')");
+            table.HasCheckConstraint(
+                "ck_tenant_fetch_attempts_http_status_range",
+                "http_status IS NULL OR http_status BETWEEN 100 AND 599");
+            table.HasCheckConstraint(
+                "ck_tenant_fetch_attempts_outcome_shape",
+                "(outcome = 'succeeded' AND raw_retrieval_id IS NOT NULL AND failure_class IS NULL) OR (outcome = 'failed' AND raw_retrieval_id IS NULL AND failure_class IS NOT NULL)");
+            table.HasCheckConstraint(
+                "ck_tenant_fetch_attempts_http_status_failure_has_status",
+                "failure_class IS DISTINCT FROM 'http_status' OR http_status IS NOT NULL");
+        });
+
+        builder.HasKey(x => new { x.TenantId, x.Id })
+            .HasName("pk_tenant_fetch_attempts");
+
+        builder.Property(x => x.TenantId).HasColumnName("tenant_id").IsRequired();
+        builder.Property(x => x.Id).HasColumnName("id").ValueGeneratedNever().IsRequired();
+        builder.Property(x => x.SourceEntryId).HasColumnName("source_entry_id").IsRequired();
+        builder.Property(x => x.AttemptKey)
+            .HasColumnName("attempt_key")
+            .HasMaxLength(VeritasAtlas.Application.Interfaces.TenantFetchAttemptLimits.MaxAttemptKeyLength)
+            .IsRequired();
+        builder.Property(x => x.RequestedUri)
+            .HasColumnName("requested_uri")
+            .HasMaxLength(VeritasAtlas.Application.Interfaces.TenantFetchAttemptLimits.MaxRequestedUriLength)
+            .IsRequired();
+        builder.Property(x => x.Outcome).HasColumnName("outcome").HasMaxLength(16).IsRequired();
+        builder.Property(x => x.FailureClass).HasColumnName("failure_class").HasMaxLength(32);
+        builder.Property(x => x.HttpStatus).HasColumnName("http_status");
+        builder.Property(x => x.RawRetrievalId).HasColumnName("raw_retrieval_id");
+        builder.Property(x => x.AttemptedAtUtc).HasColumnName("attempted_at_utc").IsRequired();
+        builder.Property(x => x.CreatedAtUtc).HasColumnName("created_at_utc").IsRequired();
+
+        builder.HasIndex(x => new { x.TenantId, x.AttemptKey })
+            .IsUnique()
+            .HasDatabaseName("ux_tenant_fetch_attempts_tenant_attempt_key");
+        builder.HasIndex(x => new { x.TenantId, x.SourceEntryId, x.AttemptedAtUtc })
+            .HasDatabaseName("ix_tenant_fetch_attempts_tenant_source_attempted_at");
+        builder.HasIndex(x => new { x.TenantId, x.SourceEntryId, x.RawRetrievalId })
+            .HasDatabaseName("ix_tenant_fetch_attempts_tenant_source_raw_retrieval");
+
+        builder.HasOne<VeritasAtlas.Infrastructure.Persistence.TenantSourceRegistryEntry>()
+            .WithMany()
+            .HasForeignKey(x => new { x.TenantId, x.SourceEntryId })
+            .HasPrincipalKey(x => new { x.TenantId, x.Id })
+            .HasConstraintName("fk_tenant_fetch_attempts_tenant_source_entry")
+            .OnDelete(DeleteBehavior.Restrict);
+
+        // Composite link: same tenant AND same source as the attempt. With a
+        // NULL raw_retrieval_id (failed attempt) the FK is not enforced.
+        builder.HasOne<VeritasAtlas.Infrastructure.Persistence.TenantRawRetrieval>()
+            .WithMany()
+            .HasForeignKey(x => new { x.TenantId, x.SourceEntryId, x.RawRetrievalId })
+            .HasPrincipalKey(x => new { x.TenantId, x.SourceEntryId, x.Id })
+            .HasConstraintName("fk_tenant_fetch_attempts_tenant_source_raw_retrieval")
             .OnDelete(DeleteBehavior.Restrict);
     }
 }
