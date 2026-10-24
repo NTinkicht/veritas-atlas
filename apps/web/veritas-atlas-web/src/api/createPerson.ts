@@ -1,4 +1,5 @@
-﻿import { API_BASE_URL } from "./client";
+﻿import { getAuthHeaders } from "./httpAuth";
+import { API_BASE_URL } from "./client";
 
 export type CreatePersonRequest = {
   displayName: string;
@@ -16,6 +17,7 @@ export async function createPerson(request: CreatePersonRequest): Promise<Create
     method: "POST",
     headers: {
       "Content-Type": "application/json",
+      ...getAuthHeaders(),
     },
     body: JSON.stringify(request),
   });

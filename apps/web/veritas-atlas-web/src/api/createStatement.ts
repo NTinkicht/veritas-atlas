@@ -1,4 +1,5 @@
-﻿import { API_BASE_URL } from "./client";
+﻿import { getAuthHeaders } from "./httpAuth";
+import { API_BASE_URL } from "./client";
 
 export type CreateStatementRequest = {
   evidenceId: string;
@@ -25,6 +26,7 @@ export async function createStatement(
     method: "POST",
     headers: {
       "Content-Type": "application/json",
+      ...getAuthHeaders(),
     },
     body: JSON.stringify(request),
   });

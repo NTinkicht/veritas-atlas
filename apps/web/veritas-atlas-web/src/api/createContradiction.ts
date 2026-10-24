@@ -1,4 +1,5 @@
-﻿import { API_BASE_URL } from "./client";
+﻿import { getAuthHeaders } from "./httpAuth";
+import { API_BASE_URL } from "./client";
 
 export type CreateContradictionRequest = {
   caseId: string;
@@ -31,6 +32,7 @@ export async function createContradiction(
     method: "POST",
     headers: {
       "Content-Type": "application/json",
+      ...getAuthHeaders(),
     },
     body: JSON.stringify(request),
   });

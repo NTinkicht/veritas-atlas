@@ -1,3 +1,4 @@
+import { getAuthHeaders } from "./httpAuth";
 export type WorkflowDiagnosticsSummary = {
   actions: string[];
   stage: string;
@@ -5,7 +6,7 @@ export type WorkflowDiagnosticsSummary = {
 };
 
 export async function getWorkflowDiagnosticsSummary(): Promise<WorkflowDiagnosticsSummary> {
-  const response = await fetch("/api/v1/workflow-diagnostics/summary");
+  const response = await fetch("/api/v1/workflow-diagnostics/summary", { headers: getAuthHeaders() });
 
   if (!response.ok) {
     const text = await response.text();
@@ -16,7 +17,7 @@ export async function getWorkflowDiagnosticsSummary(): Promise<WorkflowDiagnosti
 }
 
 export async function getWorkflowDiagnosticsRoutes(): Promise<string[]> {
-  const response = await fetch("/api/v1/workflow-diagnostics/routes");
+  const response = await fetch("/api/v1/workflow-diagnostics/routes", { headers: getAuthHeaders() });
 
   if (!response.ok) {
     const text = await response.text();

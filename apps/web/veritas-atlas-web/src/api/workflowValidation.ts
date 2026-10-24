@@ -1,3 +1,4 @@
+import { getAuthHeaders } from "./httpAuth";
 export type WorkflowRulesPayload = {
   transitions: Record<string, Record<string, string[]>>;
   roles: Record<string, string[]>;
@@ -5,7 +6,7 @@ export type WorkflowRulesPayload = {
 };
 
 export async function getWorkflowRules(): Promise<WorkflowRulesPayload> {
-  const response = await fetch("/api/v1/workflow-audit/rules");
+  const response = await fetch("/api/v1/workflow-audit/rules", { headers: getAuthHeaders() });
 
   if (!response.ok) {
     const text = await response.text();

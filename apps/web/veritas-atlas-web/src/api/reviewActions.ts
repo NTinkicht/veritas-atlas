@@ -1,4 +1,5 @@
-﻿import { API_BASE_URL } from "./client";
+﻿import { getAuthHeaders } from "./httpAuth";
+import { API_BASE_URL } from "./client";
 
 export type ReviewDecision = "Approved" | "Rejected" | "NeedsChanges";
 
@@ -13,6 +14,7 @@ async function completeReview(id: string, body: CompleteReviewRequest): Promise<
     method: "POST",
     headers: {
       "Content-Type": "application/json",
+      ...getAuthHeaders(),
     },
     body: JSON.stringify(body),
   });

@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using VeritasAtlas.Api.Infrastructure.Health;
 using Microsoft.AspNetCore.RateLimiting;
@@ -71,7 +72,15 @@ builder.Services
         options.TokenValidationParameters = tokenValidationParameters;
     });
 
-builder.Services.AddAuthorization();
+// VER-P0-02: deny by default. Every endpoint requires an authenticated
+// principal unless it opts out explicitly with [AllowAnonymous] /
+// AllowAnonymous() (login, public auth diagnostics, health probes).
+builder.Services.AddAuthorization(options =>
+{
+    options.FallbackPolicy = new AuthorizationPolicyBuilder()
+        .RequireAuthenticatedUser()
+        .Build();
+});
 
 var app = builder.Build();
 
@@ -85,15 +94,15 @@ app.UseAuthorization();
 app.MapHealthChecks("/health", new HealthCheckOptions
 {
     Predicate = HealthEndpointPredicates.IsLiveness
-});
+}).AllowAnonymous();
 app.MapHealthChecks("/health/live", new HealthCheckOptions
 {
     Predicate = HealthEndpointPredicates.IsLiveness
-});
+}).AllowAnonymous();
 app.MapHealthChecks("/health/ready", new HealthCheckOptions
 {
     Predicate = HealthEndpointPredicates.IsReadiness
-});
+}).AllowAnonymous();
 app.MapControllers();
 
 app.Run();
