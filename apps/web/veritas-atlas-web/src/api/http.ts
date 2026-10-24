@@ -52,3 +52,13 @@ export async function apiPost<TResponse, TRequest = unknown>(
 
   return (await response.json()) as TResponse;
 }
+export async function apiPostNoContent(url: string, auth = true): Promise<void> {
+  const response = await fetch(toUrl(url), {
+    method: "POST",
+    headers: createHeaders(auth, false),
+  });
+
+  if (!response.ok) {
+    throw await toApiError(response);
+  }
+}

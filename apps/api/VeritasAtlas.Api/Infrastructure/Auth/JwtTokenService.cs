@@ -35,7 +35,11 @@ public sealed class JwtTokenService
             new(ClaimTypes.Name, username),
             new(ClaimTypes.Role, role),
             new("preferred_username", username),
-            new("role", role)
+            new("role", role),
+            // VER-P0-02 (#79): unique, unguessable token id so logout can
+            // revoke exactly this token server-side.
+            new(JwtRegisteredClaimNames.Jti, Convert.ToHexStringLower(
+                System.Security.Cryptography.RandomNumberGenerator.GetBytes(32)))
         };
 
         var token = new JwtSecurityToken(

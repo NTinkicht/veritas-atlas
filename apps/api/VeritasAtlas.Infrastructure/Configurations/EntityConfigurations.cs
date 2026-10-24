@@ -804,3 +804,32 @@ public sealed class PublicationConfiguration : IEntityTypeConfiguration<Publicat
     }
 }
 
+
+public sealed class RevokedAccessTokenConfiguration : IEntityTypeConfiguration<VeritasAtlas.Infrastructure.Persistence.RevokedAccessToken>
+{
+    public void Configure(EntityTypeBuilder<VeritasAtlas.Infrastructure.Persistence.RevokedAccessToken> builder)
+    {
+        builder.ToTable("revoked_access_tokens", table => table.HasCheckConstraint(
+            "ck_revoked_access_tokens_jti_sha256_hex",
+            "jti_sha256 ~ '^[0-9a-f]{64}$'"));
+
+        builder.HasKey(x => x.JtiSha256);
+
+        builder.Property(x => x.JtiSha256)
+            .HasColumnName("jti_sha256")
+            .HasMaxLength(64)
+            .IsFixedLength()
+            .IsRequired();
+
+        builder.Property(x => x.ExpiresAtUtc)
+            .HasColumnName("expires_at_utc")
+            .IsRequired();
+
+        builder.Property(x => x.RevokedAtUtc)
+            .HasColumnName("revoked_at_utc")
+            .IsRequired();
+
+        builder.HasIndex(x => x.ExpiresAtUtc)
+            .HasDatabaseName("ix_revoked_access_tokens_expires_at_utc");
+    }
+}
