@@ -57,10 +57,10 @@ public static class EvidenceProvenance
         "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~";
 
     private static readonly Regex Sha256Pattern =
-        new("^[0-9a-f]{64}$", RegexOptions.CultureInvariant);
+        new(@"^[0-9a-f]{64}\z", RegexOptions.CultureInvariant);
 
     private static readonly Regex SchemePattern =
-        new("^[A-Za-z][A-Za-z0-9+.-]*$", RegexOptions.CultureInvariant);
+        new(@"^[A-Za-z][A-Za-z0-9+.-]*\z", RegexOptions.CultureInvariant);
 
     private static readonly Regex SecretQueryPattern = new(
         "(?:^|[?&;])[^=&]*(?:password|passwd|secret|token|api[_-]?key|authorization|credential)[^=&]*=",
@@ -68,7 +68,7 @@ public static class EvidenceProvenance
 
     // RFC 3339 with an explicit UTC offset (Z or +/-00:00).
     private static readonly Regex RetrievedAtPattern = new(
-        @"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?(?:Z|[+-]00:00)$",
+        @"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?(?:Z|[+-]00:00)\z",
         RegexOptions.CultureInvariant);
 
     public static string NormalizeSourceUri(string? raw)

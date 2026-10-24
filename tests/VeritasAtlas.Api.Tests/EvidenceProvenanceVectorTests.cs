@@ -48,7 +48,7 @@ public sealed class EvidenceProvenanceVectorTests
         var root = Fixture.Value.RootElement;
         Assert.AreEqual("veritas-evidence-provenance-vectors/v1", root.GetProperty("schema").GetString());
         var cases = root.GetProperty("cases").EnumerateArray().ToList();
-        Assert.IsTrue(cases.Count >= 23, $"expected the full vector set, found {cases.Count}");
+        Assert.IsTrue(cases.Count >= 25, $"expected the full vector set, found {cases.Count}");
 
         var pairs = new Dictionary<string, List<string>>();
         var executed = new HashSet<string>();

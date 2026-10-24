@@ -458,6 +458,44 @@
         "classification_proof": "trusted-test-classification"
       },
       "trust": {"retrieval": true, "classification": true, "digest": false}
+    },
+    {
+      "id": "reject-content-digest-trailing-newline",
+      "expected": "reject",
+      "reason": "invalid_sha256",
+      "envelope": {
+        "schema_version": "1.0",
+        "source_uri": "HTTPS://EXAMPLE.COM:443/a/../record/%31#fragment",
+        "record_id": "record-1",
+        "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n",
+        "parser_name": "public-record-parser",
+        "parser_version": "1.0.0",
+        "retrieved_at": "2026-10-03T20:00:00Z",
+        "retrieval_attestation": "trusted-test-attestation",
+        "jurisdiction": "test-jurisdiction",
+        "source_type": "court_record",
+        "classification_proof": "trusted-test-classification"
+      },
+      "trust": {"retrieval": true, "classification": true, "digest": true}
+    },
+    {
+      "id": "reject-retrieved-at-trailing-newline",
+      "expected": "reject",
+      "reason": "invalid_retrieved_at",
+      "envelope": {
+        "schema_version": "1.0",
+        "source_uri": "HTTPS://EXAMPLE.COM:443/a/../record/%31#fragment",
+        "record_id": "record-1",
+        "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "parser_name": "public-record-parser",
+        "parser_version": "1.0.0",
+        "retrieved_at": "2026-10-03T20:00:00Z\n",
+        "retrieval_attestation": "trusted-test-attestation",
+        "jurisdiction": "test-jurisdiction",
+        "source_type": "court_record",
+        "classification_proof": "trusted-test-classification"
+      },
+      "trust": {"retrieval": true, "classification": true, "digest": true}
     }
   ]
 }
