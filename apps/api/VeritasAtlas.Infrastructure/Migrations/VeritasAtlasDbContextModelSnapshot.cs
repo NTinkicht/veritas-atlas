@@ -742,6 +742,87 @@ namespace VeritasAtlas.Infrastructure.Migrations
                         });
                 });
 
+            modelBuilder.Entity("VeritasAtlas.Infrastructure.Persistence.TenantRawRetrieval", b =>
+                {
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<long>("ByteLength")
+                        .HasColumnType("bigint")
+                        .HasColumnName("byte_length");
+
+                    b.Property<string>("ContentSha256")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character(64)")
+                        .HasColumnName("content_sha256")
+                        .IsFixedLength();
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<string>("EvidenceReference")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("evidence_reference");
+
+                    b.Property<string>("FinalUri")
+                        .IsRequired()
+                        .HasMaxLength(2048)
+                        .HasColumnType("character varying(2048)")
+                        .HasColumnName("final_uri");
+
+                    b.Property<string>("IdempotencyKey")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("idempotency_key");
+
+                    b.Property<byte[]>("RawBytes")
+                        .IsRequired()
+                        .HasColumnType("bytea")
+                        .HasColumnName("raw_bytes");
+
+                    b.Property<DateTime>("RetrievedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("retrieved_at_utc");
+
+                    b.Property<Guid>("SourceEntryId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("source_entry_id");
+
+                    b.HasKey("TenantId", "Id")
+                        .HasName("pk_tenant_raw_retrievals");
+
+                    b.HasIndex("TenantId", "IdempotencyKey")
+                        .IsUnique()
+                        .HasDatabaseName("ux_tenant_raw_retrievals_tenant_idempotency_key");
+
+                    b.HasIndex("TenantId", "SourceEntryId")
+                        .HasDatabaseName("ix_tenant_raw_retrievals_tenant_source_entry");
+
+                    b.ToTable("tenant_raw_retrievals", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_tenant_raw_retrievals_byte_length_matches_bytes", "byte_length = octet_length(raw_bytes)");
+
+                            t.HasCheckConstraint("ck_tenant_raw_retrievals_content_sha256_matches_bytes", "content_sha256 = encode(sha256(raw_bytes), 'hex')");
+
+                            t.HasCheckConstraint("ck_tenant_raw_retrievals_final_uri_not_blank", "length(btrim(final_uri)) > 0");
+
+                            t.HasCheckConstraint("ck_tenant_raw_retrievals_idempotency_key_not_blank", "length(btrim(idempotency_key)) > 0");
+
+                            t.HasCheckConstraint("ck_tenant_raw_retrievals_no_pre_parser_evidence_reference", "evidence_reference IS NULL");
+
+                            t.HasCheckConstraint("ck_tenant_raw_retrievals_tenant_id_not_empty", "tenant_id <> '00000000-0000-0000-0000-000000000000'::uuid");
+                        });
+                });
+
             modelBuilder.Entity("VeritasAtlas.Infrastructure.Persistence.TenantSourceRegistryEntry", b =>
                 {
                     b.Property<Guid>("TenantId")
@@ -1078,6 +1159,16 @@ namespace VeritasAtlas.Infrastructure.Migrations
 
                     b.Navigation("Text")
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("VeritasAtlas.Infrastructure.Persistence.TenantRawRetrieval", b =>
+                {
+                    b.HasOne("VeritasAtlas.Infrastructure.Persistence.TenantSourceRegistryEntry", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "SourceEntryId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_tenant_raw_retrievals_tenant_source_entry");
                 });
 
             modelBuilder.Entity("VeritasAtlas.Domain.Entities.AgentRun", b =>

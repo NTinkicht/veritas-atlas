@@ -26,6 +26,8 @@ public sealed class VeritasAtlasDbContext : DbContext
     public DbSet<RevokedAccessToken> RevokedAccessTokens => Set<RevokedAccessToken>();
     public DbSet<TenantSourceRegistryEntry> TenantSourceRegistryEntries => Set<TenantSourceRegistryEntry>();
 
+    public DbSet<TenantRawRetrieval> TenantRawRetrievals => Set<TenantRawRetrieval>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfiguration(new PersonConfiguration());
@@ -43,6 +45,7 @@ public sealed class VeritasAtlasDbContext : DbContext
         modelBuilder.ApplyConfiguration(new PublicationConfiguration());
         modelBuilder.ApplyConfiguration(new RevokedAccessTokenConfiguration());
         modelBuilder.ApplyConfiguration(new TenantSourceRegistryEntryConfiguration());
+        modelBuilder.ApplyConfiguration(new TenantRawRetrievalConfiguration());
 
         base.OnModelCreating(modelBuilder);
     }
