@@ -1100,6 +1100,94 @@ public sealed class TenantParseRunConfiguration : IEntityTypeConfiguration<Verit
     }
 }
 
+public sealed class TenantRetrievalAttestationConfiguration : IEntityTypeConfiguration<VeritasAtlas.Infrastructure.Persistence.TenantRetrievalAttestation>
+{
+    // Stored exactly as given: not blank, no surrounding whitespace and no
+    // control characters (C0, DEL, C1).
+    private static string ExactText(string column) =>
+        $"length({column}) > 0 AND {column} = btrim({column}) AND {column} !~ '[\\x01-\\x1f\\x7f-\\x9f]'";
+
+    public void Configure(EntityTypeBuilder<VeritasAtlas.Infrastructure.Persistence.TenantRetrievalAttestation> builder)
+    {
+        builder.ToTable("tenant_retrieval_attestations", table =>
+        {
+            table.HasCheckConstraint(
+                "ck_tenant_retrieval_attestations_tenant_id_not_empty",
+                "tenant_id <> '00000000-0000-0000-0000-000000000000'::uuid");
+            table.HasCheckConstraint(
+                "ck_tenant_retrieval_attestations_attestation_key_not_blank",
+                "length(btrim(attestation_key)) > 0");
+            table.HasCheckConstraint(
+                "ck_tenant_retrieval_attestations_retriever_identity_shape",
+                ExactText("retriever_identity"));
+            table.HasCheckConstraint(
+                "ck_tenant_retrieval_attestations_publisher_identity_shape",
+                ExactText("publisher_identity"));
+            table.HasCheckConstraint(
+                "ck_tenant_retrieval_attestations_binding_reference_shape",
+                ExactText("binding_reference"));
+            table.HasCheckConstraint(
+                "ck_tenant_retrieval_attestations_binding_mechanism",
+                "binding_mechanism IN ('source_registry', 'publisher_signature')");
+            table.HasCheckConstraint(
+                "ck_tenant_retrieval_attestations_authentication_result",
+                "authentication_result IN ('authenticated', 'unauthenticated', 'failed')");
+            table.HasCheckConstraint(
+                "ck_tenant_retrieval_attestations_jurisdiction_code",
+                "jurisdiction ~ '^[a-z0-9][a-z0-9._-]*$'");
+            table.HasCheckConstraint(
+                "ck_tenant_retrieval_attestations_source_type",
+                "source_type IN ('court_record', 'statute', 'regulation', 'register', 'filing', 'other_public_record')");
+        });
+
+        builder.HasKey(x => new { x.TenantId, x.Id })
+            .HasName("pk_tenant_retrieval_attestations");
+
+        builder.Property(x => x.TenantId).HasColumnName("tenant_id").IsRequired();
+        builder.Property(x => x.Id).HasColumnName("id").ValueGeneratedNever().IsRequired();
+        builder.Property(x => x.RawRetrievalId).HasColumnName("raw_retrieval_id").IsRequired();
+        builder.Property(x => x.AttestationKey)
+            .HasColumnName("attestation_key")
+            .HasMaxLength(VeritasAtlas.Application.Interfaces.TenantRetrievalAttestationLimits.MaxAttestationKeyLength)
+            .IsRequired();
+        builder.Property(x => x.RetrieverIdentity)
+            .HasColumnName("retriever_identity")
+            .HasMaxLength(VeritasAtlas.Application.Interfaces.TenantRetrievalAttestationLimits.MaxIdentityLength)
+            .IsRequired();
+        builder.Property(x => x.PublisherIdentity)
+            .HasColumnName("publisher_identity")
+            .HasMaxLength(VeritasAtlas.Application.Interfaces.TenantRetrievalAttestationLimits.MaxIdentityLength)
+            .IsRequired();
+        builder.Property(x => x.BindingMechanism).HasColumnName("binding_mechanism").HasMaxLength(32).IsRequired();
+        builder.Property(x => x.BindingReference)
+            .HasColumnName("binding_reference")
+            .HasMaxLength(VeritasAtlas.Application.Interfaces.TenantRetrievalAttestationLimits.MaxBindingReferenceLength)
+            .IsRequired();
+        builder.Property(x => x.AuthenticationResult).HasColumnName("authentication_result").HasMaxLength(24).IsRequired();
+        builder.Property(x => x.Jurisdiction)
+            .HasColumnName("jurisdiction")
+            .HasMaxLength(VeritasAtlas.Application.Interfaces.TenantRetrievalAttestationLimits.MaxJurisdictionLength)
+            .IsRequired();
+        builder.Property(x => x.SourceType).HasColumnName("source_type").HasMaxLength(32).IsRequired();
+        builder.Property(x => x.AttestedAtUtc).HasColumnName("attested_at_utc").IsRequired();
+        builder.Property(x => x.CreatedAtUtc).HasColumnName("created_at_utc").IsRequired();
+
+        builder.HasIndex(x => new { x.TenantId, x.AttestationKey })
+            .IsUnique()
+            .HasDatabaseName("ux_tenant_retrieval_attestations_tenant_attestation_key");
+        builder.HasIndex(x => new { x.TenantId, x.RawRetrievalId, x.AttestedAtUtc })
+            .HasDatabaseName("ix_tenant_retrieval_attestations_tenant_raw_retrieval_attested_at");
+
+        // Composite key: an attestation can only point at its own tenant's retrieval.
+        builder.HasOne<VeritasAtlas.Infrastructure.Persistence.TenantRawRetrieval>()
+            .WithMany()
+            .HasForeignKey(x => new { x.TenantId, x.RawRetrievalId })
+            .HasPrincipalKey(x => new { x.TenantId, x.Id })
+            .HasConstraintName("fk_tenant_retrieval_attestations_tenant_raw_retrieval")
+            .OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
 public sealed class TenantInvestigationConfiguration : IEntityTypeConfiguration<VeritasAtlas.Infrastructure.Persistence.TenantInvestigation>
 {
     public void Configure(EntityTypeBuilder<VeritasAtlas.Infrastructure.Persistence.TenantInvestigation> builder)
