@@ -71,7 +71,7 @@ public class AuthController : ControllerBase
 
         _attemptGuard.RecordSuccess(request.Username);
 
-        var token = _jwtTokenService.CreateToken(user.Username, user.Role);
+        var token = _jwtTokenService.CreateToken(user.Username, user.Role, user.TenantId);
 
         return Ok(new LoginResponse(
             token.Token,

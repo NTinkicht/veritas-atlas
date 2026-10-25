@@ -41,6 +41,12 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IReviewService, ReviewService>();
         services.AddScoped<IPublicationService, PublicationService>();
         services.AddScoped<IAccessTokenRevocationStore, EfAccessTokenRevocationStore>();
+        services.AddScoped<ITenantSourceRegistry, EfTenantSourceRegistry>();
+        services.AddScoped<ITenantRawRetrievalLedger, EfTenantRawRetrievalLedger>();
+        services.AddScoped<ITenantFetchAttemptLedger, EfTenantFetchAttemptLedger>();
+        services.AddScoped<ITenantParseRunLedger, EfTenantParseRunLedger>();
+        services.AddScoped<ITenantInvestigationStore, EfTenantInvestigationStore>();
+        services.AddScoped<ITenantAuditEventStore, EfTenantAuditEventStore>();
 
         return services;
     }

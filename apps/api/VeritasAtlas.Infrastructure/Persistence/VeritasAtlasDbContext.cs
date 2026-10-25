@@ -24,6 +24,17 @@ public sealed class VeritasAtlasDbContext : DbContext
     public DbSet<Review> Reviews => Set<Review>();
     public DbSet<Publication> Publications => Set<Publication>();
     public DbSet<RevokedAccessToken> RevokedAccessTokens => Set<RevokedAccessToken>();
+    public DbSet<TenantSourceRegistryEntry> TenantSourceRegistryEntries => Set<TenantSourceRegistryEntry>();
+
+    public DbSet<TenantRawRetrieval> TenantRawRetrievals => Set<TenantRawRetrieval>();
+
+    public DbSet<TenantFetchAttempt> TenantFetchAttempts => Set<TenantFetchAttempt>();
+
+    public DbSet<TenantParseRun> TenantParseRuns => Set<TenantParseRun>();
+
+    public DbSet<TenantInvestigation> TenantInvestigations => Set<TenantInvestigation>();
+
+    public DbSet<TenantAuditEvent> TenantAuditEvents => Set<TenantAuditEvent>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -41,6 +52,12 @@ public sealed class VeritasAtlasDbContext : DbContext
         modelBuilder.ApplyConfiguration(new ReviewConfiguration());
         modelBuilder.ApplyConfiguration(new PublicationConfiguration());
         modelBuilder.ApplyConfiguration(new RevokedAccessTokenConfiguration());
+        modelBuilder.ApplyConfiguration(new TenantSourceRegistryEntryConfiguration());
+        modelBuilder.ApplyConfiguration(new TenantRawRetrievalConfiguration());
+        modelBuilder.ApplyConfiguration(new TenantFetchAttemptConfiguration());
+        modelBuilder.ApplyConfiguration(new TenantParseRunConfiguration());
+        modelBuilder.ApplyConfiguration(new TenantInvestigationConfiguration());
+        modelBuilder.ApplyConfiguration(new TenantAuditEventConfiguration());
 
         base.OnModelCreating(modelBuilder);
     }

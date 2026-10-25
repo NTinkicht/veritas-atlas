@@ -223,6 +223,279 @@
         "classification_proof": "trusted-test-classification"
       },
       "trust": {"retrieval": true, "classification": true, "digest": true}
+    },
+    {
+      "id": "accept-default-port-percent-unreserved-query-order",
+      "expected": "accept",
+      "envelope": {
+        "schema_version": "1.0",
+        "source_uri": "http://Example.ORG:80/%7euser/%2fdocs/./x%2Dy?b=2&a=1&b=%7e#top",
+        "record_id": "record-7",
+        "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "parser_name": "public-record-parser",
+        "parser_version": "1.0.0",
+        "retrieved_at": "2026-10-03T20:00:00Z",
+        "retrieval_attestation": "trusted-test-attestation",
+        "jurisdiction": "test-jurisdiction",
+        "source_type": "court_record",
+        "classification_proof": "trusted-test-classification",
+        "evidence_ref": "ev1:18b52d0882a69ab37d46e86d646ddfa90d54d67d8afde998bfcac9dda70a2b42"
+      },
+      "trust": {"retrieval": true, "classification": true, "digest": true},
+      "expected_normalized_source_uri": "http://example.org/~user/%2Fdocs/x-y?b=2&a=1&b=~",
+      "expected_evidence_ref": "ev1:18b52d0882a69ab37d46e86d646ddfa90d54d67d8afde998bfcac9dda70a2b42"
+    },
+    {
+      "id": "accept-non-default-port-trailing-slash",
+      "expected": "accept",
+      "envelope": {
+        "schema_version": "1.0",
+        "source_uri": "https://Records.Example:8443/a/b/../c/",
+        "record_id": "record-8",
+        "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "parser_name": "public-record-parser",
+        "parser_version": "1.0.0",
+        "retrieved_at": "2026-10-03T20:00:00Z",
+        "retrieval_attestation": "trusted-test-attestation",
+        "jurisdiction": "test-jurisdiction",
+        "source_type": "court_record",
+        "classification_proof": "trusted-test-classification",
+        "evidence_ref": "ev1:7a09e3f49e679ef3e60e6b04f2b91dcc55dc1616f6c92c4ef572b6e5118202eb"
+      },
+      "trust": {"retrieval": true, "classification": true, "digest": true},
+      "expected_normalized_source_uri": "https://records.example:8443/a/c/",
+      "expected_evidence_ref": "ev1:7a09e3f49e679ef3e60e6b04f2b91dcc55dc1616f6c92c4ef572b6e5118202eb"
+    },
+    {
+      "id": "accept-empty-path-becomes-root",
+      "expected": "accept",
+      "envelope": {
+        "schema_version": "1.0",
+        "source_uri": "https://EXAMPLE.com?x=1#f",
+        "record_id": "record-9",
+        "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "parser_name": "public-record-parser",
+        "parser_version": "1.0.0",
+        "retrieved_at": "2026-10-03T20:00:00Z",
+        "retrieval_attestation": "trusted-test-attestation",
+        "jurisdiction": "test-jurisdiction",
+        "source_type": "court_record",
+        "classification_proof": "trusted-test-classification",
+        "evidence_ref": "ev1:ff71487e86755a15f2efe425261ea6fd9474ece68b7de55b8c197ec2246e4a09"
+      },
+      "trust": {"retrieval": true, "classification": true, "digest": true},
+      "expected_normalized_source_uri": "https://example.com/?x=1",
+      "expected_evidence_ref": "ev1:ff71487e86755a15f2efe425261ea6fd9474ece68b7de55b8c197ec2246e4a09"
+    },
+    {
+      "id": "reject-secret-bearing-query",
+      "expected": "reject",
+      "reason": "secret_bearing_query",
+      "envelope": {
+        "schema_version": "1.0",
+        "source_uri": "https://example.com/r?id=1&api_key=abc",
+        "record_id": "record-1",
+        "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "parser_name": "public-record-parser",
+        "parser_version": "1.0.0",
+        "retrieved_at": "2026-10-03T20:00:00Z",
+        "retrieval_attestation": "trusted-test-attestation",
+        "jurisdiction": "test-jurisdiction",
+        "source_type": "court_record",
+        "classification_proof": "trusted-test-classification"
+      },
+      "trust": {"retrieval": true, "classification": true, "digest": true}
+    },
+    {
+      "id": "reject-userinfo",
+      "expected": "reject",
+      "reason": "source_uri_userinfo_forbidden",
+      "envelope": {
+        "schema_version": "1.0",
+        "source_uri": "https://user:pw@example.com/r",
+        "record_id": "record-1",
+        "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "parser_name": "public-record-parser",
+        "parser_version": "1.0.0",
+        "retrieved_at": "2026-10-03T20:00:00Z",
+        "retrieval_attestation": "trusted-test-attestation",
+        "jurisdiction": "test-jurisdiction",
+        "source_type": "court_record",
+        "classification_proof": "trusted-test-classification"
+      },
+      "trust": {"retrieval": true, "classification": true, "digest": true}
+    },
+    {
+      "id": "reject-unicode-host-pinned-idna-unprovable",
+      "expected": "reject",
+      "reason": "unsupported_idna_profile",
+      "envelope": {
+        "schema_version": "1.0",
+        "source_uri": "https://BÜCHER.example/r",
+        "record_id": "record-1",
+        "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "parser_name": "public-record-parser",
+        "parser_version": "1.0.0",
+        "retrieved_at": "2026-10-03T20:00:00Z",
+        "retrieval_attestation": "trusted-test-attestation",
+        "jurisdiction": "test-jurisdiction",
+        "source_type": "court_record",
+        "classification_proof": "trusted-test-classification"
+      },
+      "trust": {"retrieval": true, "classification": true, "digest": true}
+    },
+    {
+      "id": "reject-malformed-percent-escape",
+      "expected": "reject",
+      "reason": "malformed_percent_escape",
+      "envelope": {
+        "schema_version": "1.0",
+        "source_uri": "https://example.com/r%2",
+        "record_id": "record-1",
+        "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "parser_name": "public-record-parser",
+        "parser_version": "1.0.0",
+        "retrieved_at": "2026-10-03T20:00:00Z",
+        "retrieval_attestation": "trusted-test-attestation",
+        "jurisdiction": "test-jurisdiction",
+        "source_type": "court_record",
+        "classification_proof": "trusted-test-classification"
+      },
+      "trust": {"retrieval": true, "classification": true, "digest": true}
+    },
+    {
+      "id": "reject-non-http-scheme",
+      "expected": "reject",
+      "reason": "malformed_source_uri",
+      "envelope": {
+        "schema_version": "1.0",
+        "source_uri": "ftp://example.com/r",
+        "record_id": "record-1",
+        "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "parser_name": "public-record-parser",
+        "parser_version": "1.0.0",
+        "retrieved_at": "2026-10-03T20:00:00Z",
+        "retrieval_attestation": "trusted-test-attestation",
+        "jurisdiction": "test-jurisdiction",
+        "source_type": "court_record",
+        "classification_proof": "trusted-test-classification"
+      },
+      "trust": {"retrieval": true, "classification": true, "digest": true}
+    },
+    {
+      "id": "reject-evidence-ref-mismatch",
+      "expected": "reject",
+      "reason": "evidence_ref_mismatch",
+      "envelope": {
+        "schema_version": "1.0",
+        "source_uri": "HTTPS://EXAMPLE.COM:443/a/../record/%31#fragment",
+        "record_id": "record-1",
+        "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "parser_name": "public-record-parser",
+        "parser_version": "1.0.0",
+        "retrieved_at": "2026-10-03T20:00:00Z",
+        "retrieval_attestation": "trusted-test-attestation",
+        "jurisdiction": "test-jurisdiction",
+        "source_type": "court_record",
+        "classification_proof": "trusted-test-classification",
+        "evidence_ref": "ev1:0000000000000000000000000000000000000000000000000000000000000000"
+      },
+      "trust": {"retrieval": true, "classification": true, "digest": true}
+    },
+    {
+      "id": "reject-non-utc-retrieved-at",
+      "expected": "reject",
+      "reason": "invalid_retrieved_at",
+      "envelope": {
+        "schema_version": "1.0",
+        "source_uri": "HTTPS://EXAMPLE.COM:443/a/../record/%31#fragment",
+        "record_id": "record-1",
+        "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "parser_name": "public-record-parser",
+        "parser_version": "1.0.0",
+        "retrieved_at": "2026-10-03T21:00:00+01:00",
+        "retrieval_attestation": "trusted-test-attestation",
+        "jurisdiction": "test-jurisdiction",
+        "source_type": "court_record",
+        "classification_proof": "trusted-test-classification"
+      },
+      "trust": {"retrieval": true, "classification": true, "digest": true}
+    },
+    {
+      "id": "reject-untrusted-retrieval",
+      "expected": "reject",
+      "reason": "untrusted_retrieval",
+      "envelope": {
+        "schema_version": "1.0",
+        "source_uri": "HTTPS://EXAMPLE.COM:443/a/../record/%31#fragment",
+        "record_id": "record-1",
+        "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "parser_name": "public-record-parser",
+        "parser_version": "1.0.0",
+        "retrieved_at": "2026-10-03T20:00:00Z",
+        "retrieval_attestation": "trusted-test-attestation",
+        "jurisdiction": "test-jurisdiction",
+        "source_type": "court_record",
+        "classification_proof": "trusted-test-classification"
+      },
+      "trust": {"retrieval": false, "classification": true, "digest": true}
+    },
+    {
+      "id": "reject-unverified-content-digest",
+      "expected": "reject",
+      "reason": "content_digest_unverified",
+      "envelope": {
+        "schema_version": "1.0",
+        "source_uri": "HTTPS://EXAMPLE.COM:443/a/../record/%31#fragment",
+        "record_id": "record-1",
+        "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "parser_name": "public-record-parser",
+        "parser_version": "1.0.0",
+        "retrieved_at": "2026-10-03T20:00:00Z",
+        "retrieval_attestation": "trusted-test-attestation",
+        "jurisdiction": "test-jurisdiction",
+        "source_type": "court_record",
+        "classification_proof": "trusted-test-classification"
+      },
+      "trust": {"retrieval": true, "classification": true, "digest": false}
+    },
+    {
+      "id": "reject-content-digest-trailing-newline",
+      "expected": "reject",
+      "reason": "invalid_sha256",
+      "envelope": {
+        "schema_version": "1.0",
+        "source_uri": "HTTPS://EXAMPLE.COM:443/a/../record/%31#fragment",
+        "record_id": "record-1",
+        "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n",
+        "parser_name": "public-record-parser",
+        "parser_version": "1.0.0",
+        "retrieved_at": "2026-10-03T20:00:00Z",
+        "retrieval_attestation": "trusted-test-attestation",
+        "jurisdiction": "test-jurisdiction",
+        "source_type": "court_record",
+        "classification_proof": "trusted-test-classification"
+      },
+      "trust": {"retrieval": true, "classification": true, "digest": true}
+    },
+    {
+      "id": "reject-retrieved-at-trailing-newline",
+      "expected": "reject",
+      "reason": "invalid_retrieved_at",
+      "envelope": {
+        "schema_version": "1.0",
+        "source_uri": "HTTPS://EXAMPLE.COM:443/a/../record/%31#fragment",
+        "record_id": "record-1",
+        "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "parser_name": "public-record-parser",
+        "parser_version": "1.0.0",
+        "retrieved_at": "2026-10-03T20:00:00Z\n",
+        "retrieval_attestation": "trusted-test-attestation",
+        "jurisdiction": "test-jurisdiction",
+        "source_type": "court_record",
+        "classification_proof": "trusted-test-classification"
+      },
+      "trust": {"retrieval": true, "classification": true, "digest": true}
     }
   ]
 }
