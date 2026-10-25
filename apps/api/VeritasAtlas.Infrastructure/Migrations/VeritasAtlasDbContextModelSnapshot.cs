@@ -828,6 +828,92 @@ namespace VeritasAtlas.Infrastructure.Migrations
                         });
                 });
 
+            modelBuilder.Entity("VeritasAtlas.Infrastructure.Persistence.TenantParseRun", b =>
+                {
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<string>("EvidenceReference")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("evidence_reference");
+
+                    b.Property<string>("FailureClass")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("failure_class");
+
+                    b.Property<string>("Outcome")
+                        .IsRequired()
+                        .HasMaxLength(24)
+                        .HasColumnType("character varying(24)")
+                        .HasColumnName("outcome");
+
+                    b.Property<string>("ParserName")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("parser_name");
+
+                    b.Property<string>("ParserVersion")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("parser_version");
+
+                    b.Property<Guid>("RawRetrievalId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("raw_retrieval_id");
+
+                    b.Property<string>("RunKey")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("run_key");
+
+                    b.Property<DateTime>("StartedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("started_at_utc");
+
+                    b.HasKey("TenantId", "Id")
+                        .HasName("pk_tenant_parse_runs");
+
+                    b.HasIndex("TenantId", "RunKey")
+                        .IsUnique()
+                        .HasDatabaseName("ux_tenant_parse_runs_tenant_run_key");
+
+                    b.HasIndex("TenantId", "RawRetrievalId", "StartedAtUtc")
+                        .HasDatabaseName("ix_tenant_parse_runs_tenant_raw_retrieval_started_at");
+
+                    b.ToTable("tenant_parse_runs", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_tenant_parse_runs_failure_class", "failure_class IS NULL OR failure_class IN ('unsupported_format', 'malformed', 'oversized', 'parser_error')");
+
+                            t.HasCheckConstraint("ck_tenant_parse_runs_no_pre_parser_evidence_reference", "evidence_reference IS NULL");
+
+                            t.HasCheckConstraint("ck_tenant_parse_runs_outcome", "outcome IN ('failed', 'parsed_unverified')");
+
+                            t.HasCheckConstraint("ck_tenant_parse_runs_outcome_shape", "(outcome = 'failed' AND failure_class IS NOT NULL) OR (outcome = 'parsed_unverified' AND failure_class IS NULL)");
+
+                            t.HasCheckConstraint("ck_tenant_parse_runs_parser_name_identity", "parser_name ~ '^[a-z0-9][a-z0-9._-]*$'");
+
+                            t.HasCheckConstraint("ck_tenant_parse_runs_parser_version_identity", "parser_version ~ '^[a-z0-9][a-z0-9._-]*$'");
+
+                            t.HasCheckConstraint("ck_tenant_parse_runs_run_key_not_blank", "length(btrim(run_key)) > 0");
+
+                            t.HasCheckConstraint("ck_tenant_parse_runs_tenant_id_not_empty", "tenant_id <> '00000000-0000-0000-0000-000000000000'::uuid");
+                        });
+                });
+
             modelBuilder.Entity("VeritasAtlas.Infrastructure.Persistence.TenantRawRetrieval", b =>
                 {
                     b.Property<Guid>("TenantId")
@@ -1265,6 +1351,16 @@ namespace VeritasAtlas.Infrastructure.Migrations
                         .HasPrincipalKey("TenantId", "SourceEntryId", "Id")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_tenant_fetch_attempts_tenant_source_raw_retrieval");
+                });
+
+            modelBuilder.Entity("VeritasAtlas.Infrastructure.Persistence.TenantParseRun", b =>
+                {
+                    b.HasOne("VeritasAtlas.Infrastructure.Persistence.TenantRawRetrieval", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "RawRetrievalId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_tenant_parse_runs_tenant_raw_retrieval");
                 });
 
             modelBuilder.Entity("VeritasAtlas.Infrastructure.Persistence.TenantRawRetrieval", b =>
