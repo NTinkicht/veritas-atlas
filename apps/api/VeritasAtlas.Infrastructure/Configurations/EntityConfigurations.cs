@@ -1115,8 +1115,8 @@ public sealed class TenantRetrievalAttestationConfiguration : IEntityTypeConfigu
                 "ck_tenant_retrieval_attestations_tenant_id_not_empty",
                 "tenant_id <> '00000000-0000-0000-0000-000000000000'::uuid");
             table.HasCheckConstraint(
-                "ck_tenant_retrieval_attestations_attestation_key_not_blank",
-                "length(btrim(attestation_key)) > 0");
+                "ck_tenant_retrieval_attestations_attestation_key_shape",
+                ExactText("attestation_key"));
             table.HasCheckConstraint(
                 "ck_tenant_retrieval_attestations_retriever_identity_shape",
                 ExactText("retriever_identity"));

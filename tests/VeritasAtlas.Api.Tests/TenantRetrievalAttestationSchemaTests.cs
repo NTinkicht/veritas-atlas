@@ -44,14 +44,23 @@ public sealed class TenantRetrievalAttestationSchemaTests
         var retrievalA = await RetrievalAsync(db, TenantA, "r-a");
         var retrievalB = await RetrievalAsync(db, TenantB, "r-b");
 
-        Task Insert(Guid tenant, Guid retrieval) =>
+        Task Insert(Guid tenant, Guid retrieval, string key = "att-1") =>
             db.Database.ExecuteSqlInterpolatedAsync(
-                $"INSERT INTO tenant_retrieval_attestations (tenant_id, id, raw_retrieval_id, attestation_key, retriever_identity, publisher_identity, binding_mechanism, binding_reference, authentication_result, jurisdiction, source_type, attested_at_utc, created_at_utc) VALUES ({tenant}, {Guid.NewGuid()}, {retrieval}, {"att-1"}, {"veritas-retriever/1"}, {"Cour supreme"}, {"source_registry"}, {"registry:1"}, {"authenticated"}, {"dz"}, {"court_record"}, {AttestedAt}, {AttestedAt})");
+                $"INSERT INTO tenant_retrieval_attestations (tenant_id, id, raw_retrieval_id, attestation_key, retriever_identity, publisher_identity, binding_mechanism, binding_reference, authentication_result, jurisdiction, source_type, attested_at_utc, created_at_utc) VALUES ({tenant}, {Guid.NewGuid()}, {retrieval}, {key}, {"veritas-retriever/1"}, {"Cour supreme"}, {"source_registry"}, {"registry:1"}, {"authenticated"}, {"dz"}, {"court_record"}, {AttestedAt}, {AttestedAt})");
 
         await Insert(TenantA, retrievalA);
         await Insert(TenantB, retrievalB);
         var duplicate = await Assert.ThrowsExactlyAsync<PostgresException>(() => Insert(TenantA, retrievalA));
         Assert.AreEqual("23505", duplicate.SqlState);
+
+        // The idempotency key is stored exactly as given, like the other text
+        // columns: never blank, never padded, no control characters.
+        foreach (var key in new[] { "", "   ", " att-2", "att-2 ", "att\u00072", "att\n2", "att\u00852" })
+        {
+            var refused = await Assert.ThrowsExactlyAsync<PostgresException>(() => Insert(TenantA, retrievalA, key), key);
+            Assert.AreEqual("23514", refused.SqlState, key);
+        }
+
         Assert.AreEqual(2, await db.TenantRetrievalAttestations.CountAsync());
     }
 

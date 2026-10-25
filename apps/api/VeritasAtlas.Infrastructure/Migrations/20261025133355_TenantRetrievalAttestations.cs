@@ -32,7 +32,7 @@ namespace VeritasAtlas.Infrastructure.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("pk_tenant_retrieval_attestations", x => new { x.tenant_id, x.id });
-                    table.CheckConstraint("ck_tenant_retrieval_attestations_attestation_key_not_blank", "length(btrim(attestation_key)) > 0");
+                    table.CheckConstraint("ck_tenant_retrieval_attestations_attestation_key_shape", "length(attestation_key) > 0 AND attestation_key = btrim(attestation_key) AND attestation_key !~ '[\\x01-\\x1f\\x7f-\\x9f]'");
                     table.CheckConstraint("ck_tenant_retrieval_attestations_authentication_result", "authentication_result IN ('authenticated', 'unauthenticated', 'failed')");
                     table.CheckConstraint("ck_tenant_retrieval_attestations_binding_mechanism", "binding_mechanism IN ('source_registry', 'publisher_signature')");
                     table.CheckConstraint("ck_tenant_retrieval_attestations_binding_reference_shape", "length(binding_reference) > 0 AND binding_reference = btrim(binding_reference) AND binding_reference !~ '[\\x01-\\x1f\\x7f-\\x9f]'");

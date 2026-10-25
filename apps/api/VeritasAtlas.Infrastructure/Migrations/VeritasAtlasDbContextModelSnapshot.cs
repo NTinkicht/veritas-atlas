@@ -1204,7 +1204,7 @@ namespace VeritasAtlas.Infrastructure.Migrations
 
                     b.ToTable("tenant_retrieval_attestations", null, t =>
                         {
-                            t.HasCheckConstraint("ck_tenant_retrieval_attestations_attestation_key_not_blank", "length(btrim(attestation_key)) > 0");
+                            t.HasCheckConstraint("ck_tenant_retrieval_attestations_attestation_key_shape", "length(attestation_key) > 0 AND attestation_key = btrim(attestation_key) AND attestation_key !~ '[\\x01-\\x1f\\x7f-\\x9f]'");
 
                             t.HasCheckConstraint("ck_tenant_retrieval_attestations_authentication_result", "authentication_result IN ('authenticated', 'unauthenticated', 'failed')");
 
