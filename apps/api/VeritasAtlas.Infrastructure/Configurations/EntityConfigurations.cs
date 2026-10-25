@@ -1025,3 +1025,77 @@ public sealed class TenantFetchAttemptConfiguration : IEntityTypeConfiguration<V
             .OnDelete(DeleteBehavior.Restrict);
     }
 }
+
+public sealed class TenantParseRunConfiguration : IEntityTypeConfiguration<VeritasAtlas.Infrastructure.Persistence.TenantParseRun>
+{
+    public void Configure(EntityTypeBuilder<VeritasAtlas.Infrastructure.Persistence.TenantParseRun> builder)
+    {
+        builder.ToTable("tenant_parse_runs", table =>
+        {
+            table.HasCheckConstraint(
+                "ck_tenant_parse_runs_tenant_id_not_empty",
+                "tenant_id <> '00000000-0000-0000-0000-000000000000'::uuid");
+            table.HasCheckConstraint(
+                "ck_tenant_parse_runs_run_key_not_blank",
+                "length(btrim(run_key)) > 0");
+            table.HasCheckConstraint(
+                "ck_tenant_parse_runs_parser_name_identity",
+                "parser_name ~ '^[a-z0-9][a-z0-9._-]*$'");
+            table.HasCheckConstraint(
+                "ck_tenant_parse_runs_parser_version_identity",
+                "parser_version ~ '^[a-z0-9][a-z0-9._-]*$'");
+            table.HasCheckConstraint(
+                "ck_tenant_parse_runs_outcome",
+                "outcome IN ('failed', 'parsed_unverified')");
+            table.HasCheckConstraint(
+                "ck_tenant_parse_runs_failure_class",
+                "failure_class IS NULL OR failure_class IN ('unsupported_format', 'malformed', 'oversized', 'parser_error')");
+            table.HasCheckConstraint(
+                "ck_tenant_parse_runs_outcome_shape",
+                "(outcome = 'failed' AND failure_class IS NOT NULL) OR (outcome = 'parsed_unverified' AND failure_class IS NULL)");
+            // Only VER-P0-07's versioned parser may populate or verify this slot,
+            // through its own migration: no pre-parser ev1: reference.
+            table.HasCheckConstraint(
+                "ck_tenant_parse_runs_no_pre_parser_evidence_reference",
+                "evidence_reference IS NULL");
+        });
+
+        builder.HasKey(x => new { x.TenantId, x.Id })
+            .HasName("pk_tenant_parse_runs");
+
+        builder.Property(x => x.TenantId).HasColumnName("tenant_id").IsRequired();
+        builder.Property(x => x.Id).HasColumnName("id").ValueGeneratedNever().IsRequired();
+        builder.Property(x => x.RawRetrievalId).HasColumnName("raw_retrieval_id").IsRequired();
+        builder.Property(x => x.RunKey)
+            .HasColumnName("run_key")
+            .HasMaxLength(VeritasAtlas.Application.Interfaces.TenantParseRunLimits.MaxRunKeyLength)
+            .IsRequired();
+        builder.Property(x => x.ParserName)
+            .HasColumnName("parser_name")
+            .HasMaxLength(VeritasAtlas.Application.Interfaces.TenantParseRunLimits.MaxParserIdentityLength)
+            .IsRequired();
+        builder.Property(x => x.ParserVersion)
+            .HasColumnName("parser_version")
+            .HasMaxLength(VeritasAtlas.Application.Interfaces.TenantParseRunLimits.MaxParserIdentityLength)
+            .IsRequired();
+        builder.Property(x => x.Outcome).HasColumnName("outcome").HasMaxLength(24).IsRequired();
+        builder.Property(x => x.FailureClass).HasColumnName("failure_class").HasMaxLength(32);
+        builder.Property(x => x.EvidenceReference).HasColumnName("evidence_reference").HasMaxLength(128);
+        builder.Property(x => x.StartedAtUtc).HasColumnName("started_at_utc").IsRequired();
+        builder.Property(x => x.CreatedAtUtc).HasColumnName("created_at_utc").IsRequired();
+
+        builder.HasIndex(x => new { x.TenantId, x.RunKey })
+            .IsUnique()
+            .HasDatabaseName("ux_tenant_parse_runs_tenant_run_key");
+        builder.HasIndex(x => new { x.TenantId, x.RawRetrievalId, x.StartedAtUtc })
+            .HasDatabaseName("ix_tenant_parse_runs_tenant_raw_retrieval_started_at");
+
+        // Composite key: a run can only point at its own tenant's retrieval.
+        builder.HasOne<VeritasAtlas.Infrastructure.Persistence.TenantRawRetrieval>()
+            .WithMany()
+            .HasForeignKey(x => new { x.TenantId, x.RawRetrievalId })
+            .HasPrincipalKey(x => new { x.TenantId, x.Id })
+            .HasConstraintName("fk_tenant_parse_runs_tenant_raw_retrieval")
+            .OnDelete(DeleteBehavior.Restrict);
+    }
+}
