@@ -242,7 +242,7 @@ public sealed class TenantParseRunLedgerTests
         var source = await new EfTenantSourceRegistry(db, TimeProvider.System)
             .CreateAsync(tenant, "https://example.test/" + key, "synthetic-seeder", CancellationToken.None);
         var result = await new EfTenantRawRetrievalLedger(db, TimeProvider.System).RecordAsync(
-            tenant, new RawRetrievalInput(source!.Id, key, "https://example.test/a", StartedAt, Bytes), CancellationToken.None);
+            tenant, new RawRetrievalInput(source!.Id, key, "https://example.test/a", StartedAt, Bytes), "synthetic-seeder", CancellationToken.None);
         Assert.AreEqual(RawRetrievalRecordOutcome.Recorded, result.Outcome);
         return result.Record!.Id;
     }
