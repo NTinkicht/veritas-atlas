@@ -1099,3 +1099,52 @@ public sealed class TenantParseRunConfiguration : IEntityTypeConfiguration<Verit
             .OnDelete(DeleteBehavior.Restrict);
     }
 }
+
+public sealed class TenantInvestigationConfiguration : IEntityTypeConfiguration<VeritasAtlas.Infrastructure.Persistence.TenantInvestigation>
+{
+    public void Configure(EntityTypeBuilder<VeritasAtlas.Infrastructure.Persistence.TenantInvestigation> builder)
+    {
+        builder.ToTable("tenant_investigations", table =>
+        {
+            table.HasCheckConstraint(
+                "ck_tenant_investigations_tenant_id_not_empty",
+                "tenant_id <> '00000000-0000-0000-0000-000000000000'::uuid");
+            table.HasCheckConstraint(
+                "ck_tenant_investigations_creation_key_not_blank",
+                "length(btrim(creation_key)) > 0");
+            // Stored exactly as given: not blank, no surrounding whitespace and
+            // no control characters (C0, DEL, C1).
+            table.HasCheckConstraint(
+                "ck_tenant_investigations_title_shape",
+                "length(title) > 0 AND title = btrim(title) AND title !~ '[\\x01-\\x1f\\x7f-\\x9f]'");
+            table.HasCheckConstraint(
+                "ck_tenant_investigations_created_by_subject_not_blank",
+                "length(btrim(created_by_subject)) > 0");
+        });
+
+        builder.HasKey(x => new { x.TenantId, x.Id })
+            .HasName("pk_tenant_investigations");
+
+        builder.Property(x => x.TenantId).HasColumnName("tenant_id").IsRequired();
+        builder.Property(x => x.Id).HasColumnName("id").ValueGeneratedNever().IsRequired();
+        builder.Property(x => x.CreationKey)
+            .HasColumnName("creation_key")
+            .HasMaxLength(VeritasAtlas.Application.Interfaces.TenantInvestigationLimits.MaxCreationKeyLength)
+            .IsRequired();
+        builder.Property(x => x.Title)
+            .HasColumnName("title")
+            .HasMaxLength(VeritasAtlas.Application.Interfaces.TenantInvestigationLimits.MaxTitleLength)
+            .IsRequired();
+        builder.Property(x => x.CreatedBySubject)
+            .HasColumnName("created_by_subject")
+            .HasMaxLength(VeritasAtlas.Application.Interfaces.TenantInvestigationLimits.MaxSubjectLength)
+            .IsRequired();
+        builder.Property(x => x.CreatedAtUtc).HasColumnName("created_at_utc").IsRequired();
+
+        builder.HasIndex(x => new { x.TenantId, x.CreationKey })
+            .IsUnique()
+            .HasDatabaseName("ux_tenant_investigations_tenant_creation_key");
+        builder.HasIndex(x => new { x.TenantId, x.CreatedAtUtc })
+            .HasDatabaseName("ix_tenant_investigations_tenant_created_at");
+    }
+}
