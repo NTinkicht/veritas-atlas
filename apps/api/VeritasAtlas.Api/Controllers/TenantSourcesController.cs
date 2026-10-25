@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using Microsoft.AspNetCore.Mvc;
 using VeritasAtlas.Api.Infrastructure.Auth;
 using VeritasAtlas.Application.Interfaces;
@@ -28,6 +29,18 @@ public sealed class TenantSourcesController : ControllerBase
     {
         if (TenantClaim.GetTenantId(User) is not { } tenantId) return TenantRequired();
 
+        // The audit actor is the authenticated name claim; without a usable
+        // one the request is refused, never recorded as "anonymous" (#99).
+        var actor = User.FindFirstValue(ClaimTypes.Name);
+        if (string.IsNullOrWhiteSpace(actor)
+            || actor.Length > TenantAuditEventLimits.MaxSubjectLength
+            || actor.Any(char.IsControl))
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, new TenantSourceError(
+                "actor_required",
+                "The access token carries no usable subject name."));
+        }
+
         var canonicalKey = request?.CanonicalKey?.Trim();
         if (string.IsNullOrEmpty(canonicalKey)
             || canonicalKey.Length > TenantSourceRegistryLimits.MaxCanonicalKeyLength
@@ -38,7 +51,7 @@ public sealed class TenantSourcesController : ControllerBase
                 $"canonicalKey must be 1-{TenantSourceRegistryLimits.MaxCanonicalKeyLength} characters without control characters."));
         }
 
-        var created = await _registry.CreateAsync(tenantId, canonicalKey, cancellationToken);
+        var created = await _registry.CreateAsync(tenantId, canonicalKey, actor, cancellationToken);
         if (created is null)
         {
             return Conflict(new TenantSourceError(
