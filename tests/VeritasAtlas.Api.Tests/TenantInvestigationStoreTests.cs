@@ -42,6 +42,10 @@ public sealed class TenantInvestigationStoreTests
             (TenantA, Input() with { CreatedBySubject = "" }),
             (TenantA, Input() with { CreatedBySubject = "  " }),
             (TenantA, Input() with { CreatedBySubject = new string('s', TenantInvestigationLimits.MaxSubjectLength + 1) }),
+            // The audit actor rule (#97): no C0, DEL or C1 control characters.
+            (TenantA, Input() with { CreatedBySubject = "analyst\n7" }),
+            (TenantA, Input() with { CreatedBySubject = "analyst\u007f" }),
+            (TenantA, Input() with { CreatedBySubject = "analyst\u0085" }),
         };
         foreach (var (tenant, input) in cases)
         {
@@ -114,6 +118,63 @@ public sealed class TenantInvestigationStoreTests
         }
 
         Assert.AreEqual(1, await db.TenantInvestigations.CountAsync());
+        // Neither the replay nor the conflicts wrote an audit event (#97).
+        Assert.AreEqual(1, await db.TenantAuditEvents.CountAsync());
+    }
+
+    [TestMethod]
+    public async Task CreationWritesExactlyOneAuditEventInTheCallerTenant()
+    {
+        if (Database() is not { } connectionString) return;
+        await ResetAsync(connectionString);
+        await using var db = new VeritasAtlasDbContext(Options(connectionString));
+        var store = new EfTenantInvestigationStore(db, TimeProvider.System);
+        var audit = new EfTenantAuditEventStore(db, TimeProvider.System);
+
+        var created = (await store.CreateAsync(TenantA, Input(), CancellationToken.None)).Investigation!;
+        var id = created.Id.ToString("D");
+
+        var events = await audit.ListAsync(TenantA, null, null, CancellationToken.None);
+        Assert.AreEqual(1, events.Count);
+        var evt = events[0];
+        Assert.AreEqual($"investigation.created:{id}", evt.EventKey);
+        Assert.AreEqual("investigation.created", evt.Action);
+        Assert.AreEqual("investigation", evt.EntityType);
+        Assert.AreEqual(id, evt.EntityId);
+        Assert.AreEqual("analyst-7", evt.ActorSubject);
+        Assert.AreEqual(created.CreatedAtUtc, evt.OccurredAtUtc);
+        Assert.AreEqual(DateTimeKind.Utc, evt.OccurredAtUtc.Kind);
+        Assert.AreEqual(1, (await audit.ListAsync(TenantA, "investigation", id, CancellationToken.None)).Count);
+
+        // The event is tenant-scoped like the investigation itself.
+        Assert.AreEqual(0, (await audit.ListAsync(TenantB, null, null, CancellationToken.None)).Count);
+        await store.CreateAsync(TenantB, Input(), CancellationToken.None);
+        Assert.AreEqual(1, (await audit.ListAsync(TenantB, null, null, CancellationToken.None)).Count);
+        Assert.AreEqual(1, (await audit.ListAsync(TenantA, null, null, CancellationToken.None)).Count);
+    }
+
+    [TestMethod]
+    public async Task FailedAuditWriteRollsBackTheInvestigation()
+    {
+        if (Database() is not { } connectionString) return;
+        await ResetAsync(connectionString);
+        await using var db = new VeritasAtlasDbContext(Options(connectionString));
+        // Test-only fault in this per-test database: every audit insert fails.
+        await db.Database.ExecuteSqlRawAsync(
+            "CREATE FUNCTION test_refuse_audit() RETURNS trigger LANGUAGE plpgsql AS "
+            + "$$BEGIN RAISE EXCEPTION 'audit unavailable' USING ERRCODE = 'P0001'; END$$");
+        await db.Database.ExecuteSqlRawAsync(
+            "CREATE TRIGGER test_refuse_audit BEFORE INSERT ON tenant_audit_events "
+            + "FOR EACH ROW EXECUTE FUNCTION test_refuse_audit()");
+
+        var store = new EfTenantInvestigationStore(db, TimeProvider.System);
+        var error = await Assert.ThrowsExactlyAsync<DbUpdateException>(() =>
+            store.CreateAsync(TenantA, Input(), CancellationToken.None));
+        Assert.AreEqual("P0001", (error.InnerException as PostgresException)?.SqlState);
+
+        await using var check = new VeritasAtlasDbContext(Options(connectionString));
+        Assert.AreEqual(0, await check.TenantInvestigations.CountAsync());
+        Assert.AreEqual(0, await check.TenantAuditEvents.CountAsync());
     }
 
     [TestMethod]
@@ -135,6 +196,7 @@ public sealed class TenantInvestigationStoreTests
         Assert.AreEqual(1, results.Select(r => r.Investigation!.Id).Distinct().Count());
         await using var check = new VeritasAtlasDbContext(options);
         Assert.AreEqual(1, await check.TenantInvestigations.CountAsync());
+        Assert.AreEqual(1, await check.TenantAuditEvents.CountAsync());
     }
 
     [TestMethod]

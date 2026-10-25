@@ -10,11 +10,14 @@ namespace VeritasAtlas.Infrastructure.Services;
 /// #93). The database enforces the tenant key, title shape and refuses
 /// UPDATE/DELETE/TRUNCATE; this service checks the same rules first so callers
 /// get a typed outcome rather than a raw error. Every read is filtered to the
-/// caller tenant.
+/// caller tenant. Each created investigation writes its
+/// <c>investigation.created</c> audit event in the same transaction (#97).
 /// </summary>
 public sealed class EfTenantInvestigationStore : ITenantInvestigationStore
 {
     private const string UniqueViolation = "23505";
+    public const string CreatedAction = "investigation.created";
+    public const string AuditEntityType = "investigation";
     private readonly VeritasAtlasDbContext _db;
     private readonly TimeProvider _timeProvider;
 
@@ -46,7 +49,22 @@ public sealed class EfTenantInvestigationStore : ITenantInvestigationStore
             CreatedAtUtc = ToPostgresPrecision(_timeProvider.GetUtcNow().UtcDateTime)
         };
 
+        // Same SaveChanges, so one transaction: the investigation never
+        // exists without its audit event, nor the event without it (#97).
+        var audit = new TenantAuditEvent
+        {
+            TenantId = tenantId,
+            Id = Guid.NewGuid(),
+            EventKey = $"{CreatedAction}:{row.Id:D}",
+            Action = CreatedAction,
+            EntityType = AuditEntityType,
+            EntityId = row.Id.ToString("D"),
+            ActorSubject = row.CreatedBySubject,
+            OccurredAtUtc = row.CreatedAtUtc
+        };
+
         _db.TenantInvestigations.Add(row);
+        _db.TenantAuditEvents.Add(audit);
         try
         {
             await _db.SaveChangesAsync(cancellationToken);
@@ -54,6 +72,7 @@ public sealed class EfTenantInvestigationStore : ITenantInvestigationStore
         catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: UniqueViolation })
         {
             _db.Entry(row).State = EntityState.Detached;
+            _db.Entry(audit).State = EntityState.Detached;
 
             // A concurrent writer won the creation key: replay against it.
             var winner = await FindByKeyAsync(tenantId, input.CreationKey, cancellationToken)
@@ -119,8 +138,12 @@ public sealed class EfTenantInvestigationStore : ITenantInvestigationStore
             throw new ArgumentException("Invalid investigation title.", nameof(input));
         }
 
+        // Control characters are refused like the audit ledger's actor rule
+        // (ck_tenant_audit_events_actor_subject_shape), so wiring the audit
+        // event never turns valid-looking input into a raw database error.
         if (string.IsNullOrWhiteSpace(input.CreatedBySubject)
-            || input.CreatedBySubject.Length > TenantInvestigationLimits.MaxSubjectLength)
+            || input.CreatedBySubject.Length > TenantInvestigationLimits.MaxSubjectLength
+            || input.CreatedBySubject.Any(char.IsControl))
         {
             throw new ArgumentException("A creating subject is required.", nameof(input));
         }
