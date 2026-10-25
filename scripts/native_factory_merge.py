@@ -50,8 +50,13 @@ REQUIRED_JOBS = frozenset({
     "Staging HTTP smoke (unauthenticated)",
 })
 AUTHORIZED_REVIEWERS = frozenset({
-    "coderabbitai[bot]",
     "chatgpt-codex-connector[bot]",
+})
+# CodeRabbit review authority is retired (owner governance approval,
+# OneCompany #282): its approvals never satisfy review_gate_clean, but its
+# comments still count as findings and its actor alias is kept below.
+RETIRED_REVIEWERS = frozenset({
+    "coderabbitai[bot]",
 })
 
 # Canonical material-actor vocabulary. ChatGPT and Codex are distinct actors;
@@ -65,7 +70,7 @@ ACTOR_ALIASES = {
     "codex": "codex",
     "chatgpt": "chatgpt",
 }
-FINDING_COMMENT_AUTHORS = AUTHORIZED_REVIEWERS | frozenset({
+FINDING_COMMENT_AUTHORS = AUTHORIZED_REVIEWERS | RETIRED_REVIEWERS | frozenset({
     "ntinkicht",
     "github-actions[bot]",
 })
