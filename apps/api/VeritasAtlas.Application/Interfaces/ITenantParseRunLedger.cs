@@ -10,8 +10,14 @@ namespace VeritasAtlas.Application.Interfaces;
 /// </summary>
 public interface ITenantParseRunLedger
 {
+    /// <summary>
+    /// <paramref name="actorSubject"/> is the parse run's initiator (analyst or
+    /// parser worker subject); a newly recorded run writes its
+    /// <c>tenant_parse_run.recorded</c> audit event in the same transaction
+    /// (#105). Replays and refusals write no event.
+    /// </summary>
     Task<ParseRunRecordResult> RecordAsync(
-        Guid tenantId, ParseRunInput input, CancellationToken cancellationToken);
+        Guid tenantId, ParseRunInput input, string actorSubject, CancellationToken cancellationToken);
 
     Task<IReadOnlyList<TenantParseRunModel>> ListForRetrievalAsync(
         Guid tenantId, Guid rawRetrievalId, CancellationToken cancellationToken);

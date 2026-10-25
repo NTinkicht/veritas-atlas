@@ -21,6 +21,7 @@ public sealed class TenantParseRunLedgerTests
     private static readonly Guid TenantB = Guid.Parse("b2222222-2222-4222-8222-222222222222");
     private static readonly DateTime StartedAt = new(2026, 10, 25, 9, 0, 0, DateTimeKind.Utc);
     private static readonly byte[] Bytes = Encoding.UTF8.GetBytes("<html>public record 1</html>");
+    private const string Actor = "synthetic-parser";
 
     [TestMethod]
     public async Task InvalidInputIsRefusedBeforeTheDatabaseIsTouched()
@@ -55,7 +56,7 @@ public sealed class TenantParseRunLedgerTests
         foreach (var (tenant, input) in cases)
         {
             await Assert.ThrowsExactlyAsync<ArgumentException>(() =>
-                ledger.RecordAsync(tenant, input, CancellationToken.None), input.ToString());
+                ledger.RecordAsync(tenant, input, Actor, CancellationToken.None), input.ToString());
         }
 
         await Assert.ThrowsExactlyAsync<ArgumentException>(() =>
@@ -71,14 +72,14 @@ public sealed class TenantParseRunLedgerTests
         var retrieval = await RetrievalAsync(db, TenantA, "r1");
         var ledger = new EfTenantParseRunLedger(db, TimeProvider.System);
 
-        var failed = await ledger.RecordAsync(TenantA, Failed(retrieval), CancellationToken.None);
+        var failed = await ledger.RecordAsync(TenantA, Failed(retrieval), Actor, CancellationToken.None);
         Assert.AreEqual(ParseRunRecordOutcome.Recorded, failed.Outcome);
         Assert.AreEqual(ParseRunOutcome.Failed, failed.Run!.Outcome);
         Assert.AreEqual(ParseFailureClass.Malformed, failed.Run.FailureClass);
         Assert.AreEqual("1.0.0", failed.Run.ParserVersion);
 
         var unverified = await ledger.RecordAsync(
-            TenantA, Unverified(retrieval) with { StartedAtUtc = StartedAt.AddMinutes(5) }, CancellationToken.None);
+            TenantA, Unverified(retrieval) with { StartedAtUtc = StartedAt.AddMinutes(5) }, Actor, CancellationToken.None);
         Assert.AreEqual(ParseRunRecordOutcome.Recorded, unverified.Outcome);
         Assert.AreEqual(ParseRunOutcome.ParsedUnverified, unverified.Run!.Outcome);
         Assert.AreEqual("1.1.0", unverified.Run.ParserVersion);
@@ -105,8 +106,8 @@ public sealed class TenantParseRunLedgerTests
         var retrievalB = await RetrievalAsync(db, TenantB, "r-b");
         var ledger = new EfTenantParseRunLedger(db, TimeProvider.System);
 
-        var crossTenant = await ledger.RecordAsync(TenantA, Failed(retrievalB) with { RunKey = "k1" }, CancellationToken.None);
-        var unknown = await ledger.RecordAsync(TenantA, Failed(Guid.NewGuid()) with { RunKey = "k2" }, CancellationToken.None);
+        var crossTenant = await ledger.RecordAsync(TenantA, Failed(retrievalB) with { RunKey = "k1" }, Actor, CancellationToken.None);
+        var unknown = await ledger.RecordAsync(TenantA, Failed(Guid.NewGuid()) with { RunKey = "k2" }, Actor, CancellationToken.None);
         Assert.AreEqual(new ParseRunRecordResult(ParseRunRecordOutcome.RetrievalNotFound, null), crossTenant);
         Assert.AreEqual(crossTenant, unknown);
         Assert.AreEqual(0, await db.TenantParseRuns.CountAsync());
@@ -123,8 +124,8 @@ public sealed class TenantParseRunLedgerTests
         var retrievalB = await RetrievalAsync(db, TenantB, "r-b");
         var ledger = new EfTenantParseRunLedger(db, TimeProvider.System);
 
-        var first = await ledger.RecordAsync(TenantA, Failed(retrieval), CancellationToken.None);
-        var replay = await ledger.RecordAsync(TenantA, Failed(retrieval), CancellationToken.None);
+        var first = await ledger.RecordAsync(TenantA, Failed(retrieval), Actor, CancellationToken.None);
+        var replay = await ledger.RecordAsync(TenantA, Failed(retrieval), Actor, CancellationToken.None);
         Assert.AreEqual(ParseRunRecordOutcome.Replayed, replay.Outcome);
         Assert.AreEqual(first.Run, replay.Run);
 
@@ -141,12 +142,12 @@ public sealed class TenantParseRunLedgerTests
         {
             Assert.AreEqual(
                 new ParseRunRecordResult(ParseRunRecordOutcome.IdempotencyConflict, null),
-                await ledger.RecordAsync(TenantA, conflict, CancellationToken.None), conflict.ToString());
+                await ledger.RecordAsync(TenantA, conflict, Actor, CancellationToken.None), conflict.ToString());
         }
 
         // The same key in another tenant is a distinct run.
         Assert.AreEqual(ParseRunRecordOutcome.Recorded,
-            (await ledger.RecordAsync(TenantB, Failed(retrievalB), CancellationToken.None)).Outcome);
+            (await ledger.RecordAsync(TenantB, Failed(retrievalB), Actor, CancellationToken.None)).Outcome);
         Assert.AreEqual(2, await db.TenantParseRuns.CountAsync());
     }
 
@@ -166,7 +167,7 @@ public sealed class TenantParseRunLedgerTests
         {
             await using var db = new VeritasAtlasDbContext(options);
             return await new EfTenantParseRunLedger(db, TimeProvider.System)
-                .RecordAsync(TenantA, Unverified(retrieval), CancellationToken.None);
+                .RecordAsync(TenantA, Unverified(retrieval), Actor, CancellationToken.None);
         }));
 
         Assert.AreEqual(1, results.Count(r => r.Outcome == ParseRunRecordOutcome.Recorded));
@@ -229,6 +230,149 @@ public sealed class TenantParseRunLedgerTests
         }
 
         Assert.AreEqual(2, await db.TenantParseRuns.CountAsync());
+    }
+
+    [TestMethod]
+    public async Task RecordedRunsWriteExactlyOneAuditEventEachInTheSameTenant()
+    {
+        if (Database() is not { } connectionString) return;
+        await ResetAsync(connectionString);
+        await using var db = new VeritasAtlasDbContext(Options(connectionString));
+        var retrieval = await RetrievalAsync(db, TenantA, "r1");
+        var ledger = new EfTenantParseRunLedger(db, TimeProvider.System);
+
+        var failed = await ledger.RecordAsync(TenantA, Failed(retrieval), "synthetic-worker", CancellationToken.None);
+        var unverified = await ledger.RecordAsync(TenantA, Unverified(retrieval), Actor, CancellationToken.None);
+        Assert.AreEqual(ParseRunRecordOutcome.Recorded, failed.Outcome);
+        Assert.AreEqual(ParseRunRecordOutcome.Recorded, unverified.Outcome);
+
+        await using var check = new VeritasAtlasDbContext(Options(connectionString));
+        var events = await check.TenantAuditEvents.AsNoTracking()
+            .Where(e => e.EntityType == EfTenantParseRunLedger.AuditEntityType)
+            .ToListAsync();
+        Assert.AreEqual(2, events.Count);
+        foreach (var (run, actor) in new[] { (failed.Run!, "synthetic-worker"), (unverified.Run!, Actor) })
+        {
+            var audit = events.Single(e => e.EntityId == run.Id.ToString("D"));
+            Assert.AreEqual(TenantA, audit.TenantId);
+            Assert.AreEqual($"tenant_parse_run.recorded:{run.Id:D}", audit.EventKey);
+            Assert.AreEqual("tenant_parse_run.recorded", audit.Action);
+            Assert.AreEqual("tenant_parse_run", audit.EntityType);
+            Assert.AreEqual(actor, audit.ActorSubject);
+            Assert.AreEqual(run.CreatedAtUtc, DateTime.SpecifyKind(audit.OccurredAtUtc, DateTimeKind.Utc));
+        }
+
+        // The event carries no parser identity, outcome, failure class or retrieval id.
+        foreach (var audit in events)
+        {
+            var fields = string.Join("|", audit.EventKey, audit.Action, audit.EntityType, audit.EntityId, audit.ActorSubject);
+            foreach (var leaked in new[] { "html", "1.0.0", "1.1.0", "malformed", "parsed_unverified", "failed", retrieval.ToString("D") })
+            {
+                Assert.IsFalse(fields.Contains(leaked, StringComparison.Ordinal), fields);
+            }
+        }
+
+        Assert.AreEqual(0, await check.TenantAuditEvents.CountAsync(e => e.TenantId == TenantB));
+    }
+
+    [TestMethod]
+    public async Task ReplaysConflictsAndRefusalsWriteNoAuditEvent()
+    {
+        if (Database() is not { } connectionString) return;
+        await ResetAsync(connectionString);
+        await using var db = new VeritasAtlasDbContext(Options(connectionString));
+        var retrievalA = await RetrievalAsync(db, TenantA, "r-a");
+        var retrievalB = await RetrievalAsync(db, TenantB, "r-b");
+        var ledger = new EfTenantParseRunLedger(db, TimeProvider.System);
+        Assert.AreEqual(ParseRunRecordOutcome.Recorded,
+            (await ledger.RecordAsync(TenantA, Failed(retrievalA), Actor, CancellationToken.None)).Outcome);
+
+        var outcomes = new[]
+        {
+            await ledger.RecordAsync(TenantA, Failed(retrievalA), Actor, CancellationToken.None),
+            await ledger.RecordAsync(TenantA, Failed(retrievalA) with { ParserVersion = "9.9.9" }, Actor, CancellationToken.None),
+            await ledger.RecordAsync(TenantA, Failed(retrievalB) with { RunKey = "k1" }, Actor, CancellationToken.None),
+            await ledger.RecordAsync(TenantA, Failed(Guid.NewGuid()) with { RunKey = "k2" }, Actor, CancellationToken.None),
+        };
+        CollectionAssert.AreEqual(
+            new[]
+            {
+                ParseRunRecordOutcome.Replayed, ParseRunRecordOutcome.IdempotencyConflict,
+                ParseRunRecordOutcome.RetrievalNotFound, ParseRunRecordOutcome.RetrievalNotFound
+            },
+            outcomes.Select(o => o.Outcome).ToArray());
+
+        await using var check = new VeritasAtlasDbContext(Options(connectionString));
+        Assert.AreEqual(1, await check.TenantParseRuns.CountAsync());
+        Assert.AreEqual(1, await check.TenantAuditEvents.CountAsync(e => e.EntityType == EfTenantParseRunLedger.AuditEntityType));
+    }
+
+    [TestMethod]
+    public async Task ConcurrentSameKeyWritesYieldOneAuditEvent()
+    {
+        if (Database() is not { } connectionString) return;
+        await ResetAsync(connectionString);
+        var options = Options(connectionString);
+        Guid retrieval;
+        await using (var setup = new VeritasAtlasDbContext(options))
+        {
+            retrieval = await RetrievalAsync(setup, TenantA, "race");
+        }
+
+        var results = await Task.WhenAll(Enumerable.Range(0, 8).Select(async i =>
+        {
+            await using var db = new VeritasAtlasDbContext(options);
+            return await new EfTenantParseRunLedger(db, TimeProvider.System)
+                .RecordAsync(TenantA, Unverified(retrieval), $"synthetic-worker-{i}", CancellationToken.None);
+        }));
+
+        var winner = results.Single(r => r.Outcome == ParseRunRecordOutcome.Recorded).Run!;
+        await using var check = new VeritasAtlasDbContext(options);
+        var audit = await check.TenantAuditEvents.AsNoTracking()
+            .SingleAsync(e => e.EntityType == EfTenantParseRunLedger.AuditEntityType);
+        Assert.AreEqual(winner.Id.ToString("D"), audit.EntityId);
+    }
+
+    [TestMethod]
+    public async Task FailedAuditWriteRollsBackTheRun()
+    {
+        if (Database() is not { } connectionString) return;
+        await ResetAsync(connectionString);
+        await using var db = new VeritasAtlasDbContext(Options(connectionString));
+        var retrieval = await RetrievalAsync(db, TenantA, "r1");
+        // Test-only fault in this per-test database: every later audit insert fails.
+        await db.Database.ExecuteSqlRawAsync(
+            "CREATE FUNCTION test_refuse_audit() RETURNS trigger LANGUAGE plpgsql AS "
+            + "$$BEGIN RAISE EXCEPTION 'audit unavailable' USING ERRCODE = 'P0001'; END$$");
+        await db.Database.ExecuteSqlRawAsync(
+            "CREATE TRIGGER test_refuse_audit BEFORE INSERT ON tenant_audit_events "
+            + "FOR EACH ROW EXECUTE FUNCTION test_refuse_audit()");
+
+        var error = await Assert.ThrowsExactlyAsync<DbUpdateException>(() =>
+            new EfTenantParseRunLedger(db, TimeProvider.System)
+                .RecordAsync(TenantA, Failed(retrieval), Actor, CancellationToken.None));
+        Assert.AreEqual("P0001", (error.InnerException as PostgresException)?.SqlState);
+
+        await using var check = new VeritasAtlasDbContext(Options(connectionString));
+        Assert.AreEqual(0, await check.TenantParseRuns.CountAsync());
+        Assert.AreEqual(0, await check.TenantAuditEvents.CountAsync(e => e.EntityType == EfTenantParseRunLedger.AuditEntityType));
+    }
+
+    [TestMethod]
+    public async Task InvalidActorIsRefusedBeforeTheDatabaseIsTouched()
+    {
+        // No reachable server: a refusal must happen before any connection.
+        var options = new DbContextOptionsBuilder<VeritasAtlasDbContext>()
+            .UseNpgsql("Host=127.0.0.1;Port=1;Database=unreachable;Timeout=1").Options;
+        await using var db = new VeritasAtlasDbContext(options);
+        var ledger = new EfTenantParseRunLedger(db, TimeProvider.System);
+
+        foreach (var actor in new[] { "", "   ", "a\u0000b", "a\u007fb", "a\u0085b",
+                     new string('a', TenantAuditEventLimits.MaxSubjectLength + 1) })
+        {
+            await Assert.ThrowsExactlyAsync<ArgumentException>(() =>
+                ledger.RecordAsync(TenantA, Failed(Guid.NewGuid()), actor, CancellationToken.None), actor);
+        }
     }
 
     private static ParseRunInput Failed(Guid retrieval) =>

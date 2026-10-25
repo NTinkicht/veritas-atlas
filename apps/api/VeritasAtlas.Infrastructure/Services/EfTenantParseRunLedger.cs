@@ -12,11 +12,15 @@ namespace VeritasAtlas.Infrastructure.Services;
 /// retrieval, a null evidence reference, and refuses UPDATE/DELETE/TRUNCATE;
 /// this service checks the same rules first so callers get a typed outcome
 /// rather than a raw error. It never writes an evidence reference.
+/// Each newly recorded run writes its <c>tenant_parse_run.recorded</c> audit
+/// event in the same transaction (#105).
 /// </summary>
 public sealed partial class EfTenantParseRunLedger : ITenantParseRunLedger
 {
     private const string UniqueViolation = "23505";
     private const string ForeignKeyViolation = "23503";
+    public const string RecordedAction = "tenant_parse_run.recorded";
+    public const string AuditEntityType = "tenant_parse_run";
     private readonly VeritasAtlasDbContext _db;
     private readonly TimeProvider _timeProvider;
 
@@ -27,10 +31,19 @@ public sealed partial class EfTenantParseRunLedger : ITenantParseRunLedger
     }
 
     public async Task<ParseRunRecordResult> RecordAsync(
-        Guid tenantId, ParseRunInput input, CancellationToken cancellationToken)
+        Guid tenantId, ParseRunInput input, string actorSubject, CancellationToken cancellationToken)
     {
         RequireTenant(tenantId);
         Validate(input);
+        // Same rule as the audit ledger's actor check
+        // (ck_tenant_audit_events_actor_subject_shape): a typed refusal before
+        // the database, never a raw DbUpdateException.
+        if (string.IsNullOrWhiteSpace(actorSubject)
+            || actorSubject.Length > TenantAuditEventLimits.MaxSubjectLength
+            || actorSubject.Any(char.IsControl))
+        {
+            throw new ArgumentException("Invalid actor subject.", nameof(actorSubject));
+        }
 
         var retrievalExists = await _db.TenantRawRetrievals.AsNoTracking()
             .AnyAsync(x => x.TenantId == tenantId && x.Id == input.RawRetrievalId, cancellationToken);
@@ -59,7 +72,23 @@ public sealed partial class EfTenantParseRunLedger : ITenantParseRunLedger
             return Replay(existing, row);
         }
 
+        // Same SaveChanges, so one transaction: the run never exists without
+        // its audit event, nor the event without it (#105). The event carries
+        // no parser identity, outcome, failure class or retrieval id.
+        var audit = new TenantAuditEvent
+        {
+            TenantId = tenantId,
+            Id = Guid.NewGuid(),
+            EventKey = $"{RecordedAction}:{row.Id:D}",
+            Action = RecordedAction,
+            EntityType = AuditEntityType,
+            EntityId = row.Id.ToString("D"),
+            ActorSubject = actorSubject,
+            OccurredAtUtc = row.CreatedAtUtc
+        };
+
         _db.TenantParseRuns.Add(row);
+        _db.TenantAuditEvents.Add(audit);
         try
         {
             await _db.SaveChangesAsync(cancellationToken);
@@ -67,6 +96,7 @@ public sealed partial class EfTenantParseRunLedger : ITenantParseRunLedger
         catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: UniqueViolation or ForeignKeyViolation } pg)
         {
             _db.Entry(row).State = EntityState.Detached;
+            _db.Entry(audit).State = EntityState.Detached;
             if (pg.SqlState == ForeignKeyViolation)
             {
                 return new ParseRunRecordResult(ParseRunRecordOutcome.RetrievalNotFound, null);
