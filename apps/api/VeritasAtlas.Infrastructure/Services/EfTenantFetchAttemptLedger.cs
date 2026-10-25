@@ -10,12 +10,16 @@ namespace VeritasAtlas.Infrastructure.Services;
 /// The database enforces the outcome shape, the same-tenant same-source link to
 /// the raw retrieval and refuses UPDATE/DELETE/TRUNCATE; this service checks the
 /// same rules first so callers get a typed outcome rather than a raw error.
+/// Each newly recorded attempt writes its <c>tenant_fetch_attempt.recorded</c>
+/// audit event in the same transaction (#103).
 /// </summary>
 public sealed class EfTenantFetchAttemptLedger : ITenantFetchAttemptLedger
 {
     private const string UniqueViolation = "23505";
     private const string ForeignKeyViolation = "23503";
     private const string RetrievalConstraint = "fk_tenant_fetch_attempts_tenant_source_raw_retrieval";
+    public const string RecordedAction = "tenant_fetch_attempt.recorded";
+    public const string AuditEntityType = "tenant_fetch_attempt";
     private readonly VeritasAtlasDbContext _db;
     private readonly TimeProvider _timeProvider;
 
@@ -26,10 +30,19 @@ public sealed class EfTenantFetchAttemptLedger : ITenantFetchAttemptLedger
     }
 
     public async Task<FetchAttemptRecordResult> RecordAsync(
-        Guid tenantId, FetchAttemptInput input, CancellationToken cancellationToken)
+        Guid tenantId, FetchAttemptInput input, string actorSubject, CancellationToken cancellationToken)
     {
         RequireTenant(tenantId);
         Validate(input);
+        // Same rule as the audit ledger's actor check
+        // (ck_tenant_audit_events_actor_subject_shape): a typed refusal before
+        // the database, never a raw DbUpdateException.
+        if (string.IsNullOrWhiteSpace(actorSubject)
+            || actorSubject.Length > TenantAuditEventLimits.MaxSubjectLength
+            || actorSubject.Any(char.IsControl))
+        {
+            throw new ArgumentException("Invalid actor subject.", nameof(actorSubject));
+        }
 
         var sourceExists = await _db.TenantSourceRegistryEntries.AsNoTracking()
             .AnyAsync(x => x.TenantId == tenantId && x.Id == input.SourceEntryId, cancellationToken);
@@ -70,7 +83,23 @@ public sealed class EfTenantFetchAttemptLedger : ITenantFetchAttemptLedger
             return Replay(existing, row);
         }
 
+        // Same SaveChanges, so one transaction: the attempt never exists
+        // without its audit event, nor the event without it (#103). The event
+        // carries no URI, status, failure class or retrieval id.
+        var audit = new TenantAuditEvent
+        {
+            TenantId = tenantId,
+            Id = Guid.NewGuid(),
+            EventKey = $"{RecordedAction}:{row.Id:D}",
+            Action = RecordedAction,
+            EntityType = AuditEntityType,
+            EntityId = row.Id.ToString("D"),
+            ActorSubject = actorSubject,
+            OccurredAtUtc = row.CreatedAtUtc
+        };
+
         _db.TenantFetchAttempts.Add(row);
+        _db.TenantAuditEvents.Add(audit);
         try
         {
             await _db.SaveChangesAsync(cancellationToken);
@@ -78,6 +107,7 @@ public sealed class EfTenantFetchAttemptLedger : ITenantFetchAttemptLedger
         catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: UniqueViolation or ForeignKeyViolation } pg)
         {
             _db.Entry(row).State = EntityState.Detached;
+            _db.Entry(audit).State = EntityState.Detached;
             if (pg.SqlState == ForeignKeyViolation)
             {
                 return new FetchAttemptRecordResult(

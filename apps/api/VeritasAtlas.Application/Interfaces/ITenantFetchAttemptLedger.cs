@@ -8,8 +8,14 @@ namespace VeritasAtlas.Application.Interfaces;
 /// </summary>
 public interface ITenantFetchAttemptLedger
 {
+    /// <summary>
+    /// <paramref name="actorSubject"/> is the fetch's initiator (analyst or
+    /// ingestion worker subject); a newly recorded attempt writes its
+    /// <c>tenant_fetch_attempt.recorded</c> audit event in the same
+    /// transaction (#103). Replays and refusals write no event.
+    /// </summary>
     Task<FetchAttemptRecordResult> RecordAsync(
-        Guid tenantId, FetchAttemptInput input, CancellationToken cancellationToken);
+        Guid tenantId, FetchAttemptInput input, string actorSubject, CancellationToken cancellationToken);
 
     Task<IReadOnlyList<TenantFetchAttemptModel>> ListForSourceAsync(
         Guid tenantId, Guid sourceEntryId, CancellationToken cancellationToken);
