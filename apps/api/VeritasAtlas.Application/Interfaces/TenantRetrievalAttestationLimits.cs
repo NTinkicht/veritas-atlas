@@ -2,8 +2,7 @@ namespace VeritasAtlas.Application.Interfaces;
 
 /// <summary>
 /// Column limits of <c>tenant_retrieval_attestations</c> (VER-P0-03 slice 12,
-/// #107). The append-only ledger service that writes these rows follows in a
-/// separate PR.
+/// #107), enforced by <see cref="ITenantRetrievalAttestationLedger"/> (#109).
 /// </summary>
 public static class TenantRetrievalAttestationLimits
 {
