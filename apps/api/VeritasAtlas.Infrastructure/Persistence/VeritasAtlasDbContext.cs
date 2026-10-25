@@ -32,6 +32,8 @@ public sealed class VeritasAtlasDbContext : DbContext
 
     public DbSet<TenantParseRun> TenantParseRuns => Set<TenantParseRun>();
 
+    public DbSet<TenantInvestigation> TenantInvestigations => Set<TenantInvestigation>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfiguration(new PersonConfiguration());
@@ -52,6 +54,7 @@ public sealed class VeritasAtlasDbContext : DbContext
         modelBuilder.ApplyConfiguration(new TenantRawRetrievalConfiguration());
         modelBuilder.ApplyConfiguration(new TenantFetchAttemptConfiguration());
         modelBuilder.ApplyConfiguration(new TenantParseRunConfiguration());
+        modelBuilder.ApplyConfiguration(new TenantInvestigationConfiguration());
 
         base.OnModelCreating(modelBuilder);
     }
