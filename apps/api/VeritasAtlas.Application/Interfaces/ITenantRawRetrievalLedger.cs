@@ -4,12 +4,14 @@ namespace VeritasAtlas.Application.Interfaces;
 /// VER-P0-03 slice 2 (#87): immutable, tenant-scoped ledger of raw retrieved
 /// bytes. The SHA-256 digest is computed server-side and re-checked by the
 /// database; a row can never be updated or deleted, and no evidence reference
-/// is minted before the versioned parser (VER-P0-07).
+/// is minted before the versioned parser (VER-P0-07). Each newly recorded row
+/// writes its audit event, attributed to <c>actorSubject</c>, in the same
+/// transaction (#101); replays and refusals write none.
 /// </summary>
 public interface ITenantRawRetrievalLedger
 {
     Task<RawRetrievalRecordResult> RecordAsync(
-        Guid tenantId, RawRetrievalInput input, CancellationToken cancellationToken);
+        Guid tenantId, RawRetrievalInput input, string actorSubject, CancellationToken cancellationToken);
 
     Task<TenantRawRetrievalModel?> GetAsync(
         Guid tenantId, Guid id, CancellationToken cancellationToken);

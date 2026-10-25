@@ -406,7 +406,7 @@ public sealed class TenantFetchAttemptLedgerTests
     private static async Task<Guid> RetrievalAsync(VeritasAtlasDbContext db, Guid tenant, Guid source, string key)
     {
         var result = await new EfTenantRawRetrievalLedger(db, TimeProvider.System).RecordAsync(
-            tenant, new RawRetrievalInput(source, key, "https://example.test/a", AttemptedAt, Bytes), CancellationToken.None);
+            tenant, new RawRetrievalInput(source, key, "https://example.test/a", AttemptedAt, Bytes), "synthetic-seeder", CancellationToken.None);
         Assert.AreEqual(RawRetrievalRecordOutcome.Recorded, result.Outcome);
         return result.Record!.Id;
     }
