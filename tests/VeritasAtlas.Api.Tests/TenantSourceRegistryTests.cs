@@ -149,7 +149,7 @@ public sealed class TenantSourceRegistryTests
         Assert.AreEqual(HttpStatusCode.BadRequest, blank.StatusCode);
         Assert.AreEqual(HttpStatusCode.BadRequest, control.StatusCode);
         Assert.AreEqual(HttpStatusCode.BadRequest, oversized.StatusCode);
-        Assert.AreEqual((TenantA, "https://example.test/a"), registry.Created.Single());
+        Assert.AreEqual((TenantA, "https://example.test/a", "synthetic-analyst"), registry.Created.Single());
     }
 
     [TestMethod]
@@ -202,11 +202,12 @@ public sealed class TenantSourceRegistryTests
         {
             await using var db = new VeritasAtlasDbContext(options);
             return await new EfTenantSourceRegistry(db, TimeProvider.System)
-                .CreateAsync(TenantA, "https://example.test/race", CancellationToken.None);
+                .CreateAsync(TenantA, "https://example.test/race", "synthetic-analyst", CancellationToken.None);
         }));
         Assert.AreEqual(1, results.Count(r => r is not null));
 
         await using var check = new VeritasAtlasDbContext(options);
+        Assert.AreEqual(1, await check.TenantAuditEvents.CountAsync(), "one event for the one winner (#99)");
         var winner = results.Single(r => r is not null)!;
         var registry = new EfTenantSourceRegistry(check, TimeProvider.System);
         Assert.IsNull(await registry.GetAsync(TenantB, winner.Id, CancellationToken.None));
@@ -223,6 +224,92 @@ public sealed class TenantSourceRegistryTests
         await Assert.ThrowsExactlyAsync<PostgresException>(() => check.Database.ExecuteSqlInterpolatedAsync(
             $"INSERT INTO tenant_source_registry_entries (tenant_id, id, canonical_key, created_at_utc) VALUES ({TenantA}, {Guid.NewGuid()}, {"  "}, {DateTime.UtcNow})"));
         Assert.AreEqual(2, await check.TenantSourceRegistryEntries.CountAsync());
+    }
+
+    [TestMethod]
+    public async Task TokenWithoutAUsableNameIsRefusedBeforeTheRegistryIsTouched()
+    {
+        var registry = new RecordingRegistry();
+        using var factory = new ApiFactory(registry: registry);
+        using var client = factory.CreateClient();
+
+        foreach (var name in new[] { null, "   ", "a\u0001b", new string('n', TenantAuditEventLimits.MaxSubjectLength + 1) })
+        {
+            using var create = await Send(client, HttpMethod.Post, Path,
+                SignWithName(name, TenantA.ToString("D")), new { canonicalKey = "https://example.test/a" });
+            Assert.AreEqual(HttpStatusCode.Forbidden, create.StatusCode, name ?? "<no name claim>");
+            StringAssert.Contains(await create.Content.ReadAsStringAsync(), "actor_required");
+        }
+
+        Assert.AreEqual(0, registry.Calls, "no registry access without an audit actor");
+    }
+
+    [TestMethod]
+    public async Task RegistrationWritesExactlyOneAuditEventInTheSameTenant()
+    {
+        if (TenantDatabase() is not { } connectionString) return;
+        await ResetAsync(connectionString);
+        await using var db = new VeritasAtlasDbContext(Options(connectionString));
+        var registry = new EfTenantSourceRegistry(db, TimeProvider.System);
+
+        var created = await registry.CreateAsync(TenantA, "https://example.test/a", "synthetic-analyst", CancellationToken.None);
+        Assert.IsNotNull(created);
+        Assert.IsNull(await registry.CreateAsync(TenantA, "https://example.test/a", "synthetic-other", CancellationToken.None),
+            "duplicate key");
+
+        await using var check = new VeritasAtlasDbContext(Options(connectionString));
+        var audit = await check.TenantAuditEvents.AsNoTracking().SingleAsync();
+        Assert.AreEqual(TenantA, audit.TenantId);
+        Assert.AreEqual($"tenant_source.registered:{created!.Id:D}", audit.EventKey);
+        Assert.AreEqual(EfTenantSourceRegistry.RegisteredAction, audit.Action);
+        Assert.AreEqual("tenant_source", audit.EntityType);
+        Assert.AreEqual(created.Id.ToString("D"), audit.EntityId);
+        Assert.AreEqual("synthetic-analyst", audit.ActorSubject);
+        Assert.AreEqual(created.CreatedAtUtc, DateTime.SpecifyKind(audit.OccurredAtUtc, DateTimeKind.Utc));
+        Assert.AreEqual(created.CreatedAtUtc, (await registry.GetAsync(TenantA, created.Id, CancellationToken.None))!.CreatedAtUtc,
+            "round-trip-stable instant");
+        Assert.AreEqual(0, await check.TenantAuditEvents.CountAsync(e => e.TenantId == TenantB));
+    }
+
+    [TestMethod]
+    public async Task FailedAuditWriteRollsBackTheRegistration()
+    {
+        if (TenantDatabase() is not { } connectionString) return;
+        await ResetAsync(connectionString);
+        await using var db = new VeritasAtlasDbContext(Options(connectionString));
+        // Test-only fault in this per-test database: every audit insert fails.
+        await db.Database.ExecuteSqlRawAsync(
+            "CREATE FUNCTION test_refuse_audit() RETURNS trigger LANGUAGE plpgsql AS "
+            + "$$BEGIN RAISE EXCEPTION 'audit unavailable' USING ERRCODE = 'P0001'; END$$");
+        await db.Database.ExecuteSqlRawAsync(
+            "CREATE TRIGGER test_refuse_audit BEFORE INSERT ON tenant_audit_events "
+            + "FOR EACH ROW EXECUTE FUNCTION test_refuse_audit()");
+
+        var error = await Assert.ThrowsExactlyAsync<DbUpdateException>(() =>
+            new EfTenantSourceRegistry(db, TimeProvider.System)
+                .CreateAsync(TenantA, "https://example.test/a", "synthetic-analyst", CancellationToken.None));
+        Assert.AreEqual("P0001", (error.InnerException as PostgresException)?.SqlState);
+
+        await using var check = new VeritasAtlasDbContext(Options(connectionString));
+        Assert.AreEqual(0, await check.TenantSourceRegistryEntries.CountAsync());
+        Assert.AreEqual(0, await check.TenantAuditEvents.CountAsync());
+    }
+
+    [TestMethod]
+    public async Task InvalidActorIsRefusedBeforeTheDatabaseIsTouched()
+    {
+        // No reachable server: a refusal must happen before any connection.
+        var options = new DbContextOptionsBuilder<VeritasAtlasDbContext>()
+            .UseNpgsql("Host=127.0.0.1;Port=1;Database=unreachable;Timeout=1").Options;
+        await using var db = new VeritasAtlasDbContext(options);
+        var registry = new EfTenantSourceRegistry(db, TimeProvider.System);
+
+        foreach (var actor in new[] { "", "   ", "a\u0000b", "a\u007fb", "a\u0085b",
+                     new string('a', TenantAuditEventLimits.MaxSubjectLength + 1) })
+        {
+            await Assert.ThrowsExactlyAsync<ArgumentException>(() =>
+                registry.CreateAsync(TenantA, "https://example.test/a", actor, CancellationToken.None));
+        }
     }
 
     private sealed record Entry(Guid Id, string CanonicalKey, DateTime CreatedAtUtc);
@@ -286,14 +373,16 @@ public sealed class TenantSourceRegistryTests
     private static IConfiguration Config(Dictionary<string, string?> values) =>
         new ConfigurationBuilder().AddInMemoryCollection(values).Build();
 
-    private static string Sign(params string[] tenants)
+    private static string Sign(params string[] tenants) => SignWithName("synthetic-forged", tenants);
+
+    private static string SignWithName(string? name, params string[] tenants)
     {
         var claims = new List<Claim>
         {
-            new(ClaimTypes.Name, "synthetic-forged"),
             new(ClaimTypes.Role, "admin"),
             new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString("N"))
         };
+        if (name is not null) claims.Add(new Claim(ClaimTypes.Name, name));
         claims.AddRange(tenants.Select(t => new Claim(TenantClaim.Type, t)));
         var now = DateTime.UtcNow;
         return new JwtSecurityTokenHandler().WriteToken(new JwtSecurityToken(
@@ -312,12 +401,13 @@ public sealed class TenantSourceRegistryTests
     {
         private int _calls;
         public int Calls => _calls;
-        public List<(Guid, string)> Created { get; } = new();
+        public List<(Guid, string, string)> Created { get; } = new();
 
-        public Task<TenantSourceRegistryEntryModel?> CreateAsync(Guid tenantId, string canonicalKey, CancellationToken cancellationToken)
+        public Task<TenantSourceRegistryEntryModel?> CreateAsync(
+            Guid tenantId, string canonicalKey, string actorSubject, CancellationToken cancellationToken)
         {
             Interlocked.Increment(ref _calls);
-            lock (Created) Created.Add((tenantId, canonicalKey));
+            lock (Created) Created.Add((tenantId, canonicalKey, actorSubject));
             return Task.FromResult<TenantSourceRegistryEntryModel?>(
                 new TenantSourceRegistryEntryModel(Guid.NewGuid(), canonicalKey, DateTime.UtcNow));
         }

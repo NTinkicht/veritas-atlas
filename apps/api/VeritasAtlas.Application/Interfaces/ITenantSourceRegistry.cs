@@ -9,9 +9,11 @@ namespace VeritasAtlas.Application.Interfaces;
 public interface ITenantSourceRegistry
 {
     /// <summary>Creates an entry, or returns null when the tenant already has
-    /// an entry with the same canonical key.</summary>
+    /// an entry with the same canonical key. The registration and its
+    /// <c>tenant_source.registered</c> audit event (actor
+    /// <paramref name="actorSubject"/>) commit together (#99).</summary>
     Task<TenantSourceRegistryEntryModel?> CreateAsync(
-        Guid tenantId, string canonicalKey, CancellationToken cancellationToken);
+        Guid tenantId, string canonicalKey, string actorSubject, CancellationToken cancellationToken);
 
     Task<TenantSourceRegistryEntryModel?> GetAsync(
         Guid tenantId, Guid id, CancellationToken cancellationToken);

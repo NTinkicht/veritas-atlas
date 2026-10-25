@@ -200,7 +200,7 @@ public sealed class TenantRawRetrievalLedgerTests
     private static async Task<Guid> SourceAsync(VeritasAtlasDbContext db, Guid tenant, string key)
     {
         var entry = await new EfTenantSourceRegistry(db, TimeProvider.System)
-            .CreateAsync(tenant, key, CancellationToken.None);
+            .CreateAsync(tenant, key, "synthetic-seeder", CancellationToken.None);
         return entry!.Id;
     }
 
