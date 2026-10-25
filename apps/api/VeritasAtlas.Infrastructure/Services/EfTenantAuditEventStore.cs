@@ -148,7 +148,8 @@ public sealed partial class EfTenantAuditEventStore : ITenantAuditEventStore
     }
 
     // Same shape as ck_tenant_audit_events_action_shape / _entity_type_shape.
-    [GeneratedRegex("^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$", RegexOptions.CultureInvariant)]
+    // \z, not $: .NET's $ also matches before a final newline.
+    [GeneratedRegex("\\A[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*\\z", RegexOptions.CultureInvariant)]
     private static partial Regex DottedIdentifier();
 
     private static bool IsDottedIdentifier(string? value, int maxLength) =>
