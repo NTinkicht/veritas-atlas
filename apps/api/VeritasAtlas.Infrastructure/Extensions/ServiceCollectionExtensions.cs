@@ -46,6 +46,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<ITenantFetchAttemptLedger, EfTenantFetchAttemptLedger>();
         services.AddScoped<ITenantParseRunLedger, EfTenantParseRunLedger>();
         services.AddScoped<ITenantInvestigationStore, EfTenantInvestigationStore>();
+        services.AddScoped<ITenantAuditEventStore, EfTenantAuditEventStore>();
 
         return services;
     }
