@@ -22,6 +22,7 @@ public sealed class TenantRawRetrievalLedgerTests
     private static readonly Guid TenantB = Guid.Parse("b2222222-2222-4222-8222-222222222222");
     private static readonly DateTime RetrievedAt = new(2026, 10, 24, 12, 0, 0, DateTimeKind.Utc);
     private static readonly byte[] Bytes = Encoding.UTF8.GetBytes("<html>public record 1</html>");
+    private const string Actor = "synthetic-fetcher";
 
     [TestMethod]
     public async Task InvalidInputIsRefusedBeforeTheDatabaseIsTouched()
@@ -42,7 +43,7 @@ public sealed class TenantRawRetrievalLedgerTests
         foreach (var (tenant, input) in cases)
         {
             await Assert.ThrowsExactlyAsync<ArgumentException>(() =>
-                ledger.RecordAsync(tenant, input, CancellationToken.None));
+                ledger.RecordAsync(tenant, input, Actor, CancellationToken.None));
         }
 
         await Assert.ThrowsExactlyAsync<ArgumentException>(() =>
@@ -59,7 +60,7 @@ public sealed class TenantRawRetrievalLedgerTests
         var sourceB = await SourceAsync(db, TenantB, "https://example.test/b");
         var ledger = new EfTenantRawRetrievalLedger(db, TimeProvider.System);
 
-        var result = await ledger.RecordAsync(TenantA, Input(sourceA), CancellationToken.None);
+        var result = await ledger.RecordAsync(TenantA, Input(sourceA), Actor, CancellationToken.None);
         Assert.AreEqual(RawRetrievalRecordOutcome.Recorded, result.Outcome);
         var record = result.Record!;
         Assert.AreEqual(Convert.ToHexStringLower(SHA256.HashData(Bytes)), record.ContentSha256);
@@ -76,8 +77,8 @@ public sealed class TenantRawRetrievalLedgerTests
         Assert.IsNull(stored.EvidenceReference, "no pre-parser evidence reference");
 
         // Another tenant's source and an unknown source are indistinguishable.
-        var crossTenant = await ledger.RecordAsync(TenantA, Input(sourceB) with { IdempotencyKey = "k2" }, CancellationToken.None);
-        var unknown = await ledger.RecordAsync(TenantA, Input(Guid.NewGuid()) with { IdempotencyKey = "k3" }, CancellationToken.None);
+        var crossTenant = await ledger.RecordAsync(TenantA, Input(sourceB) with { IdempotencyKey = "k2" }, Actor, CancellationToken.None);
+        var unknown = await ledger.RecordAsync(TenantA, Input(Guid.NewGuid()) with { IdempotencyKey = "k3" }, Actor, CancellationToken.None);
         Assert.AreEqual(new RawRetrievalRecordResult(RawRetrievalRecordOutcome.SourceNotFound, null), crossTenant);
         Assert.AreEqual(crossTenant, unknown);
         Assert.AreEqual(1, await db.TenantRawRetrievals.CountAsync());
@@ -94,8 +95,8 @@ public sealed class TenantRawRetrievalLedgerTests
         var sourceB = await SourceAsync(db, TenantB, "https://example.test/b");
         var ledger = new EfTenantRawRetrievalLedger(db, TimeProvider.System);
 
-        var first = await ledger.RecordAsync(TenantA, Input(sourceA), CancellationToken.None);
-        var replay = await ledger.RecordAsync(TenantA, Input(sourceA), CancellationToken.None);
+        var first = await ledger.RecordAsync(TenantA, Input(sourceA), Actor, CancellationToken.None);
+        var replay = await ledger.RecordAsync(TenantA, Input(sourceA), Actor, CancellationToken.None);
         Assert.AreEqual(RawRetrievalRecordOutcome.Replayed, replay.Outcome);
         Assert.AreEqual(first.Record, replay.Record);
 
@@ -109,12 +110,12 @@ public sealed class TenantRawRetrievalLedgerTests
         {
             Assert.AreEqual(
                 new RawRetrievalRecordResult(RawRetrievalRecordOutcome.IdempotencyConflict, null),
-                await ledger.RecordAsync(TenantA, conflict, CancellationToken.None));
+                await ledger.RecordAsync(TenantA, conflict, Actor, CancellationToken.None));
         }
 
         // The same key in another tenant is a distinct record.
         Assert.AreEqual(RawRetrievalRecordOutcome.Recorded,
-            (await ledger.RecordAsync(TenantB, Input(sourceB), CancellationToken.None)).Outcome);
+            (await ledger.RecordAsync(TenantB, Input(sourceB), Actor, CancellationToken.None)).Outcome);
         Assert.AreEqual(2, await db.TenantRawRetrievals.CountAsync());
     }
 
@@ -134,7 +135,7 @@ public sealed class TenantRawRetrievalLedgerTests
         {
             await using var db = new VeritasAtlasDbContext(options);
             return await new EfTenantRawRetrievalLedger(db, TimeProvider.System)
-                .RecordAsync(TenantA, Input(source), CancellationToken.None);
+                .RecordAsync(TenantA, Input(source), Actor, CancellationToken.None);
         }));
 
         Assert.AreEqual(1, results.Count(r => r.Outcome == RawRetrievalRecordOutcome.Recorded));
@@ -142,6 +143,81 @@ public sealed class TenantRawRetrievalLedgerTests
         Assert.AreEqual(1, results.Select(r => r.Record!.Id).Distinct().Count());
         await using var check = new VeritasAtlasDbContext(options);
         Assert.AreEqual(1, await check.TenantRawRetrievals.CountAsync());
+        Assert.AreEqual(1, await check.TenantAuditEvents.CountAsync(e => e.Action == EfTenantRawRetrievalLedger.RecordedAction),
+            "one event for the one winner (#101)");
+    }
+
+    [TestMethod]
+    public async Task RecordingWritesExactlyOneAuditEventAndReplaysOrRefusalsWriteNone()
+    {
+        if (Database() is not { } connectionString) return;
+        await ResetAsync(connectionString);
+        await using var db = new VeritasAtlasDbContext(Options(connectionString));
+        var sourceA = await SourceAsync(db, TenantA, "https://example.test/a");
+        var sourceB = await SourceAsync(db, TenantB, "https://example.test/b");
+        var ledger = new EfTenantRawRetrievalLedger(db, TimeProvider.System);
+
+        var recorded = await ledger.RecordAsync(TenantA, Input(sourceA), Actor, CancellationToken.None);
+        Assert.AreEqual(RawRetrievalRecordOutcome.Recorded, recorded.Outcome);
+        Assert.AreEqual(RawRetrievalRecordOutcome.Replayed,
+            (await ledger.RecordAsync(TenantA, Input(sourceA), "synthetic-other", CancellationToken.None)).Outcome);
+        Assert.AreEqual(RawRetrievalRecordOutcome.IdempotencyConflict,
+            (await ledger.RecordAsync(TenantA, Input(sourceA) with { RawBytes = [1, 2, 3] }, Actor, CancellationToken.None)).Outcome);
+        Assert.AreEqual(RawRetrievalRecordOutcome.SourceNotFound,
+            (await ledger.RecordAsync(TenantA, Input(sourceB) with { IdempotencyKey = "k2" }, Actor, CancellationToken.None)).Outcome);
+        Assert.AreEqual(RawRetrievalRecordOutcome.SourceNotFound,
+            (await ledger.RecordAsync(TenantA, Input(Guid.NewGuid()) with { IdempotencyKey = "k3" }, Actor, CancellationToken.None)).Outcome);
+
+        await using var check = new VeritasAtlasDbContext(Options(connectionString));
+        var audit = await check.TenantAuditEvents.AsNoTracking()
+            .SingleAsync(e => e.EntityType == EfTenantRawRetrievalLedger.AuditEntityType);
+        var record = recorded.Record!;
+        Assert.AreEqual(TenantA, audit.TenantId);
+        Assert.AreEqual($"tenant_raw_retrieval.recorded:{record.Id:D}", audit.EventKey);
+        Assert.AreEqual("tenant_raw_retrieval.recorded", audit.Action);
+        Assert.AreEqual("tenant_raw_retrieval", audit.EntityType);
+        Assert.AreEqual(record.Id.ToString("D"), audit.EntityId);
+        Assert.AreEqual(Actor, audit.ActorSubject);
+        Assert.AreEqual(record.CreatedAtUtc, DateTime.SpecifyKind(audit.OccurredAtUtc, DateTimeKind.Utc));
+        Assert.AreEqual(0, await check.TenantAuditEvents.CountAsync(
+            e => e.TenantId == TenantB && e.EntityType == EfTenantRawRetrievalLedger.AuditEntityType));
+    }
+
+    [TestMethod]
+    public async Task FailedAuditWriteRollsBackTheRawRecord()
+    {
+        if (Database() is not { } connectionString) return;
+        await ResetAsync(connectionString);
+        await using var db = new VeritasAtlasDbContext(Options(connectionString));
+        var source = await SourceAsync(db, TenantA, "https://example.test/a");
+        // Test-only fault in this per-test database: every later audit insert fails.
+        await db.Database.ExecuteSqlRawAsync(
+            "CREATE FUNCTION test_refuse_audit() RETURNS trigger LANGUAGE plpgsql AS "
+            + "$$BEGIN RAISE EXCEPTION 'audit unavailable' USING ERRCODE = 'P0001'; END$$");
+        await db.Database.ExecuteSqlRawAsync(
+            "CREATE TRIGGER test_refuse_audit BEFORE INSERT ON tenant_audit_events "
+            + "FOR EACH ROW EXECUTE FUNCTION test_refuse_audit()");
+
+        var error = await Assert.ThrowsExactlyAsync<DbUpdateException>(() =>
+            new EfTenantRawRetrievalLedger(db, TimeProvider.System)
+                .RecordAsync(TenantA, Input(source), Actor, CancellationToken.None));
+        Assert.AreEqual("P0001", (error.InnerException as PostgresException)?.SqlState);
+
+        await using var check = new VeritasAtlasDbContext(Options(connectionString));
+        Assert.AreEqual(0, await check.TenantRawRetrievals.CountAsync());
+        Assert.AreEqual(0, await check.TenantAuditEvents.CountAsync(e => e.EntityType == EfTenantRawRetrievalLedger.AuditEntityType));
+    }
+
+    [TestMethod]
+    public async Task InvalidActorIsRefusedBeforeTheDatabaseIsTouched()
+    {
+        var ledger = new EfTenantRawRetrievalLedger(null!, TimeProvider.System);
+        foreach (var actor in new[] { null!, "", "   ", "a\u0000b", "a\u007fb", "a\u0085b",
+                     new string('a', TenantAuditEventLimits.MaxSubjectLength + 1) })
+        {
+            await Assert.ThrowsExactlyAsync<ArgumentException>(() =>
+                ledger.RecordAsync(TenantA, Input(Guid.NewGuid()), actor, CancellationToken.None));
+        }
     }
 
     [TestMethod]
@@ -152,7 +228,7 @@ public sealed class TenantRawRetrievalLedgerTests
         await using var db = new VeritasAtlasDbContext(Options(connectionString));
         var sourceA = await SourceAsync(db, TenantA, "https://example.test/a");
         var record = (await new EfTenantRawRetrievalLedger(db, TimeProvider.System)
-            .RecordAsync(TenantA, Input(sourceA), CancellationToken.None)).Record!;
+            .RecordAsync(TenantA, Input(sourceA), Actor, CancellationToken.None)).Record!;
         var digest = record.ContentSha256;
 
         Task Insert(Guid tenant, Guid sourceId, string sha, string? reference, long length) =>

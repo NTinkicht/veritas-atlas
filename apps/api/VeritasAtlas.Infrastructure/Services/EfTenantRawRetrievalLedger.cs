@@ -10,11 +10,15 @@ namespace VeritasAtlas.Infrastructure.Services;
 /// PostgreSQL-backed immutable raw retrieval ledger (VER-P0-03 slice 2, #87).
 /// Bytes, digest and metadata are written in one INSERT; the database re-checks
 /// the digest, refuses UPDATE/DELETE and keeps the evidence reference NULL.
+/// Each newly recorded row writes its <c>tenant_raw_retrieval.recorded</c>
+/// audit event in the same transaction (#101); replays and refusals write none.
 /// </summary>
 public sealed class EfTenantRawRetrievalLedger : ITenantRawRetrievalLedger
 {
     private const string UniqueViolation = "23505";
     private const string ForeignKeyViolation = "23503";
+    public const string RecordedAction = "tenant_raw_retrieval.recorded";
+    public const string AuditEntityType = "tenant_raw_retrieval";
     private readonly VeritasAtlasDbContext _db;
     private readonly TimeProvider _timeProvider;
 
@@ -25,10 +29,11 @@ public sealed class EfTenantRawRetrievalLedger : ITenantRawRetrievalLedger
     }
 
     public async Task<RawRetrievalRecordResult> RecordAsync(
-        Guid tenantId, RawRetrievalInput input, CancellationToken cancellationToken)
+        Guid tenantId, RawRetrievalInput input, string actorSubject, CancellationToken cancellationToken)
     {
         RequireTenant(tenantId);
         Validate(input);
+        RequireActor(actorSubject);
         var digest = Convert.ToHexStringLower(SHA256.HashData(input.RawBytes));
 
         var sourceExists = await _db.TenantSourceRegistryEntries.AsNoTracking()
@@ -57,7 +62,23 @@ public sealed class EfTenantRawRetrievalLedger : ITenantRawRetrievalLedger
             RetrievedAtUtc = ToPostgresPrecision(input.RetrievedAtUtc),
             CreatedAtUtc = ToPostgresPrecision(_timeProvider.GetUtcNow().UtcDateTime)
         };
+        // Same SaveChanges, so one transaction: the raw row never exists without
+        // its audit event, nor the event without it (#101). The event carries
+        // no digest, URI or bytes.
+        var audit = new TenantAuditEvent
+        {
+            TenantId = tenantId,
+            Id = Guid.NewGuid(),
+            EventKey = $"{RecordedAction}:{row.Id:D}",
+            Action = RecordedAction,
+            EntityType = AuditEntityType,
+            EntityId = row.Id.ToString("D"),
+            ActorSubject = actorSubject,
+            OccurredAtUtc = row.CreatedAtUtc
+        };
+
         _db.TenantRawRetrievals.Add(row);
+        _db.TenantAuditEvents.Add(audit);
         try
         {
             await _db.SaveChangesAsync(cancellationToken);
@@ -65,6 +86,7 @@ public sealed class EfTenantRawRetrievalLedger : ITenantRawRetrievalLedger
         catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: UniqueViolation or ForeignKeyViolation } pg)
         {
             _db.Entry(row).State = EntityState.Detached;
+            _db.Entry(audit).State = EntityState.Detached;
             if (pg.SqlState == ForeignKeyViolation)
             {
                 return new RawRetrievalRecordResult(RawRetrievalRecordOutcome.SourceNotFound, null);
@@ -108,6 +130,19 @@ public sealed class EfTenantRawRetrievalLedger : ITenantRawRetrievalLedger
         if (tenantId == Guid.Empty)
         {
             throw new ArgumentException("A tenant is required.", nameof(tenantId));
+        }
+    }
+
+    // Same rule as the audit ledger's actor check
+    // (ck_tenant_audit_events_actor_subject_shape): a typed refusal before the
+    // database, never a raw DbUpdateException.
+    private static void RequireActor(string actorSubject)
+    {
+        if (string.IsNullOrWhiteSpace(actorSubject)
+            || actorSubject.Length > TenantAuditEventLimits.MaxSubjectLength
+            || actorSubject.Any(char.IsControl))
+        {
+            throw new ArgumentException("Invalid actor subject.", nameof(actorSubject));
         }
     }
 
