@@ -1148,3 +1148,65 @@ public sealed class TenantInvestigationConfiguration : IEntityTypeConfiguration<
             .HasDatabaseName("ix_tenant_investigations_tenant_created_at");
     }
 }
+
+public sealed class TenantAuditEventConfiguration : IEntityTypeConfiguration<VeritasAtlas.Infrastructure.Persistence.TenantAuditEvent>
+{
+    public void Configure(EntityTypeBuilder<VeritasAtlas.Infrastructure.Persistence.TenantAuditEvent> builder)
+    {
+        builder.ToTable("tenant_audit_events", table =>
+        {
+            table.HasCheckConstraint(
+                "ck_tenant_audit_events_tenant_id_not_empty",
+                "tenant_id <> '00000000-0000-0000-0000-000000000000'::uuid");
+            table.HasCheckConstraint(
+                "ck_tenant_audit_events_event_key_not_blank",
+                "length(btrim(event_key)) > 0");
+            // Lowercase dotted identifiers only: no free text in the audit trail.
+            table.HasCheckConstraint(
+                "ck_tenant_audit_events_action_shape",
+                "action ~ '^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$'");
+            table.HasCheckConstraint(
+                "ck_tenant_audit_events_entity_type_shape",
+                "entity_type ~ '^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$'");
+            table.HasCheckConstraint(
+                "ck_tenant_audit_events_entity_id_shape",
+                "length(btrim(entity_id)) > 0 AND entity_id !~ '[\\x01-\\x1f\\x7f-\\x9f]'");
+            table.HasCheckConstraint(
+                "ck_tenant_audit_events_actor_subject_shape",
+                "length(btrim(actor_subject)) > 0 AND actor_subject !~ '[\\x01-\\x1f\\x7f-\\x9f]'");
+        });
+
+        builder.HasKey(x => new { x.TenantId, x.Id })
+            .HasName("pk_tenant_audit_events");
+
+        builder.Property(x => x.TenantId).HasColumnName("tenant_id").IsRequired();
+        builder.Property(x => x.Id).HasColumnName("id").ValueGeneratedNever().IsRequired();
+        builder.Property(x => x.EventKey)
+            .HasColumnName("event_key")
+            .HasMaxLength(VeritasAtlas.Application.Interfaces.TenantAuditEventLimits.MaxEventKeyLength)
+            .IsRequired();
+        builder.Property(x => x.Action)
+            .HasColumnName("action")
+            .HasMaxLength(VeritasAtlas.Application.Interfaces.TenantAuditEventLimits.MaxActionLength)
+            .IsRequired();
+        builder.Property(x => x.EntityType)
+            .HasColumnName("entity_type")
+            .HasMaxLength(VeritasAtlas.Application.Interfaces.TenantAuditEventLimits.MaxEntityTypeLength)
+            .IsRequired();
+        builder.Property(x => x.EntityId)
+            .HasColumnName("entity_id")
+            .HasMaxLength(VeritasAtlas.Application.Interfaces.TenantAuditEventLimits.MaxEntityIdLength)
+            .IsRequired();
+        builder.Property(x => x.ActorSubject)
+            .HasColumnName("actor_subject")
+            .HasMaxLength(VeritasAtlas.Application.Interfaces.TenantAuditEventLimits.MaxSubjectLength)
+            .IsRequired();
+        builder.Property(x => x.OccurredAtUtc).HasColumnName("occurred_at_utc").IsRequired();
+
+        builder.HasIndex(x => new { x.TenantId, x.EventKey })
+            .IsUnique()
+            .HasDatabaseName("ux_tenant_audit_events_tenant_event_key");
+        builder.HasIndex(x => new { x.TenantId, x.EntityType, x.EntityId, x.OccurredAtUtc })
+            .HasDatabaseName("ix_tenant_audit_events_tenant_entity_occurred_at");
+    }
+}
