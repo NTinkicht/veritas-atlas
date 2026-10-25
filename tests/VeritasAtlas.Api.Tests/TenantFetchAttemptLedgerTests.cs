@@ -21,6 +21,7 @@ public sealed class TenantFetchAttemptLedgerTests
     private static readonly Guid TenantB = Guid.Parse("b2222222-2222-4222-8222-222222222222");
     private static readonly DateTime AttemptedAt = new(2026, 10, 24, 12, 0, 0, DateTimeKind.Utc);
     private static readonly byte[] Bytes = Encoding.UTF8.GetBytes("<html>public record 1</html>");
+    private const string Actor = "synthetic-fetcher";
 
     [TestMethod]
     public async Task InvalidInputIsRefusedBeforeTheDatabaseIsTouched()
@@ -53,7 +54,7 @@ public sealed class TenantFetchAttemptLedgerTests
         foreach (var (tenant, input) in cases)
         {
             await Assert.ThrowsExactlyAsync<ArgumentException>(() =>
-                ledger.RecordAsync(tenant, input, CancellationToken.None), input.ToString());
+                ledger.RecordAsync(tenant, input, Actor, CancellationToken.None), input.ToString());
         }
 
         await Assert.ThrowsExactlyAsync<ArgumentException>(() =>
@@ -70,7 +71,7 @@ public sealed class TenantFetchAttemptLedgerTests
         var retrieval = await RetrievalAsync(db, TenantA, sourceA, "r1");
         var ledger = new EfTenantFetchAttemptLedger(db, TimeProvider.System);
 
-        var failed = await ledger.RecordAsync(TenantA, Failed(sourceA), CancellationToken.None);
+        var failed = await ledger.RecordAsync(TenantA, Failed(sourceA), Actor, CancellationToken.None);
         Assert.AreEqual(FetchAttemptRecordOutcome.Recorded, failed.Outcome);
         Assert.AreEqual(FetchAttemptOutcome.Failed, failed.Attempt!.Outcome);
         Assert.AreEqual(FetchFailureClass.HttpStatus, failed.Attempt.FailureClass);
@@ -78,7 +79,7 @@ public sealed class TenantFetchAttemptLedgerTests
         Assert.IsNull(failed.Attempt.RawRetrievalId);
 
         var succeeded = await ledger.RecordAsync(
-            TenantA, Succeeded(sourceA, retrieval) with { AttemptedAtUtc = AttemptedAt.AddMinutes(5) }, CancellationToken.None);
+            TenantA, Succeeded(sourceA, retrieval) with { AttemptedAtUtc = AttemptedAt.AddMinutes(5) }, Actor, CancellationToken.None);
         Assert.AreEqual(FetchAttemptRecordOutcome.Recorded, succeeded.Outcome);
         Assert.AreEqual(retrieval, succeeded.Attempt!.RawRetrievalId);
         Assert.IsNull(succeeded.Attempt.FailureClass);
@@ -106,8 +107,8 @@ public sealed class TenantFetchAttemptLedgerTests
         var ledger = new EfTenantFetchAttemptLedger(db, TimeProvider.System);
 
         // Another tenant's source and an unknown source are indistinguishable.
-        var crossTenantSource = await ledger.RecordAsync(TenantA, Failed(sourceB) with { AttemptKey = "k1" }, CancellationToken.None);
-        var unknownSource = await ledger.RecordAsync(TenantA, Failed(Guid.NewGuid()) with { AttemptKey = "k2" }, CancellationToken.None);
+        var crossTenantSource = await ledger.RecordAsync(TenantA, Failed(sourceB) with { AttemptKey = "k1" }, Actor, CancellationToken.None);
+        var unknownSource = await ledger.RecordAsync(TenantA, Failed(Guid.NewGuid()) with { AttemptKey = "k2" }, Actor, CancellationToken.None);
         Assert.AreEqual(new FetchAttemptRecordResult(FetchAttemptRecordOutcome.SourceNotFound, null), crossTenantSource);
         Assert.AreEqual(crossTenantSource, unknownSource);
 
@@ -116,7 +117,7 @@ public sealed class TenantFetchAttemptLedgerTests
         {
             Assert.AreEqual(
                 new FetchAttemptRecordResult(FetchAttemptRecordOutcome.RetrievalNotFound, null),
-                await ledger.RecordAsync(TenantA, Succeeded(sourceA, retrieval) with { AttemptKey = key }, CancellationToken.None));
+                await ledger.RecordAsync(TenantA, Succeeded(sourceA, retrieval) with { AttemptKey = key }, Actor, CancellationToken.None));
         }
 
         Assert.AreEqual(0, await db.TenantFetchAttempts.CountAsync());
@@ -133,8 +134,8 @@ public sealed class TenantFetchAttemptLedgerTests
         var sourceB = await SourceAsync(db, TenantB, "https://example.test/b");
         var ledger = new EfTenantFetchAttemptLedger(db, TimeProvider.System);
 
-        var first = await ledger.RecordAsync(TenantA, Failed(sourceA), CancellationToken.None);
-        var replay = await ledger.RecordAsync(TenantA, Failed(sourceA), CancellationToken.None);
+        var first = await ledger.RecordAsync(TenantA, Failed(sourceA), Actor, CancellationToken.None);
+        var replay = await ledger.RecordAsync(TenantA, Failed(sourceA), Actor, CancellationToken.None);
         Assert.AreEqual(FetchAttemptRecordOutcome.Replayed, replay.Outcome);
         Assert.AreEqual(first.Attempt, replay.Attempt);
 
@@ -150,12 +151,12 @@ public sealed class TenantFetchAttemptLedgerTests
         {
             Assert.AreEqual(
                 new FetchAttemptRecordResult(FetchAttemptRecordOutcome.IdempotencyConflict, null),
-                await ledger.RecordAsync(TenantA, conflict, CancellationToken.None), conflict.ToString());
+                await ledger.RecordAsync(TenantA, conflict, Actor, CancellationToken.None), conflict.ToString());
         }
 
         // The same key in another tenant is a distinct attempt.
         Assert.AreEqual(FetchAttemptRecordOutcome.Recorded,
-            (await ledger.RecordAsync(TenantB, Failed(sourceB), CancellationToken.None)).Outcome);
+            (await ledger.RecordAsync(TenantB, Failed(sourceB), Actor, CancellationToken.None)).Outcome);
         Assert.AreEqual(2, await db.TenantFetchAttempts.CountAsync());
     }
 
@@ -175,7 +176,7 @@ public sealed class TenantFetchAttemptLedgerTests
         {
             await using var db = new VeritasAtlasDbContext(options);
             return await new EfTenantFetchAttemptLedger(db, TimeProvider.System)
-                .RecordAsync(TenantA, Failed(source), CancellationToken.None);
+                .RecordAsync(TenantA, Failed(source), Actor, CancellationToken.None);
         }));
 
         Assert.AreEqual(1, results.Count(r => r.Outcome == FetchAttemptRecordOutcome.Recorded));
@@ -238,6 +239,153 @@ public sealed class TenantFetchAttemptLedgerTests
         }
 
         Assert.AreEqual(2, await db.TenantFetchAttempts.CountAsync());
+    }
+
+    [TestMethod]
+    public async Task RecordedAttemptsWriteExactlyOneAuditEventEachInTheSameTenant()
+    {
+        if (Database() is not { } connectionString) return;
+        await ResetAsync(connectionString);
+        await using var db = new VeritasAtlasDbContext(Options(connectionString));
+        var sourceA = await SourceAsync(db, TenantA, "https://example.test/a");
+        var retrieval = await RetrievalAsync(db, TenantA, sourceA, "r1");
+        var ledger = new EfTenantFetchAttemptLedger(db, TimeProvider.System);
+
+        var failed = await ledger.RecordAsync(TenantA, Failed(sourceA), "synthetic-worker", CancellationToken.None);
+        var succeeded = await ledger.RecordAsync(TenantA, Succeeded(sourceA, retrieval), Actor, CancellationToken.None);
+        Assert.AreEqual(FetchAttemptRecordOutcome.Recorded, failed.Outcome);
+        Assert.AreEqual(FetchAttemptRecordOutcome.Recorded, succeeded.Outcome);
+
+        await using var check = new VeritasAtlasDbContext(Options(connectionString));
+        var events = await check.TenantAuditEvents.AsNoTracking()
+            .Where(e => e.EntityType == EfTenantFetchAttemptLedger.AuditEntityType)
+            .ToListAsync();
+        Assert.AreEqual(2, events.Count);
+        foreach (var (attempt, actor) in new[] { (failed.Attempt!, "synthetic-worker"), (succeeded.Attempt!, Actor) })
+        {
+            var audit = events.Single(e => e.EntityId == attempt.Id.ToString("D"));
+            Assert.AreEqual(TenantA, audit.TenantId);
+            Assert.AreEqual($"tenant_fetch_attempt.recorded:{attempt.Id:D}", audit.EventKey);
+            Assert.AreEqual("tenant_fetch_attempt.recorded", audit.Action);
+            Assert.AreEqual("tenant_fetch_attempt", audit.EntityType);
+            Assert.AreEqual(actor, audit.ActorSubject);
+            Assert.AreEqual(attempt.CreatedAtUtc, DateTime.SpecifyKind(audit.OccurredAtUtc, DateTimeKind.Utc));
+        }
+
+        // The event carries no URI, failure class or retrieval id.
+        foreach (var audit in events)
+        {
+            var fields = string.Join("|", audit.EventKey, audit.Action, audit.EntityType, audit.EntityId, audit.ActorSubject);
+            Assert.IsFalse(fields.Contains("example.test", StringComparison.Ordinal), fields);
+            Assert.IsFalse(fields.Contains("http_status", StringComparison.Ordinal), fields);
+            Assert.IsFalse(fields.Contains(retrieval.ToString("D"), StringComparison.Ordinal), fields);
+        }
+
+        Assert.AreEqual(0, await check.TenantAuditEvents.CountAsync(e => e.TenantId == TenantB));
+    }
+
+    [TestMethod]
+    public async Task ReplaysConflictsAndRefusalsWriteNoAuditEvent()
+    {
+        if (Database() is not { } connectionString) return;
+        await ResetAsync(connectionString);
+        await using var db = new VeritasAtlasDbContext(Options(connectionString));
+        var sourceA = await SourceAsync(db, TenantA, "https://example.test/a");
+        var sourceA2 = await SourceAsync(db, TenantA, "https://example.test/a2");
+        var sourceB = await SourceAsync(db, TenantB, "https://example.test/b");
+        var retrievalA2 = await RetrievalAsync(db, TenantA, sourceA2, "r-a2");
+        var ledger = new EfTenantFetchAttemptLedger(db, TimeProvider.System);
+        Assert.AreEqual(FetchAttemptRecordOutcome.Recorded,
+            (await ledger.RecordAsync(TenantA, Failed(sourceA), Actor, CancellationToken.None)).Outcome);
+
+        var outcomes = new[]
+        {
+            await ledger.RecordAsync(TenantA, Failed(sourceA), Actor, CancellationToken.None),
+            await ledger.RecordAsync(TenantA, Failed(sourceA) with { HttpStatus = 500 }, Actor, CancellationToken.None),
+            await ledger.RecordAsync(TenantA, Failed(sourceB) with { AttemptKey = "k1" }, Actor, CancellationToken.None),
+            await ledger.RecordAsync(TenantA, Failed(Guid.NewGuid()) with { AttemptKey = "k2" }, Actor, CancellationToken.None),
+            await ledger.RecordAsync(TenantA, Succeeded(sourceA, retrievalA2) with { AttemptKey = "k3" }, Actor, CancellationToken.None),
+        };
+        CollectionAssert.AreEqual(
+            new[]
+            {
+                FetchAttemptRecordOutcome.Replayed, FetchAttemptRecordOutcome.IdempotencyConflict,
+                FetchAttemptRecordOutcome.SourceNotFound, FetchAttemptRecordOutcome.SourceNotFound,
+                FetchAttemptRecordOutcome.RetrievalNotFound
+            },
+            outcomes.Select(o => o.Outcome).ToArray());
+
+        await using var check = new VeritasAtlasDbContext(Options(connectionString));
+        Assert.AreEqual(1, await check.TenantFetchAttempts.CountAsync());
+        Assert.AreEqual(1, await check.TenantAuditEvents.CountAsync(e => e.EntityType == EfTenantFetchAttemptLedger.AuditEntityType));
+    }
+
+    [TestMethod]
+    public async Task ConcurrentSameKeyWritesYieldOneAuditEvent()
+    {
+        if (Database() is not { } connectionString) return;
+        await ResetAsync(connectionString);
+        var options = Options(connectionString);
+        Guid source;
+        await using (var setup = new VeritasAtlasDbContext(options))
+        {
+            source = await SourceAsync(setup, TenantA, "https://example.test/race");
+        }
+
+        var results = await Task.WhenAll(Enumerable.Range(0, 8).Select(async i =>
+        {
+            await using var db = new VeritasAtlasDbContext(options);
+            return await new EfTenantFetchAttemptLedger(db, TimeProvider.System)
+                .RecordAsync(TenantA, Failed(source), $"synthetic-worker-{i}", CancellationToken.None);
+        }));
+
+        var winner = results.Single(r => r.Outcome == FetchAttemptRecordOutcome.Recorded).Attempt!;
+        await using var check = new VeritasAtlasDbContext(options);
+        var audit = await check.TenantAuditEvents.AsNoTracking()
+            .SingleAsync(e => e.EntityType == EfTenantFetchAttemptLedger.AuditEntityType);
+        Assert.AreEqual(winner.Id.ToString("D"), audit.EntityId);
+    }
+
+    [TestMethod]
+    public async Task FailedAuditWriteRollsBackTheAttempt()
+    {
+        if (Database() is not { } connectionString) return;
+        await ResetAsync(connectionString);
+        await using var db = new VeritasAtlasDbContext(Options(connectionString));
+        var sourceA = await SourceAsync(db, TenantA, "https://example.test/a");
+        // Test-only fault in this per-test database: every later audit insert fails.
+        await db.Database.ExecuteSqlRawAsync(
+            "CREATE FUNCTION test_refuse_audit() RETURNS trigger LANGUAGE plpgsql AS "
+            + "$$BEGIN RAISE EXCEPTION 'audit unavailable' USING ERRCODE = 'P0001'; END$$");
+        await db.Database.ExecuteSqlRawAsync(
+            "CREATE TRIGGER test_refuse_audit BEFORE INSERT ON tenant_audit_events "
+            + "FOR EACH ROW EXECUTE FUNCTION test_refuse_audit()");
+
+        var error = await Assert.ThrowsExactlyAsync<DbUpdateException>(() =>
+            new EfTenantFetchAttemptLedger(db, TimeProvider.System)
+                .RecordAsync(TenantA, Failed(sourceA), Actor, CancellationToken.None));
+        Assert.AreEqual("P0001", (error.InnerException as PostgresException)?.SqlState);
+
+        await using var check = new VeritasAtlasDbContext(Options(connectionString));
+        Assert.AreEqual(0, await check.TenantFetchAttempts.CountAsync());
+        Assert.AreEqual(0, await check.TenantAuditEvents.CountAsync(e => e.EntityType == EfTenantFetchAttemptLedger.AuditEntityType));
+    }
+
+    [TestMethod]
+    public async Task InvalidActorIsRefusedBeforeTheDatabaseIsTouched()
+    {
+        // No reachable server: a refusal must happen before any connection.
+        var options = new DbContextOptionsBuilder<VeritasAtlasDbContext>()
+            .UseNpgsql("Host=127.0.0.1;Port=1;Database=unreachable;Timeout=1").Options;
+        await using var db = new VeritasAtlasDbContext(options);
+        var ledger = new EfTenantFetchAttemptLedger(db, TimeProvider.System);
+
+        foreach (var actor in new[] { "", "   ", "a\u0000b", "a\u007fb", "a\u0085b",
+                     new string('a', TenantAuditEventLimits.MaxSubjectLength + 1) })
+        {
+            await Assert.ThrowsExactlyAsync<ArgumentException>(() =>
+                ledger.RecordAsync(TenantA, Failed(Guid.NewGuid()), actor, CancellationToken.None), actor);
+        }
     }
 
     private static FetchAttemptInput Failed(Guid source) =>
