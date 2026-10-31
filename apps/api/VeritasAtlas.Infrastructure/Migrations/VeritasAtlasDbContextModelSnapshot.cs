@@ -1224,6 +1224,108 @@ namespace VeritasAtlas.Infrastructure.Migrations
                         });
                 });
 
+            modelBuilder.Entity("VeritasAtlas.Infrastructure.Persistence.TenantSourceFetchPolicy", b =>
+                {
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.PrimitiveCollection<string[]>("AllowedHosts")
+                        .IsRequired()
+                        .HasColumnType("text[]")
+                        .HasColumnName("allowed_hosts");
+
+                    b.PrimitiveCollection<int[]>("AllowedPorts")
+                        .IsRequired()
+                        .HasColumnType("integer[]")
+                        .HasColumnName("allowed_ports");
+
+                    b.PrimitiveCollection<string[]>("AllowedSchemes")
+                        .IsRequired()
+                        .HasColumnType("text[]")
+                        .HasColumnName("allowed_schemes");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<string>("Jurisdiction")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("jurisdiction");
+
+                    b.Property<int>("MaxRedirects")
+                        .HasColumnType("integer")
+                        .HasColumnName("max_redirects");
+
+                    b.Property<bool>("PlaintextHttpException")
+                        .HasColumnType("boolean")
+                        .HasColumnName("plaintext_http_exception");
+
+                    b.Property<string>("PolicyVersion")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("policy_version");
+
+                    b.Property<int>("Revision")
+                        .HasColumnType("integer")
+                        .HasColumnName("revision");
+
+                    b.Property<Guid>("SourceRegistryEntryId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("source_registry_entry_id");
+
+                    b.Property<string>("SourceType")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("source_type");
+
+                    b.Property<bool>("WideningApproved")
+                        .HasColumnType("boolean")
+                        .HasColumnName("widening_approved");
+
+                    b.HasKey("TenantId", "Id")
+                        .HasName("pk_tenant_source_fetch_policies");
+
+                    b.HasIndex("TenantId", "SourceRegistryEntryId", "PolicyVersion")
+                        .IsUnique()
+                        .HasDatabaseName("ux_tenant_source_fetch_policies_tenant_source_policy_version");
+
+                    b.HasIndex("TenantId", "SourceRegistryEntryId", "Revision")
+                        .IsUnique()
+                        .HasDatabaseName("ux_tenant_source_fetch_policies_tenant_source_revision");
+
+                    b.ToTable("tenant_source_fetch_policies", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_tenant_source_fetch_policies_allowed_hosts", "array_ndims(allowed_hosts) = 1 AND cardinality(allowed_hosts) >= 1 AND array_position(allowed_hosts, NULL) IS NULL AND cardinality(allowed_hosts) <= 32 AND array_to_string(allowed_hosts, ',') ~ '^[a-z0-9][a-z0-9.-]*(,[a-z0-9][a-z0-9.-]*)*$' AND cardinality(string_to_array(array_to_string(allowed_hosts, ','), ',')) = cardinality(allowed_hosts)");
+
+                            t.HasCheckConstraint("ck_tenant_source_fetch_policies_allowed_ports", "array_ndims(allowed_ports) = 1 AND cardinality(allowed_ports) >= 1 AND array_position(allowed_ports, NULL) IS NULL AND 1 <= ALL (allowed_ports) AND 65535 >= ALL (allowed_ports)");
+
+                            t.HasCheckConstraint("ck_tenant_source_fetch_policies_allowed_schemes", "array_ndims(allowed_schemes) = 1 AND cardinality(allowed_schemes) >= 1 AND array_position(allowed_schemes, NULL) IS NULL AND cardinality(allowed_schemes) <= 2 AND allowed_schemes <@ ARRAY['https', 'http']::text[]");
+
+                            t.HasCheckConstraint("ck_tenant_source_fetch_policies_http_requires_exception", "NOT ('http' = ANY (allowed_schemes)) OR plaintext_http_exception");
+
+                            t.HasCheckConstraint("ck_tenant_source_fetch_policies_jurisdiction_shape", "jurisdiction ~ '^[a-z0-9][a-z0-9-]{0,63}$'");
+
+                            t.HasCheckConstraint("ck_tenant_source_fetch_policies_max_redirects_range", "max_redirects BETWEEN 0 AND 10");
+
+                            t.HasCheckConstraint("ck_tenant_source_fetch_policies_policy_version_shape", "policy_version ~ '^[a-z0-9][a-z0-9._-]{0,63}$'");
+
+                            t.HasCheckConstraint("ck_tenant_source_fetch_policies_revision_positive", "revision >= 1");
+
+                            t.HasCheckConstraint("ck_tenant_source_fetch_policies_source_type_shape", "source_type ~ '^[a-z][a-z0-9_]{0,63}$'");
+
+                            t.HasCheckConstraint("ck_tenant_source_fetch_policies_tenant_id_not_empty", "tenant_id <> '00000000-0000-0000-0000-000000000000'::uuid");
+                        });
+                });
+
             modelBuilder.Entity("VeritasAtlas.Infrastructure.Persistence.TenantSourceRegistryEntry", b =>
                 {
                     b.Property<Guid>("TenantId")
@@ -1607,6 +1709,16 @@ namespace VeritasAtlas.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_tenant_retrieval_attestations_tenant_raw_retrieval");
+                });
+
+            modelBuilder.Entity("VeritasAtlas.Infrastructure.Persistence.TenantSourceFetchPolicy", b =>
+                {
+                    b.HasOne("VeritasAtlas.Infrastructure.Persistence.TenantSourceRegistryEntry", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "SourceRegistryEntryId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_tenant_source_fetch_policies_tenant_source_registry_entry");
                 });
 
             modelBuilder.Entity("VeritasAtlas.Domain.Entities.AgentRun", b =>
