@@ -6,7 +6,9 @@ namespace VeritasAtlas.Domain.Provenance;
 /// <summary>
 /// A registered public-record source policy for independent server-side fetches
 /// (VER-P0-04 slice 1, #111). Hosts are exact (no wildcards) and compared
-/// case-insensitively; only the listed schemes and ports are admitted.
+/// case-insensitively; only the listed schemes and ports are admitted. Plain
+/// <c>http</c> additionally needs <see cref="PlaintextHttpException"/>, a separately
+/// approved exception (VER-P0-04 slice 2, #113); listing the scheme alone is not enough.
 /// </summary>
 public sealed record SourceFetchPolicy(
     string PolicyVersion,
@@ -15,7 +17,8 @@ public sealed record SourceFetchPolicy(
     IReadOnlyCollection<string> AllowedHosts,
     IReadOnlyCollection<string> AllowedSchemes,
     IReadOnlyCollection<int> AllowedPorts,
-    int MaxRedirects);
+    int MaxRedirects,
+    bool PlaintextHttpException = false);
 
 /// <summary>What the caller expects to fetch: the registry policy version and classification.</summary>
 public sealed record FetchExpectation(string PolicyVersion, string Jurisdiction, string SourceType);
@@ -94,7 +97,8 @@ public static class FetchDestinationGuard
         var scheme = uri.Scheme.ToLowerInvariant();
         if ((scheme != "https" && scheme != "http")
             || policy.AllowedSchemes is null
-            || !policy.AllowedSchemes.Any(s => string.Equals(s, scheme, StringComparison.OrdinalIgnoreCase)))
+            || !policy.AllowedSchemes.Any(s => string.Equals(s, scheme, StringComparison.OrdinalIgnoreCase))
+            || (scheme == "http" && !policy.PlaintextHttpException))
             return FetchDestinationDecision.Deny("scheme_not_allowed");
 
         if (!string.IsNullOrEmpty(uri.UserInfo))
