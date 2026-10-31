@@ -37,8 +37,8 @@ public sealed record RawRetrievalEligibilityDecision(bool Eligible, string? Reas
 /// </summary>
 public static class RawRetrievalEligibility
 {
-    private static readonly Regex Sha256Lower = new("^[0-9a-f]{64}$", RegexOptions.CultureInvariant);
-    private static readonly Regex EvidenceRefPattern = new("^ev1:[0-9a-f]{64}$", RegexOptions.CultureInvariant);
+    private static readonly Regex Sha256Lower = new(@"^[0-9a-f]{64}\z", RegexOptions.CultureInvariant);
+    private static readonly Regex EvidenceRefPattern = new(@"^ev1:[0-9a-f]{64}\z", RegexOptions.CultureInvariant);
 
     public static RawRetrievalEligibilityDecision Evaluate(RawRetrievalProvenanceState? state)
     {
