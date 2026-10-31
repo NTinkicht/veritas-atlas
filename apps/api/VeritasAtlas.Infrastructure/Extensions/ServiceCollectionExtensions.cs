@@ -42,6 +42,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IPublicationService, PublicationService>();
         services.AddScoped<IAccessTokenRevocationStore, EfAccessTokenRevocationStore>();
         services.AddScoped<ITenantSourceRegistry, EfTenantSourceRegistry>();
+        services.AddScoped<ITenantSourceFetchPolicyRegistry, EfTenantSourceFetchPolicyRegistry>();
         services.AddScoped<ITenantRawRetrievalLedger, EfTenantRawRetrievalLedger>();
         services.AddScoped<ITenantFetchAttemptLedger, EfTenantFetchAttemptLedger>();
         services.AddScoped<ITenantParseRunLedger, EfTenantParseRunLedger>();
