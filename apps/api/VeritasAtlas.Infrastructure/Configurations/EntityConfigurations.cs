@@ -1298,3 +1298,95 @@ public sealed class TenantAuditEventConfiguration : IEntityTypeConfiguration<Ver
             .HasDatabaseName("ix_tenant_audit_events_tenant_entity_occurred_at");
     }
 }
+
+/// <summary>
+/// VER-P0-04 slice 5a (#119): append-only fetch policy revisions per tenant
+/// source registry entry. Shapes match <c>SourceFetchPolicyAdmission</c>;
+/// rules that need the previous revision (version bump, no re-classification,
+/// approved widening) belong to the registry service.
+/// </summary>
+public sealed class TenantSourceFetchPolicyConfiguration : IEntityTypeConfiguration<VeritasAtlas.Infrastructure.Persistence.TenantSourceFetchPolicy>
+{
+    public const int MaxCodeLength = 64;
+
+    // One-dimensional, non-empty and without NULL elements (ALL() over a NULL
+    // element is NULL, which a CHECK would let through).
+    private static string DenseArray(string column) =>
+        $"array_ndims({column}) = 1 AND cardinality({column}) >= 1 AND array_position({column}, NULL) IS NULL";
+
+    public void Configure(EntityTypeBuilder<VeritasAtlas.Infrastructure.Persistence.TenantSourceFetchPolicy> builder)
+    {
+        builder.ToTable("tenant_source_fetch_policies", table =>
+        {
+            table.HasCheckConstraint(
+                "ck_tenant_source_fetch_policies_tenant_id_not_empty",
+                "tenant_id <> '00000000-0000-0000-0000-000000000000'::uuid");
+            table.HasCheckConstraint("ck_tenant_source_fetch_policies_revision_positive", "revision >= 1");
+            table.HasCheckConstraint(
+                "ck_tenant_source_fetch_policies_policy_version_shape",
+                "policy_version ~ '^[a-z0-9][a-z0-9._-]{0,63}$'");
+            table.HasCheckConstraint(
+                "ck_tenant_source_fetch_policies_jurisdiction_shape",
+                "jurisdiction ~ '^[a-z0-9][a-z0-9-]{0,63}$'");
+            table.HasCheckConstraint(
+                "ck_tenant_source_fetch_policies_source_type_shape",
+                "source_type ~ '^[a-z][a-z0-9_]{0,63}$'");
+            // Exact lowercase DNS names only; the full host rules (labels, IP
+            // literals, local-only suffixes, duplicates) are admission's.
+            table.HasCheckConstraint(
+                "ck_tenant_source_fetch_policies_allowed_hosts",
+                DenseArray("allowed_hosts")
+                + " AND cardinality(allowed_hosts) <= 32"
+                + " AND array_to_string(allowed_hosts, ',') ~ '^[a-z0-9][a-z0-9.-]*(,[a-z0-9][a-z0-9.-]*)*$'"
+                // No element may smuggle a separator (two hosts in one entry).
+                + " AND cardinality(string_to_array(array_to_string(allowed_hosts, ','), ',')) = cardinality(allowed_hosts)");
+            table.HasCheckConstraint(
+                "ck_tenant_source_fetch_policies_allowed_schemes",
+                DenseArray("allowed_schemes")
+                + " AND cardinality(allowed_schemes) <= 2"
+                + " AND allowed_schemes <@ ARRAY['https', 'http']::text[]");
+            table.HasCheckConstraint(
+                "ck_tenant_source_fetch_policies_http_requires_exception",
+                "NOT ('http' = ANY (allowed_schemes)) OR plaintext_http_exception");
+            table.HasCheckConstraint(
+                "ck_tenant_source_fetch_policies_allowed_ports",
+                DenseArray("allowed_ports") + " AND 1 <= ALL (allowed_ports) AND 65535 >= ALL (allowed_ports)");
+            table.HasCheckConstraint(
+                "ck_tenant_source_fetch_policies_max_redirects_range",
+                "max_redirects BETWEEN 0 AND 10");
+        });
+
+        builder.HasKey(x => new { x.TenantId, x.Id })
+            .HasName("pk_tenant_source_fetch_policies");
+
+        builder.Property(x => x.TenantId).HasColumnName("tenant_id").IsRequired();
+        builder.Property(x => x.Id).HasColumnName("id").ValueGeneratedNever().IsRequired();
+        builder.Property(x => x.SourceRegistryEntryId).HasColumnName("source_registry_entry_id").IsRequired();
+        builder.Property(x => x.Revision).HasColumnName("revision").IsRequired();
+        builder.Property(x => x.PolicyVersion).HasColumnName("policy_version").HasMaxLength(MaxCodeLength).IsRequired();
+        builder.Property(x => x.Jurisdiction).HasColumnName("jurisdiction").HasMaxLength(MaxCodeLength).IsRequired();
+        builder.Property(x => x.SourceType).HasColumnName("source_type").HasMaxLength(MaxCodeLength).IsRequired();
+        builder.Property(x => x.AllowedHosts).HasColumnName("allowed_hosts").HasColumnType("text[]").IsRequired();
+        builder.Property(x => x.AllowedSchemes).HasColumnName("allowed_schemes").HasColumnType("text[]").IsRequired();
+        builder.Property(x => x.AllowedPorts).HasColumnName("allowed_ports").HasColumnType("integer[]").IsRequired();
+        builder.Property(x => x.MaxRedirects).HasColumnName("max_redirects").IsRequired();
+        builder.Property(x => x.PlaintextHttpException).HasColumnName("plaintext_http_exception").IsRequired();
+        builder.Property(x => x.WideningApproved).HasColumnName("widening_approved").IsRequired();
+        builder.Property(x => x.CreatedAtUtc).HasColumnName("created_at_utc").IsRequired();
+
+        builder.HasIndex(x => new { x.TenantId, x.SourceRegistryEntryId, x.Revision })
+            .IsUnique()
+            .HasDatabaseName("ux_tenant_source_fetch_policies_tenant_source_revision");
+        builder.HasIndex(x => new { x.TenantId, x.SourceRegistryEntryId, x.PolicyVersion })
+            .IsUnique()
+            .HasDatabaseName("ux_tenant_source_fetch_policies_tenant_source_policy_version");
+
+        // Composite key: a policy can only belong to its own tenant's source.
+        builder.HasOne<VeritasAtlas.Infrastructure.Persistence.TenantSourceRegistryEntry>()
+            .WithMany()
+            .HasForeignKey(x => new { x.TenantId, x.SourceRegistryEntryId })
+            .HasPrincipalKey(x => new { x.TenantId, x.Id })
+            .HasConstraintName("fk_tenant_source_fetch_policies_tenant_source_registry_entry")
+            .OnDelete(DeleteBehavior.Restrict);
+    }
+}
