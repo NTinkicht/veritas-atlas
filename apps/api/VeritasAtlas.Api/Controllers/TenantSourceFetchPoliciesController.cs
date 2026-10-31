@@ -23,7 +23,7 @@ public sealed class TenantSourceFetchPoliciesController : ControllerBase
     /// <summary>Upper bound for a policy request body.</summary>
     public const int MaxRequestBytes = 16 * 1024;
 
-    public const string AdminRole = "admin";
+    public const string AdminRole = TenantAdminRole.Name;
 
     private readonly ITenantSourceFetchPolicyRegistry _registry;
 
@@ -60,7 +60,7 @@ public sealed class TenantSourceFetchPoliciesController : ControllerBase
                 "The access token carries no usable subject name."));
         }
 
-        if (!IsAdmin(User))
+        if (!TenantAdminRole.IsSatisfiedBy(User))
         {
             return StatusCode(StatusCodes.Status403Forbidden, new TenantSourceError(
                 "admin_required",
@@ -116,23 +116,6 @@ public sealed class TenantSourceFetchPoliciesController : ControllerBase
                     "Another revision was written concurrently; read the current policy and retry.")),
             _ => throw new InvalidOperationException($"Unexpected outcome {result.Outcome}.")
         };
-    }
-
-    /// <summary>
-    /// Fail closed: the token's role claims (issued tokens carry the same role
-    /// as both <see cref="ClaimTypes.Role"/> and <c>role</c>) must name exactly
-    /// one role, <c>admin</c> (case-insensitive). No role, another role or two
-    /// different roles are refused.
-    /// </summary>
-    internal static bool IsAdmin(ClaimsPrincipal user)
-    {
-        var roles = user.FindAll(ClaimTypes.Role)
-            .Concat(user.FindAll("role"))
-            .Select(c => c.Value)
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToList();
-        return roles.Count == 1
-            && string.Equals(roles[0], AdminRole, StringComparison.OrdinalIgnoreCase);
     }
 
     // Unknown, foreign-tenant and policy-less sources share one body.
