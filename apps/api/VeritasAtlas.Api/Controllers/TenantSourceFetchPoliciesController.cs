@@ -67,21 +67,32 @@ public sealed class TenantSourceFetchPoliciesController : ControllerBase
                 "Only a tenant admin may change a source fetch policy."));
         }
 
-        if (request is null)
+        // Every policy member is required: a missing one is a malformed
+        // request (400), refused before the registry, never passed on as null.
+        if (request is not
+            {
+                PolicyVersion: { } policyVersion,
+                Jurisdiction: { } jurisdiction,
+                SourceType: { } sourceType,
+                AllowedHosts: { } allowedHosts,
+                AllowedSchemes: { } allowedSchemes,
+                AllowedPorts: { } allowedPorts,
+                MaxRedirects: { } maxRedirects
+            })
         {
             return BadRequest(new TenantSourceError(
                 "invalid_fetch_policy",
-                "A fetch policy body is required."));
+                "policyVersion, jurisdiction, sourceType, allowedHosts, allowedSchemes, allowedPorts and maxRedirects are required."));
         }
 
         var proposed = new SourceFetchPolicy(
-            request.PolicyVersion!,
-            request.Jurisdiction!,
-            request.SourceType!,
-            request.AllowedHosts!,
-            request.AllowedSchemes!,
-            request.AllowedPorts!,
-            request.MaxRedirects,
+            policyVersion,
+            jurisdiction,
+            sourceType,
+            allowedHosts,
+            allowedSchemes,
+            allowedPorts,
+            maxRedirects,
             request.PlaintextHttpException);
 
         var result = await _registry.ProposeAsync(
@@ -156,7 +167,7 @@ public sealed record ProposeFetchPolicyRequest(
     List<string>? AllowedHosts,
     List<string>? AllowedSchemes,
     List<int>? AllowedPorts,
-    int MaxRedirects,
+    int? MaxRedirects,
     bool PlaintextHttpException = false,
     bool WideningApproved = false);
 

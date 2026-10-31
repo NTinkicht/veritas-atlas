@@ -162,6 +162,48 @@ public sealed class TenantSourceFetchPolicyEndpointTests
     }
 
     [TestMethod]
+    public async Task EveryMissingOrNullPolicyMemberIsA400BeforeTheRegistry()
+    {
+        var registry = new RecordingRegistry();
+        using var factory = new ApiFactory(registry: registry);
+        using var client = factory.CreateClient();
+        var admin = factory.Services.GetRequiredService<JwtTokenService>()
+            .CreateToken("synthetic-admin", "admin", TenantA).Token;
+        var path = PolicyPath(Guid.NewGuid());
+        var full = new Dictionary<string, object?>
+        {
+            ["policyVersion"] = "2026-10.1",
+            ["jurisdiction"] = "dz",
+            ["sourceType"] = "court_record",
+            ["allowedHosts"] = new[] { "records.example.dz" },
+            ["allowedSchemes"] = new[] { "https" },
+            ["allowedPorts"] = new[] { 443 },
+            ["maxRedirects"] = 3,
+        };
+
+        foreach (var member in full.Keys)
+        {
+            foreach (var mode in new[] { "missing", "null" })
+            {
+                var body = new Dictionary<string, object?>(full);
+                if (mode == "missing") body.Remove(member);
+                else body[member] = null;
+                using var response = await Send(client, HttpMethod.Put, path, admin, body);
+                Assert.AreEqual(HttpStatusCode.BadRequest, response.StatusCode, $"{member} {mode}");
+                StringAssert.Contains(await response.Content.ReadAsStringAsync(), "invalid_fetch_policy",
+                    $"{member} {mode}");
+            }
+        }
+
+        Assert.AreEqual(0, registry.Calls, "an incomplete policy never reaches the registry");
+
+        // The complete body does reach it (the double answers 404).
+        using var complete = await Send(client, HttpMethod.Put, path, admin, full);
+        Assert.AreEqual(HttpStatusCode.NotFound, complete.StatusCode);
+        Assert.AreEqual(1, registry.Calls);
+    }
+
+    [TestMethod]
     public async Task AdminLifecycleOverRealPostgres()
     {
         if (Database() is not { } cs) return;
