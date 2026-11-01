@@ -14,7 +14,21 @@ public sealed record AttestationClaim(
     string? FinalUri,
     string? Jurisdiction,
     string? SourceType,
+    DateTime RetrievedAtUtc,
     DateTime AttestedAtUtc);
+
+/// <summary>
+/// The verdict of the trusted registry / signature boundary for exactly these claim fields. A stored
+/// attestation is an assertion, not proof: only an explicit <paramref name="Verified"/> result that
+/// echoes the claim's publisher, mechanism, reference, URI and digest can bind it.
+/// </summary>
+public sealed record PublisherBindingVerification(
+    string? PublisherIdentity,
+    string? BindingMechanism,
+    string? BindingReference,
+    string? FinalUri,
+    string? ContentSha256,
+    bool Verified);
 
 /// <summary>What the stored raw retrieval says about itself.</summary>
 public sealed record AttestedRetrieval(
@@ -43,7 +57,7 @@ public sealed record AttestationBindingDecision(bool Bound, string? Reason)
 /// order: <c>invalid_input</c>, <c>missing_identity</c>, <c>invalid_binding_mechanism</c>,
 /// <c>missing_binding_reference</c>, <c>not_authenticated</c>, <c>digest_mismatch</c>,
 /// <c>uri_mismatch</c>, <c>jurisdiction_mismatch</c>, <c>source_type_mismatch</c>,
-/// <c>attested_before_retrieval</c>, <c>attested_in_future</c>. No clock or I/O: the instant is an
+/// <c>retrieval_time_mismatch</c>, <c>publisher_binding_unverified</c>, <c>attested_before_retrieval</c>, <c>attested_in_future</c>. No clock or I/O: the instant is an
 /// explicit input.
 /// </summary>
 public static class RetrievalAttestationBinding
@@ -57,9 +71,11 @@ public static class RetrievalAttestationBinding
     public static AttestationBindingDecision Evaluate(
         AttestationClaim? claim,
         AttestedRetrieval? retrieval,
-        AttestationExpectation? expectation)
+        AttestationExpectation? expectation,
+        PublisherBindingVerification? verification)
     {
-        if (claim is null || retrieval is null || expectation is null
+        if (claim is null || retrieval is null || expectation is null || verification is null
+            || claim.RetrievedAtUtc.Kind != DateTimeKind.Utc
             || claim.AttestedAtUtc.Kind != DateTimeKind.Utc
             || retrieval.RetrievedAtUtc.Kind != DateTimeKind.Utc
             || expectation.NowUtc.Kind != DateTimeKind.Utc)
@@ -80,6 +96,15 @@ public static class RetrievalAttestationBinding
             return AttestationBindingDecision.Refuse("jurisdiction_mismatch");
         if (!PresentAndEqual(claim.SourceType, expectation.SourceType))
             return AttestationBindingDecision.Refuse("source_type_mismatch");
+        if (claim.RetrievedAtUtc != retrieval.RetrievedAtUtc)
+            return AttestationBindingDecision.Refuse("retrieval_time_mismatch");
+        if (!verification.Verified
+            || !PresentAndEqual(verification.PublisherIdentity, claim.PublisherIdentity)
+            || !PresentAndEqual(verification.BindingMechanism, claim.BindingMechanism)
+            || !PresentAndEqual(verification.BindingReference, claim.BindingReference)
+            || !PresentAndEqual(verification.FinalUri, claim.FinalUri)
+            || !PresentAndEqual(verification.ContentSha256, claim.ContentSha256))
+            return AttestationBindingDecision.Refuse("publisher_binding_unverified");
         if (claim.AttestedAtUtc < retrieval.RetrievedAtUtc)
             return AttestationBindingDecision.Refuse("attested_before_retrieval");
         if (claim.AttestedAtUtc > expectation.NowUtc)
