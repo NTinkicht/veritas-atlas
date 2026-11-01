@@ -31,4 +31,20 @@ public static class FetchRetryObservationFactory
 
         return new FetchRetryObservation(attemptNumber, FetchRetryFailure.HttpStatus, httpStatus, retryAfter);
     }
+
+    /// <summary>
+    /// VER-P0-06 slice 13 (#151): observation for a failed attempt that produced no HTTP
+    /// status (network, timeout, partial bytes, size limit, policy denial).
+    /// </summary>
+    /// <returns>
+    /// The observation, or <c>null</c> (fail closed: the caller must not retry) for a
+    /// non-positive attempt number, an undefined failure, or <see cref="FetchRetryFailure.HttpStatus"/>,
+    /// which must be built with <see cref="FromHttpResponse"/>.
+    /// </returns>
+    public static FetchRetryObservation? FromTransportFailure(int attemptNumber, FetchRetryFailure failure)
+    {
+        if (attemptNumber < 1) return null;
+        if (!Enum.IsDefined(failure) || failure == FetchRetryFailure.HttpStatus) return null;
+        return new FetchRetryObservation(attemptNumber, failure, null, null);
+    }
 }
