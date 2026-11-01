@@ -51,7 +51,8 @@ public static class FetchDestinationGuard
 
     /// <summary>
     /// Evaluates the requested URI followed by each redirect target, in order. The first
-    /// denial wins; more than <see cref="SourceFetchPolicy.MaxRedirects"/> redirects is denied.
+    /// denial wins; more than <see cref="SourceFetchPolicy.MaxRedirects"/> redirects is denied, and so is a redirect from <c>https</c> down to <c>http</c> even when a
+    /// plaintext exception is approved (<c>scheme_downgrade</c>).
     /// </summary>
     public static FetchDestinationDecision EvaluateRedirectChain(
         SourceFetchPolicy? policy,
@@ -64,10 +65,16 @@ public static class FetchDestinationGuard
         if (policy!.MaxRedirects < 0 || hops.Count - 1 > policy.MaxRedirects)
             return FetchDestinationDecision.Deny("too_many_redirects");
         FetchDestinationDecision last = FetchDestinationDecision.Deny("invalid_uri");
+        string? previousScheme = null;
         foreach (var hop in hops)
         {
             last = CheckHop(policy, hop);
             if (!last.Admitted) return last;
+            // CheckHop admitted the hop, so its URI parses and carries http or https.
+            var scheme = new Uri(last.FinalUri!).Scheme.ToLowerInvariant();
+            if (previousScheme == "https" && scheme == "http")
+                return FetchDestinationDecision.Deny("scheme_downgrade");
+            previousScheme = scheme;
         }
         return last;
     }

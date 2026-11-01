@@ -168,6 +168,32 @@ public sealed class FetchDestinationPolicyTests
     }
 
     [TestMethod]
+    public void DeniesHttpsToHttpDowngradeInsideAnApprovedPlaintextExceptionChain()
+    {
+        var plaintextOk = Policy with { AllowedSchemes = ["https", "http"], AllowedPorts = [443, 80], PlaintextHttpException = true };
+        var secure = Hop("https://records.example.gov/a", "93.184.216.34");
+        var plain = Hop("http://records.example.gov/a", "93.184.216.34");
+
+        Assert.AreEqual("scheme_downgrade",
+            FetchDestinationGuard.EvaluateRedirectChain(plaintextOk, Expected, [secure, plain]).Reason);
+        Assert.AreEqual("scheme_downgrade",
+            FetchDestinationGuard.EvaluateRedirectChain(plaintextOk, Expected, [secure, secure, plain]).Reason);
+
+        // Upgrade and same-scheme chains stay admitted.
+        var upgrade = FetchDestinationGuard.EvaluateRedirectChain(plaintextOk, Expected, [plain, secure]);
+        Assert.IsTrue(upgrade.Admitted);
+        Assert.AreEqual("https://records.example.gov/a", upgrade.FinalUri);
+        Assert.IsTrue(FetchDestinationGuard.EvaluateRedirectChain(plaintextOk, Expected, [plain, plain]).Admitted);
+
+        // A per-hop denial keeps priority over the downgrade reason.
+        Assert.AreEqual("forbidden_address", FetchDestinationGuard.EvaluateRedirectChain(plaintextOk, Expected,
+            [secure, Hop("http://records.example.gov/a", "10.0.0.1")]).Reason);
+        // Without the exception the plaintext hop is still a scheme denial.
+        Assert.AreEqual("scheme_not_allowed", FetchDestinationGuard.EvaluateRedirectChain(
+            plaintextOk with { PlaintextHttpException = false }, Expected, [secure, plain]).Reason);
+    }
+
+    [TestMethod]
     public void BoundsTheRedirectCountAndRejectsEmptyChains()
     {
         var hop = Hop("https://records.example.gov/", "93.184.216.34");
