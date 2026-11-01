@@ -28,7 +28,7 @@ public sealed record FetchRedirectTraceResult(
 /// <c>docs/EVIDENCE_PROVENANCE_CONTRACT.md</c> › Independent-fetch network policy.
 /// The chain is validated by <see cref="FetchDestinationGuard.EvaluateRedirectChain"/> first;
 /// any denial yields no trace. Credentials may be forwarded only while every hop so far has
-/// exactly the first hop's authority (scheme, host, port); the flag latches off at the first
+/// exactly the first hop's authority (scheme, host, port; a trailing-dot host is a distinct origin and counts as a change); the flag latches off at the first
 /// authority change and stays off even if a later hop returns to the original authority.
 /// </summary>
 public static class FetchRedirectTrace
@@ -48,7 +48,7 @@ public static class FetchRedirectTrace
         {
             // The chain was admitted, so every hop URI parses as an absolute http(s) URI.
             var uri = new Uri(hops[i].Uri!);
-            var authority = (uri.Scheme.ToLowerInvariant(), uri.IdnHost.TrimEnd('.').ToLowerInvariant(), uri.Port);
+            var authority = (uri.Scheme.ToLowerInvariant(), uri.IdnHost.ToLowerInvariant(), uri.Port);
             origin ??= authority;
             var changed = authority != origin.Value;
             if (changed) forward = false;

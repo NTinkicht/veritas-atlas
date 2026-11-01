@@ -80,4 +80,14 @@ public sealed class FetchRedirectTraceTests
         Assert.AreEqual("too_many_redirects",
             FetchRedirectTrace.Build(Policy, Expected, Enumerable.Repeat(Hop("https://records.example.gov/"), 5).ToArray()).Reason);
     }
+
+    [TestMethod]
+    public void TrailingDotHostIsADistinctAuthority()
+    {
+        var result = FetchRedirectTrace.Build(Policy, Expected,
+            [Hop("https://records.example.gov/a"), Hop("https://records.example.gov./b")]);
+        Assert.IsTrue(result.Admitted);
+        Assert.IsTrue(result.Trace[1].AuthorityChanged);
+        Assert.IsFalse(result.Trace[1].CredentialsMayForward);
+    }
 }
