@@ -136,7 +136,7 @@ public sealed class TenantSourceRegistryTests
         using var factory = new ApiFactory(registry: registry);
         using var client = factory.CreateClient();
         var bearer = factory.Services.GetRequiredService<JwtTokenService>()
-            .CreateToken("synthetic-analyst", "analyst", TenantA).Token;
+            .CreateToken("synthetic-admin", "admin", TenantA).Token;
 
         using var create = await Send(client, HttpMethod.Post, $"{Path}?tenant={TenantB}", bearer,
             new { canonicalKey = "  https://example.test/a  ", tenantId = TenantB });
@@ -149,7 +149,7 @@ public sealed class TenantSourceRegistryTests
         Assert.AreEqual(HttpStatusCode.BadRequest, blank.StatusCode);
         Assert.AreEqual(HttpStatusCode.BadRequest, control.StatusCode);
         Assert.AreEqual(HttpStatusCode.BadRequest, oversized.StatusCode);
-        Assert.AreEqual((TenantA, "https://example.test/a", "synthetic-analyst"), registry.Created.Single());
+        Assert.AreEqual((TenantA, "https://example.test/a", "synthetic-admin"), registry.Created.Single());
     }
 
     [TestMethod]
@@ -160,12 +160,15 @@ public sealed class TenantSourceRegistryTests
         using var factory = new ApiFactory(connectionString);
         using var client = factory.CreateClient();
         var tokens = factory.Services.GetRequiredService<JwtTokenService>();
+        // Writes need a tenant admin (#125); reads stay open to any tenant member.
         var a = tokens.CreateToken("synthetic-analyst-a", "analyst", TenantA).Token;
         var b = tokens.CreateToken("synthetic-analyst-b", "analyst", TenantB).Token;
+        var adminA = tokens.CreateToken("synthetic-admin-a", "admin", TenantA).Token;
+        var adminB = tokens.CreateToken("synthetic-admin-b", "admin", TenantB).Token;
 
-        var aEntry = await CreateAsync(client, a, "https://example.test/shared");
-        var bEntry = await CreateAsync(client, b, "https://example.test/shared");
-        await CreateAsync(client, b, "https://example.test/b-only");
+        var aEntry = await CreateAsync(client, adminA, "https://example.test/shared");
+        var bEntry = await CreateAsync(client, adminB, "https://example.test/shared");
+        await CreateAsync(client, adminB, "https://example.test/b-only");
 
         using var own = await Send(client, HttpMethod.Get, $"{Path}/{aEntry.Id}", a);
         Assert.AreEqual(HttpStatusCode.OK, own.StatusCode);
@@ -185,7 +188,7 @@ public sealed class TenantSourceRegistryTests
             bList.Select(x => x.CanonicalKey).ToArray());
 
         // Duplicate canonical key: rejected within a tenant, allowed across.
-        using var duplicate = await Send(client, HttpMethod.Post, Path, a, new { canonicalKey = "https://example.test/shared" });
+        using var duplicate = await Send(client, HttpMethod.Post, Path, adminA, new { canonicalKey = "https://example.test/shared" });
         Assert.AreEqual(HttpStatusCode.Conflict, duplicate.StatusCode);
         Assert.AreEqual(1, (await ListAsync(client, a)).Count);
     }
@@ -242,6 +245,82 @@ public sealed class TenantSourceRegistryTests
         }
 
         Assert.AreEqual(0, registry.Calls, "no registry access without an audit actor");
+    }
+
+    [TestMethod]
+    public async Task OnlyASingleAdminRoleMayRegisterASourceAndRefusalsTouchNothing()
+    {
+        var registry = new RecordingRegistry();
+        using var factory = new ApiFactory(registry: registry);
+        using var client = factory.CreateClient();
+        var tokens = factory.Services.GetRequiredService<JwtTokenService>();
+
+        var refused = new List<(string Label, string Bearer)>();
+        foreach (var role in new[] { "operator", "reviewer", "publisher", "analyst", "anonymous" })
+        {
+            refused.Add((role, tokens.CreateToken($"synthetic-{role}", role, TenantA).Token));
+        }
+        refused.Add(("no role", SignWithRoles("synthetic-norole", Array.Empty<string>(), TenantA.ToString("D"))));
+        refused.Add(("admin+operator", SignWithRoles("synthetic-two", new[] { "admin", "operator" }, TenantA.ToString("D"))));
+        refused.Add(("administrator", SignWithRoles("synthetic-near", new[] { "administrator" }, TenantA.ToString("D"))));
+
+        foreach (var (label, bearer) in refused)
+        {
+            // A valid body and a malformed one both get the role refusal first.
+            using var create = await Send(client, HttpMethod.Post, Path, bearer, new { canonicalKey = "https://example.test/a" });
+            using var blank = await Send(client, HttpMethod.Post, Path, bearer, new { canonicalKey = "   " });
+            Assert.AreEqual(HttpStatusCode.Forbidden, create.StatusCode, label);
+            Assert.AreEqual(HttpStatusCode.Forbidden, blank.StatusCode, label);
+            StringAssert.Contains(await create.Content.ReadAsStringAsync(), "admin_required", label);
+            StringAssert.Contains(await blank.Content.ReadAsStringAsync(), "admin_required", label);
+
+            // Reads remain open to every authenticated member of the tenant.
+            using var list = await Send(client, HttpMethod.Get, Path, bearer);
+            Assert.AreEqual(HttpStatusCode.OK, list.StatusCode, label);
+        }
+        Assert.AreEqual(0, registry.Created.Count, "no registration without a single admin role");
+
+        foreach (var (label, bearer) in new[]
+                 {
+                     ("issued admin", tokens.CreateToken("synthetic-admin", "admin", TenantA).Token),
+                     ("upper-case ADMIN", SignWithRoles("synthetic-upper", new[] { "ADMIN" }, TenantA.ToString("D"))),
+                 })
+        {
+            using var create = await Send(client, HttpMethod.Post, Path, bearer,
+                new { canonicalKey = $"https://example.test/{Guid.NewGuid():N}" });
+            Assert.AreEqual(HttpStatusCode.Created, create.StatusCode, label);
+        }
+        Assert.AreEqual(2, registry.Created.Count);
+    }
+
+    [TestMethod]
+    public async Task NonAdminRegistrationWritesNoSourceAndNoAuditEventOverRealPostgres()
+    {
+        if (TenantDatabase() is not { } connectionString) return;
+        await ResetAsync(connectionString);
+        using var factory = new ApiFactory(connectionString);
+        using var client = factory.CreateClient();
+        var tokens = factory.Services.GetRequiredService<JwtTokenService>();
+
+        foreach (var role in new[] { "operator", "reviewer", "publisher", "analyst" })
+        {
+            using var create = await Send(client, HttpMethod.Post, Path,
+                tokens.CreateToken($"synthetic-{role}", role, TenantA).Token,
+                new { canonicalKey = "https://example.test/refused" });
+            Assert.AreEqual(HttpStatusCode.Forbidden, create.StatusCode, role);
+        }
+
+        await using (var check = new VeritasAtlasDbContext(Options(connectionString)))
+        {
+            Assert.AreEqual(0, await check.TenantSourceRegistryEntries.CountAsync());
+            Assert.AreEqual(0, await check.TenantAuditEvents.CountAsync());
+        }
+
+        var admin = tokens.CreateToken("synthetic-admin", "admin", TenantA).Token;
+        var created = await CreateAsync(client, admin, "https://example.test/refused");
+        await using var after = new VeritasAtlasDbContext(Options(connectionString));
+        Assert.AreEqual(created.Id, (await after.TenantSourceRegistryEntries.AsNoTracking().SingleAsync()).Id);
+        Assert.AreEqual("synthetic-admin", (await after.TenantAuditEvents.AsNoTracking().SingleAsync()).ActorSubject);
     }
 
     [TestMethod]
@@ -375,13 +454,16 @@ public sealed class TenantSourceRegistryTests
 
     private static string Sign(params string[] tenants) => SignWithName("synthetic-forged", tenants);
 
-    private static string SignWithName(string? name, params string[] tenants)
+    private static string SignWithName(string? name, params string[] tenants) =>
+        SignWithRoles(name, new[] { "admin" }, tenants);
+
+    private static string SignWithRoles(string? name, string[] roles, params string[] tenants)
     {
         var claims = new List<Claim>
         {
-            new(ClaimTypes.Role, "admin"),
             new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString("N"))
         };
+        claims.AddRange(roles.Select(r => new Claim(ClaimTypes.Role, r)));
         if (name is not null) claims.Add(new Claim(ClaimTypes.Name, name));
         claims.AddRange(tenants.Select(t => new Claim(TenantClaim.Type, t)));
         var now = DateTime.UtcNow;

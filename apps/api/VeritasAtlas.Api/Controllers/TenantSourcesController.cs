@@ -10,6 +10,9 @@ namespace VeritasAtlas.Api.Controllers;
 /// registry. The tenant comes only from the signed <c>tenant</c> claim, never
 /// from the request; a caller without a valid tenant claim is refused (403),
 /// and another tenant's id answers exactly like an unknown id (404).
+/// VER-P0-04 (#125): only a tenant admin may register a source (403
+/// <c>admin_required</c> before the request body or the registry is read);
+/// reads stay open to every authenticated member of the tenant.
 /// </summary>
 [ApiController]
 [Route("api/v1/tenant-sources")]
@@ -39,6 +42,13 @@ public sealed class TenantSourcesController : ControllerBase
             return StatusCode(StatusCodes.Status403Forbidden, new TenantSourceError(
                 "actor_required",
                 "The access token carries no usable subject name."));
+        }
+
+        if (!TenantAdminRole.IsSatisfiedBy(User))
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, new TenantSourceError(
+                "admin_required",
+                "Only a tenant admin may register a source."));
         }
 
         var canonicalKey = request?.CanonicalKey?.Trim();

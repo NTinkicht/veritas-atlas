@@ -34,6 +34,8 @@ public sealed class VeritasAtlasDbContext : DbContext
 
     public DbSet<TenantRetrievalAttestation> TenantRetrievalAttestations => Set<TenantRetrievalAttestation>();
 
+    public DbSet<TenantSourceFetchPolicy> TenantSourceFetchPolicies => Set<TenantSourceFetchPolicy>();
+
     public DbSet<TenantInvestigation> TenantInvestigations => Set<TenantInvestigation>();
 
     public DbSet<TenantAuditEvent> TenantAuditEvents => Set<TenantAuditEvent>();
@@ -59,6 +61,7 @@ public sealed class VeritasAtlasDbContext : DbContext
         modelBuilder.ApplyConfiguration(new TenantFetchAttemptConfiguration());
         modelBuilder.ApplyConfiguration(new TenantParseRunConfiguration());
         modelBuilder.ApplyConfiguration(new TenantRetrievalAttestationConfiguration());
+        modelBuilder.ApplyConfiguration(new TenantSourceFetchPolicyConfiguration());
         modelBuilder.ApplyConfiguration(new TenantInvestigationConfiguration());
         modelBuilder.ApplyConfiguration(new TenantAuditEventConfiguration());
 
