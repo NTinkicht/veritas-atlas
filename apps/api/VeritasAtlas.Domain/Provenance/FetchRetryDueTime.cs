@@ -21,6 +21,14 @@ public static class FetchRetryDueTime
         if (decision is null || !decision.Retry || decision.Reason is not null) return null;
         if (decision.Delay < TimeSpan.Zero || decision.Delay > MaxDelay) return null;
         if (trustedNow > DateTimeOffset.MaxValue - decision.Delay) return null;
-        return trustedNow + decision.Delay;
+        try
+        {
+            // The local (offset) representation can overflow even when the UTC instant fits.
+            return trustedNow + decision.Delay;
+        }
+        catch (ArgumentOutOfRangeException)
+        {
+            return null;
+        }
     }
 }

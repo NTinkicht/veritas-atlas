@@ -44,6 +44,12 @@ public sealed class FetchRetryDueTimeTests
         Assert.IsNull(FetchRetryDueTime.From(DateTimeOffset.MaxValue.AddSeconds(-1), FetchRetryDecision.After(TimeSpan.FromSeconds(2))));
 
     [TestMethod]
+    public void Positive_offset_local_overflow_fails_closed() =>
+        Assert.IsNull(FetchRetryDueTime.From(
+            new DateTimeOffset(9999, 12, 31, 23, 59, 59, TimeSpan.FromHours(1)),
+            FetchRetryDecision.After(TimeSpan.FromSeconds(2))));
+
+    [TestMethod]
     public void Composes_with_real_policy_output()
     {
         var obs = FetchRetryObservationFactory.FromTransportFailure(2, FetchRetryFailure.Timeout);
