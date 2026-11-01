@@ -36,8 +36,10 @@ public static class RetryAfterHeader
         var text = value.Trim(' ', '\t');
         if (text.Length > 0 && text.All(static c => c is >= '0' and <= '9'))
         {
-            if (text.Length > 9) return RetryAfterParse.Ok(MaxParsedDelay);
-            var seconds = long.Parse(text, CultureInfo.InvariantCulture);
+            var digits = text.TrimStart('0');
+            if (digits.Length == 0) return RetryAfterParse.Ok(TimeSpan.Zero);
+            if (digits.Length > 9) return RetryAfterParse.Ok(MaxParsedDelay);
+            var seconds = long.Parse(digits, CultureInfo.InvariantCulture);
             return RetryAfterParse.Ok(Clamp(TimeSpan.FromSeconds(seconds)));
         }
 

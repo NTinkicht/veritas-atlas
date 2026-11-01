@@ -19,6 +19,17 @@ public sealed class RetryAfterHeaderTests
     }
 
     [TestMethod]
+    public void Zero_padded_delta_seconds_use_their_numeric_value()
+    {
+        Assert.AreEqual(TimeSpan.FromSeconds(30), RetryAfterHeader.Parse("0000000030", Now).Delay);
+        Assert.AreEqual(TimeSpan.Zero, RetryAfterHeader.Parse("0000000000000", Now).Delay);
+        Assert.AreEqual(RetryAfterHeader.MaxParsedDelay, RetryAfterHeader.Parse("00001000000000", Now).Delay);
+        var d = FetchRetryPolicy.Decide(SourceFetchRetrySchedule.Default,
+            new FetchRetryObservation(1, FetchRetryFailure.HttpStatus, 429, RetryAfterHeader.Parse("0000000030", Now).Delay));
+        Assert.IsTrue(d.Retry);
+    }
+
+    [TestMethod]
     public void Http_date_is_relative_to_the_trusted_now()
     {
         var r = RetryAfterHeader.Parse("Sun, 06 Nov 1994 08:51:37 GMT", Now);
