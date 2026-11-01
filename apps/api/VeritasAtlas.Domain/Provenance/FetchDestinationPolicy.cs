@@ -145,6 +145,10 @@ public static class FetchDestinationGuard
                 || (b[0] == 169 && b[1] == 254)                // link-local + metadata
                 || (b[0] == 172 && (b[1] & 0xF0) == 16)        // 172.16/12 private
                 || (b[0] == 192 && b[1] == 168)                // 192.168/16 private
+                || (b[0] == 192 && b[1] == 0 && (b[2] == 0 || b[2] == 2)) // 192.0.0/24 IETF (192.0.0.192 metadata), 192.0.2/24 docs
+                || (b[0] == 198 && (b[1] & 0xFE) == 18)        // 198.18/15 benchmarking
+                || (b[0] == 198 && b[1] == 51 && b[2] == 100)  // 198.51.100/24 documentation
+                || (b[0] == 203 && b[1] == 0 && b[2] == 113)   // 203.0.113/24 documentation
                 || b[0] >= 224;                                // multicast, 240/4, broadcast
         }
         if (address.AddressFamily == AddressFamily.InterNetworkV6)
@@ -152,6 +156,14 @@ public static class FetchDestinationGuard
             var b = address.GetAddressBytes();
             if (b.Take(12).All(x => x == 0))                   // ::/96: unspecified, loopback, IPv4-compatible
                 return true;
+            if (b[0] == 0x00 && b[1] == 0x64 && b[2] == 0xFF && b[3] == 0x9B && b[4] == 0x00 && b[5] == 0x01)
+                return true;                                         // 64:ff9b:1::/48 local-use NAT64
+            if (b[0] == 0x01 && b[1] == 0x00 && b.Skip(2).Take(6).All(x => x == 0))
+                return true;                                         // 100::/64 discard-only
+            if (b[0] == 0x20 && b[1] == 0x01 && (b[2] & 0xFE) == 0x00)
+                return true;                                         // 2001::/23 IETF assignments incl. Teredo
+            if (b[0] == 0x20 && b[1] == 0x01 && b[2] == 0x0D && b[3] == 0xB8)
+                return true;                                         // 2001:db8::/32 documentation
             if (b[0] == 0x00 && b[1] == 0x64 && b[2] == 0xFF && b[3] == 0x9B && b.Skip(4).Take(8).All(x => x == 0))
                 return IsForbiddenAddress(new IPAddress(b[12..16])); // 64:ff9b::/96 NAT64
             if (b[0] == 0x20 && b[1] == 0x02)
