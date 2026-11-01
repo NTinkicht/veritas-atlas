@@ -1,0 +1,30 @@
+{
+  "fixture_kind": "registry_policy_entry",
+  "synthetic_marker": "SYNTHETIC: hand-written policy entry, not captured from any live registry or source response",
+  "serves": "VER-P0-01 (#155)",
+  "source_id": "uk-legislation-gov-uk",
+  "policy_version": "uk-legislation-v1",
+  "jurisdiction": "uk",
+  "source_type": "legislation",
+  "allowed_hosts": ["www.legislation.gov.uk", "legislation.gov.uk"],
+  "allowed_schemes": ["https"],
+  "allowed_ports": [443],
+  "max_redirects": 3,
+  "plaintext_http_exception": false,
+  "licence": {
+    "name": "Open Government Licence v3.0",
+    "verification": "UNVERIFIED",
+    "attribution_required": true,
+    "attribution_text": "Contains public sector information licensed under the Open Government Licence v3.0."
+  },
+  "freshness": {
+    "policy_id": "uk-legislation-source-policy",
+    "policy_version": "1",
+    "freshness_required_for_current_claims": true,
+    "max_retrieval_age_seconds": 86400,
+    "revision_signal": "source-version-id",
+    "revision_signal_required": true,
+    "replacement_authority": "uk-legislation-gov-uk-source-adapter",
+    "verification": "UNVERIFIED"
+  }
+}
