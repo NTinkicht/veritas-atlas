@@ -294,6 +294,49 @@ public sealed class EvidenceSearchTests
         Assert.AreEqual(0, recording.Calls, "invalid parameters must not reach the search service");
     }
 
+    private sealed class FixedHits : IEvidenceSearchService
+    {
+        public Task<EvidenceSearchPage> SearchAsync(Guid tenantId, EvidenceSearchRequest request, CancellationToken ct) =>
+            Task.FromResult(new EvidenceSearchPage(
+                EvidenceSearchOutcome.Ok,
+                [new EvidenceSearchHit(
+                    "synthetic-ref-1", Uri, Guid.Parse("c3333333-3333-4333-8333-333333333333"), "gb-uk", "statute",
+                    "Verified", At, FreshnessState.Superseded, false, "superseded-by-newer-revision", "2026-11-02T11:00:00Z")],
+                "next-cursor"));
+    }
+
+    /// <summary>
+    /// Pins the wire contract the analyst UI (apps/web evidenceSearch.ts, #161) parses: camelCase
+    /// property names, the freshness enum as its number (Current=0, Stale=1, Unknown=2, Superseded=3),
+    /// and no total count.
+    /// </summary>
+    [TestMethod]
+    public async Task ResponseWireShapeMatchesTheAnalystUiContract()
+    {
+        using var factory = new ApiFactory(new FixedHits());
+        using var client = factory.CreateClient();
+        var good = Sign("synthetic-an", "analyst", [TenantA.ToString("D")]);
+
+        using var response = await Get(client, "/api/v1/tenant-evidence/search?q=section", good);
+        Assert.AreEqual(HttpStatusCode.OK, response.StatusCode);
+        using var body = System.Text.Json.JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        var root = body.RootElement;
+        CollectionAssert.AreEquivalent(new[] { "results", "nextCursor" }, root.EnumerateObject().Select(p => p.Name).ToArray());
+        Assert.AreEqual("next-cursor", root.GetProperty("nextCursor").GetString());
+        var hit = root.GetProperty("results")[0];
+        CollectionAssert.AreEquivalent(
+            new[]
+            {
+                "evidenceRef", "sourceUri", "sourceEntryId", "jurisdiction", "sourceType", "attestationState",
+                "retrievedAtUtc", "freshness", "freshnessEligible", "freshnessReason", "freshnessEvaluatedAt",
+            },
+            hit.EnumerateObject().Select(p => p.Name).ToArray());
+        Assert.AreEqual(System.Text.Json.JsonValueKind.Number, hit.GetProperty("freshness").ValueKind);
+        Assert.AreEqual(3, hit.GetProperty("freshness").GetInt32(), "Superseded");
+        Assert.IsFalse(hit.GetProperty("freshnessEligible").GetBoolean());
+        Assert.AreEqual("superseded-by-newer-revision", hit.GetProperty("freshnessReason").GetString());
+    }
+
     private static async Task<HttpResponseMessage> Get(HttpClient client, string path, string bearer)
     {
         using var request = new HttpRequestMessage(HttpMethod.Get, path);

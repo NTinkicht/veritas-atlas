@@ -107,6 +107,7 @@ import { ContradictionsPage } from "./pages/ContradictionsPage";
 import { ContradictionDetailPage } from "./pages/ContradictionDetailPage";
 import { ResolutionBoardPage } from "./pages/ResolutionBoardPage";
 import { HomePage } from "./pages/HomePage";
+import { EvidenceSearchPage } from "./pages/EvidenceSearchPage";
 import { RequireAuth } from "./components/RequireAuth";
 import { isMounted } from "./routeAudit";
 
@@ -118,6 +119,7 @@ const allRoutes: RouteObject[] = [
   { path: "/", element: protect(<HomePage />) },
   { path: "/dashboard", element: protect(<DashboardPage />) },
   { path: "/login", element: <LoginPage /> },
+  { path: "/evidence-search", element: protect(<EvidenceSearchPage />) },
   { path: "/workflow-audit", element: protect(<WorkflowAuditPage />) },
   { path: "/persistence", element: protect(<PersistenceConsolePage />) },
   { path: "/persistence-console", element: protect(<PersistenceConsolePage />) },
