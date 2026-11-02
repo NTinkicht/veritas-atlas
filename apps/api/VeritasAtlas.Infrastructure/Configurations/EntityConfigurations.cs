@@ -1390,3 +1390,42 @@ public sealed class TenantSourceFetchPolicyConfiguration : IEntityTypeConfigurat
             .OnDelete(DeleteBehavior.Restrict);
     }
 }
+
+public sealed class TenantRetrievalCheckpointConfiguration : IEntityTypeConfiguration<VeritasAtlas.Infrastructure.Persistence.TenantRetrievalCheckpoint>
+{
+    public void Configure(EntityTypeBuilder<VeritasAtlas.Infrastructure.Persistence.TenantRetrievalCheckpoint> builder)
+    {
+        builder.ToTable("tenant_retrieval_checkpoints", table =>
+        {
+            table.HasCheckConstraint(
+                "ck_tenant_retrieval_checkpoints_tenant_id_not_empty",
+                "tenant_id <> '00000000-0000-0000-0000-000000000000'::uuid");
+            table.HasCheckConstraint("ck_tenant_retrieval_checkpoints_sequence_positive", "sequence >= 1");
+            table.HasCheckConstraint(
+                "ck_tenant_retrieval_checkpoints_key_not_blank",
+                "length(btrim(key)) > 0");
+        });
+
+        builder.HasKey(x => new { x.TenantId, x.SourceEntryId })
+            .HasName("pk_tenant_retrieval_checkpoints");
+
+        builder.Property(x => x.TenantId).HasColumnName("tenant_id").IsRequired();
+        builder.Property(x => x.SourceEntryId).HasColumnName("source_entry_id").IsRequired();
+        builder.Property(x => x.Sequence).HasColumnName("sequence").IsRequired();
+        builder.Property(x => x.RawRetrievalId).HasColumnName("raw_retrieval_id").IsRequired();
+        builder.Property(x => x.Key)
+            .HasColumnName("key")
+            .HasMaxLength(VeritasAtlas.Application.Interfaces.TenantRawRetrievalLimits.MaxIdempotencyKeyLength)
+            .IsRequired();
+        builder.Property(x => x.CompletedAtUtc).HasColumnName("completed_at_utc").IsRequired();
+
+        // Same tenant, same source, and an existing stored raw retrieval: the checkpoint can never
+        // point ahead of persistence or at another tenant's or source's retrieval.
+        builder.HasOne<VeritasAtlas.Infrastructure.Persistence.TenantRawRetrieval>()
+            .WithMany()
+            .HasForeignKey(x => new { x.TenantId, x.SourceEntryId, x.RawRetrievalId })
+            .HasPrincipalKey(x => new { x.TenantId, x.SourceEntryId, x.Id })
+            .HasConstraintName("fk_tenant_retrieval_checkpoints_tenant_source_raw_retrieval")
+            .OnDelete(DeleteBehavior.Restrict);
+    }
+}

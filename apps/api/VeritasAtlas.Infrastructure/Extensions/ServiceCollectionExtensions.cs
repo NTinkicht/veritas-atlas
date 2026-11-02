@@ -68,6 +68,7 @@ public static class ServiceCollectionExtensions
             sp.GetService<TimeProvider>() ?? TimeProvider.System));
         services.AddScoped<ITenantParseRunLedger, EfTenantParseRunLedger>();
         services.AddScoped<ITenantRetrievalAttestationLedger, EfTenantRetrievalAttestationLedger>();
+        services.AddScoped<ITenantRetrievalCheckpointStore, EfTenantRetrievalCheckpointStore>();
         services.AddScoped<ITenantInvestigationStore, EfTenantInvestigationStore>();
         services.AddScoped<ITenantAuditEventStore, EfTenantAuditEventStore>();
 
