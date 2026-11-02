@@ -1224,6 +1224,49 @@ namespace VeritasAtlas.Infrastructure.Migrations
                         });
                 });
 
+            modelBuilder.Entity("VeritasAtlas.Infrastructure.Persistence.TenantRetrievalCheckpoint", b =>
+                {
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<Guid>("SourceEntryId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("source_entry_id");
+
+                    b.Property<DateTime>("CompletedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("completed_at_utc");
+
+                    b.Property<string>("Key")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("key");
+
+                    b.Property<Guid>("RawRetrievalId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("raw_retrieval_id");
+
+                    b.Property<long>("Sequence")
+                        .HasColumnType("bigint")
+                        .HasColumnName("sequence");
+
+                    b.HasKey("TenantId", "SourceEntryId")
+                        .HasName("pk_tenant_retrieval_checkpoints");
+
+                    b.HasIndex("TenantId", "SourceEntryId", "RawRetrievalId");
+
+                    b.ToTable("tenant_retrieval_checkpoints", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_tenant_retrieval_checkpoints_key_not_blank", "length(btrim(key)) > 0");
+
+                            t.HasCheckConstraint("ck_tenant_retrieval_checkpoints_sequence_positive", "sequence >= 1");
+
+                            t.HasCheckConstraint("ck_tenant_retrieval_checkpoints_tenant_id_not_empty", "tenant_id <> '00000000-0000-0000-0000-000000000000'::uuid");
+                        });
+                });
+
             modelBuilder.Entity("VeritasAtlas.Infrastructure.Persistence.TenantSourceFetchPolicy", b =>
                 {
                     b.Property<Guid>("TenantId")
@@ -1709,6 +1752,17 @@ namespace VeritasAtlas.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_tenant_retrieval_attestations_tenant_raw_retrieval");
+                });
+
+            modelBuilder.Entity("VeritasAtlas.Infrastructure.Persistence.TenantRetrievalCheckpoint", b =>
+                {
+                    b.HasOne("VeritasAtlas.Infrastructure.Persistence.TenantRawRetrieval", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "SourceEntryId", "RawRetrievalId")
+                        .HasPrincipalKey("TenantId", "SourceEntryId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_tenant_retrieval_checkpoints_tenant_source_raw_retrieval");
                 });
 
             modelBuilder.Entity("VeritasAtlas.Infrastructure.Persistence.TenantSourceFetchPolicy", b =>
