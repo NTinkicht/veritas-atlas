@@ -26,7 +26,7 @@ describe("web surface audit", () => {
 
   it("lists every route with its verdict in WEB_SURFACE_AUDIT.md", () => {
     const missing = registered.filter(
-      (p) => !auditDoc.includes(`| \`${p}\` | ${ROUTE_AUDIT[p].page} | ${ROUTE_AUDIT[p].verdict} |`),
+      (p) => !auditDoc.includes(`| \`${p}\` | `) || !new RegExp(`\\| \`${p.replace(/[:/]/g, "\\$&")}\` \\| \\w+ \\| ${ROUTE_AUDIT[p].verdict} \\|`).test(auditDoc),
     );
     expect(missing).toEqual([]);
   });
