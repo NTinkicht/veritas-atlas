@@ -107,4 +107,26 @@ public sealed class ClaimExtractionV1Tests
         Assert.IsFalse(ClaimExtractionV1.IsAnswerable(confirmed, Guid.Empty, chunk));
         Assert.IsFalse(ClaimExtractionV1.IsAnswerable(confirmed with { Quotation = "forged" }, TenantA, chunk));
     }
+
+    [TestMethod]
+    public void Abbreviation_periods_do_not_truncate_the_claim()
+    {
+        var chunk = Chunk("The operator must retain records, e.g. invoices and receipts. Other text.");
+        var r = _sut.Extract(TenantA, new[] { chunk });
+        Assert.AreEqual(1, r.Claims.Count);
+        Assert.AreEqual("The operator must retain records, e.g. invoices and receipts.", r.Claims[0].Quotation);
+        var r2 = _sut.Extract(TenantA, new[] { Chunk("Fees shall be paid, i.e. in full, per art. 5 hereof.") });
+        Assert.AreEqual("Fees shall be paid, i.e. in full, per art. 5 hereof.", r2.Claims[0].Quotation);
+    }
+
+    [TestMethod]
+    public void Verify_is_overflow_safe_for_extreme_spans()
+    {
+        var chunk = Chunk(Text);
+        var claim = _sut.Extract(TenantA, new[] { chunk }).Claims[0];
+        Assert.IsFalse(ClaimExtractionV1.Verify(claim with { Span = claim.Span with { Start = 1, Length = int.MaxValue } }, chunk));
+        Assert.IsFalse(ClaimExtractionV1.Verify(claim with { Span = claim.Span with { Start = int.MaxValue, Length = 2 } }, chunk));
+        Assert.IsFalse(ClaimExtractionV1.IsAnswerable(
+            ClaimExtractionV1.Confirm(claim with { Span = claim.Span with { Start = 1, Length = int.MaxValue } }), TenantA, chunk));
+    }
 }

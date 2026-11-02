@@ -99,7 +99,8 @@ public sealed class ClaimExtractionV1 : IClaimExtractor
             && s.ElementId == chunk.ElementId
             && s.ChunkTextSha256 == chunk.TextSha256
             && Sha(chunk.Text) == chunk.TextSha256
-            && s.Start >= 0 && s.Length > 0 && s.Start + s.Length <= chunk.Text.Length
+            && s.Start >= 0 && s.Length > 0 && s.Start <= chunk.Text.Length
+            && s.Length <= chunk.Text.Length - s.Start
             && string.Equals(chunk.Text.Substring(s.Start, s.Length), claim.Quotation, StringComparison.Ordinal);
     }
 
@@ -127,6 +128,7 @@ public sealed class ClaimExtractionV1 : IClaimExtractor
             if (text[i] != '.' && text[i] != ';') continue;
             var end = i + 1;
             if (end < text.Length && !char.IsWhiteSpace(text[end])) continue;
+            if (text[i] == '.' && (EndsWithAbbreviation(text, i) || NextStartsLowercase(text, end))) continue;
             if (end > start && text.Substring(start, end - start).Trim().Length > 0)
             {
                 var lead = 0;
@@ -146,6 +148,27 @@ public sealed class ClaimExtractionV1 : IClaimExtractor
                 yield return (start + lead, trimmed.Length - lead);
             }
         }
+    }
+
+    private static readonly string[] Abbreviations = { "e.g", "i.e", "etc", "cf", "vs", "no", "nos", "art", "s", "ss", "sch", "para" };
+
+    private static bool EndsWithAbbreviation(string text, int dot)
+    {
+        foreach (var a in Abbreviations)
+        {
+            var begin = dot - a.Length;
+            if (begin < 0) continue;
+            if (!string.Equals(text.Substring(begin, a.Length), a, StringComparison.OrdinalIgnoreCase)) continue;
+            if (begin == 0 || !char.IsLetterOrDigit(text[begin - 1])) return true;
+        }
+        return false;
+    }
+
+    private static bool NextStartsLowercase(string text, int from)
+    {
+        var j = from;
+        while (j < text.Length && char.IsWhiteSpace(text[j])) j++;
+        return j < text.Length && char.IsLower(text[j]);
     }
 
     private static string Sha(string s) => Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(s)));
