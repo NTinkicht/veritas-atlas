@@ -11,7 +11,7 @@ The table mirrors `src/routeAudit.ts`. `src/routes.test.ts` fails when a route h
 | Route | Page | Verdict | Backing |
 | --- | --- | --- | --- |
 | `/` | HomePage | REAL | none (navigation landing page, no data claims) |
-| `/dashboard` | DashboardPage | REAL | /api/v1/cases, /claims, /contradictions, /workflow-audit/entries, /persistence/snapshot |
+| `/dashboard` | DashboardPage | REAL | /api/v1/cases, /claims, /contradictions, /workflow-audit/entries (scenario snapshot only in Development) |
 | `/login` | LoginPage | REAL | /api/v1/auth/login |
 | `/workflow-audit` | WorkflowAuditPage | REAL | /api/v1/workflow-audit/entries/clear |
 | `/persistence` | PersistenceConsolePage | SEEDED-OR-DEMO | /api/v1/persistence/snapshot/reset: scenario snapshot of the seeded workflow scenario |
@@ -122,6 +122,7 @@ The table mirrors `src/routeAudit.ts`. `src/routes.test.ts` fails when a route h
 
 ## Decisions
 
+- `/dashboard` is REAL for cases, claims, contradictions and workflow audit; its scenario Snapshot metric and panel are seeded content, so `DashboardPage` neither fetches nor renders them outside Development.
 - Removed the unused Vite starter `src/App.tsx`, `src/App.css`, and `src/assets/{hero.png,react.svg,vite.svg}`; a repo-wide search found no reference outside `App.tsx`. The legacy root `frontend/` is untouched.
 - DEAD and SEEDED-OR-DEMO pages stay in source (behind the Development-only mount) so the follow-up UI slice (#161) can replace or delete them one at a time with an audit row each; navigation shows only mounted routes.
 - `/case-explorer`, `/case-scoreboard`: listed REAL because they call `/api/v1/cases`; neither reads seed modules (checked by search).

@@ -6,7 +6,7 @@ export type RouteAudit = { page: string; verdict: Verdict; backing: string };
 // production builds (see routes.tsx). docs/architecture/WEB_SURFACE_AUDIT.md mirrors this table.
 export const ROUTE_AUDIT: Record<string, RouteAudit> = {
   "/": { page: "HomePage", verdict: "REAL", backing: "none (navigation landing page, no data claims)" },
-  "/dashboard": { page: "DashboardPage", verdict: "REAL", backing: "/api/v1/cases, /claims, /contradictions, /workflow-audit/entries, /persistence/snapshot" },
+  "/dashboard": { page: "DashboardPage", verdict: "REAL", backing: "/api/v1/cases, /claims, /contradictions, /workflow-audit/entries (scenario snapshot only in Development)" },
   "/login": { page: "LoginPage", verdict: "REAL", backing: "/api/v1/auth/login" },
   "/workflow-audit": { page: "WorkflowAuditPage", verdict: "REAL", backing: "/api/v1/workflow-audit/entries|clear" },
   "/persistence": { page: "PersistenceConsolePage", verdict: "SEEDED-OR-DEMO", backing: "/api/v1/persistence/snapshot|reset: scenario snapshot of the seeded workflow scenario" },

@@ -57,4 +57,11 @@ describe("web surface audit", () => {
       expect((el!.type as { name?: string }).name, route.path).toBe("RequireAuth");
     }
   });
+
+  it("does not fetch or render the seeded scenario snapshot outside Development", () => {
+    const src = readFileSync(resolve(__dirname, "pages/DashboardPage.tsx"), "utf8");
+    expect(src).toContain("const SHOW_SEEDED_SNAPSHOT = import.meta.env.DEV;");
+    expect(src).toContain("SHOW_SEEDED_SNAPSHOT ? getScenarioSnapshot() : Promise.resolve(null)");
+    expect(src.match(/\{SHOW_SEEDED_SNAPSHOT && \(/g)?.length).toBe(2);
+  });
 });
