@@ -32,6 +32,8 @@ public sealed class VeritasAtlasDbContext : DbContext
 
     public DbSet<TenantParseRun> TenantParseRuns => Set<TenantParseRun>();
 
+    public DbSet<TenantEvidenceChunk> TenantEvidenceChunks => Set<TenantEvidenceChunk>();
+
     public DbSet<TenantRetrievalAttestation> TenantRetrievalAttestations => Set<TenantRetrievalAttestation>();
 
     public DbSet<TenantRetrievalCheckpoint> TenantRetrievalCheckpoints => Set<TenantRetrievalCheckpoint>();
@@ -62,6 +64,7 @@ public sealed class VeritasAtlasDbContext : DbContext
         modelBuilder.ApplyConfiguration(new TenantRawRetrievalConfiguration());
         modelBuilder.ApplyConfiguration(new TenantFetchAttemptConfiguration());
         modelBuilder.ApplyConfiguration(new TenantParseRunConfiguration());
+        modelBuilder.ApplyConfiguration(new TenantEvidenceChunkConfiguration());
         modelBuilder.ApplyConfiguration(new TenantRetrievalAttestationConfiguration());
         modelBuilder.ApplyConfiguration(new TenantRetrievalCheckpointConfiguration());
         modelBuilder.ApplyConfiguration(new TenantSourceFetchPolicyConfiguration());
