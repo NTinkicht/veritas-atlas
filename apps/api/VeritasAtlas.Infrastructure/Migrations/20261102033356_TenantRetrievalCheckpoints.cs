@@ -46,6 +46,9 @@ namespace VeritasAtlas.Infrastructure.Migrations
             migrationBuilder.Sql(@"CREATE FUNCTION tenant_retrieval_checkpoints_guard() RETURNS trigger
 LANGUAGE plpgsql AS $$
 BEGIN
+  IF TG_OP = 'INSERT' AND NEW.sequence = 1 THEN
+    RETURN NEW;
+  END IF;
   IF TG_OP = 'UPDATE'
      AND NEW.tenant_id = OLD.tenant_id
      AND NEW.source_entry_id = OLD.source_entry_id
@@ -53,11 +56,11 @@ BEGIN
      AND NEW.completed_at_utc >= OLD.completed_at_utc THEN
     RETURN NEW;
   END IF;
-  RAISE EXCEPTION 'tenant_retrieval_checkpoints only allows a one-step advance' USING ERRCODE = '55000';
+  RAISE EXCEPTION 'tenant_retrieval_checkpoints only allows a first checkpoint at sequence 1 and one-step advances' USING ERRCODE = '55000';
 END;
 $$;");
             migrationBuilder.Sql(@"CREATE TRIGGER tr_tenant_retrieval_checkpoints_guard
-BEFORE UPDATE OR DELETE ON tenant_retrieval_checkpoints
+BEFORE INSERT OR UPDATE OR DELETE ON tenant_retrieval_checkpoints
 FOR EACH ROW EXECUTE FUNCTION tenant_retrieval_checkpoints_guard();");
             migrationBuilder.Sql(@"CREATE TRIGGER tr_tenant_retrieval_checkpoints_no_truncate
 BEFORE TRUNCATE ON tenant_retrieval_checkpoints

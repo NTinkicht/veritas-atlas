@@ -119,6 +119,23 @@ public sealed class TenantRetrievalCheckpointStoreTests
     }
 
     [TestMethod]
+    public async Task DatabaseRefusesAFirstCheckpointThatSkipsSequenceOne()
+    {
+        var cs = Database();
+        await ResetAsync(cs!);
+        await using var db = new VeritasAtlasDbContext(Options(cs!));
+        var (source, r1) = await SourceWithRetrievalAsync(db, TenantA, "k1");
+        string Insert(int sequence) =>
+            $"INSERT INTO tenant_retrieval_checkpoints (tenant_id, source_entry_id, sequence, raw_retrieval_id, key, completed_at_utc) " +
+            $"VALUES ('{TenantA}', '{source}', {sequence}, '{r1}', 'k1', now())";
+
+        var ex = await Assert.ThrowsAsync<PostgresException>(() => db.Database.ExecuteSqlRawAsync(Insert(100)));
+        Assert.AreEqual("55000", ex.SqlState);
+        Assert.AreEqual(0, await db.TenantRetrievalCheckpoints.CountAsync());
+        Assert.AreEqual(1, await db.Database.ExecuteSqlRawAsync(Insert(1)));
+    }
+
+    [TestMethod]
     public async Task DatabaseRefusesEverythingButAOneStepAdvance()
     {
         var cs = Database();
