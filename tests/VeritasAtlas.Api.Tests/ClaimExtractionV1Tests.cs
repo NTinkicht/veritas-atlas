@@ -1,0 +1,175 @@
+using System.Security.Cryptography;
+using System.Text;
+using Microsoft.VisualStudio.TestTools.UnitTesting;
+using VeritasAtlas.Domain.Parsing;
+
+namespace VeritasAtlas.Api.Tests;
+
+/// <summary>VER-P0-11 slice (#165). All fixtures are hand-written and SYNTHETIC.</summary>
+[TestClass]
+public sealed class ClaimExtractionV1Tests
+{
+    private static readonly Guid TenantA = Guid.Parse("11111111-1111-1111-1111-111111111111");
+    private static readonly Guid TenantB = Guid.Parse("22222222-2222-2222-2222-222222222222");
+    private readonly ClaimExtractionV1 _sut = new();
+
+    private static EvidenceChunk Chunk(string text, string id = "s1", string parent = "ev1:aa")
+        => new(parent, 0, id, text, Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(text))));
+
+    private const string Text = "The operator shall keep records. This is background. The operator must not alter them; Notes follow.";
+
+    [TestMethod]
+    public void Extracts_only_normative_sentences_with_exact_spans()
+    {
+        var chunk = Chunk(Text);
+        var r = _sut.Extract(TenantA, new[] { chunk });
+        Assert.IsTrue(r.Succeeded);
+        Assert.AreEqual(2, r.Claims.Count);
+        Assert.AreEqual("The operator shall keep records.", r.Claims[0].Quotation);
+        Assert.AreEqual("The operator must not alter them;", r.Claims[1].Quotation);
+        foreach (var c in r.Claims)
+        {
+            Assert.AreEqual(ClaimStatus.Unconfirmed, c.Status);
+            Assert.AreEqual(TenantA, c.TenantId);
+            Assert.AreEqual("ev1:aa", c.Span.ParentEvidenceRef);
+            Assert.IsTrue(ClaimExtractionV1.Verify(c, chunk));
+        }
+    }
+
+    [TestMethod]
+    public void Is_deterministic()
+    {
+        var a = _sut.Extract(TenantA, new[] { Chunk(Text) });
+        var b = _sut.Extract(TenantA, new[] { Chunk(Text) });
+        CollectionAssert.AreEqual(a.Claims.Select(c => c.ClaimKey).ToList(), b.Claims.Select(c => c.ClaimKey).ToList());
+    }
+
+    [TestMethod]
+    public void Claim_keys_are_tenant_scoped()
+    {
+        var a = _sut.Extract(TenantA, new[] { Chunk(Text) }).Claims[0].ClaimKey;
+        var b = _sut.Extract(TenantB, new[] { Chunk(Text) }).Claims[0].ClaimKey;
+        Assert.AreNotEqual(a, b);
+    }
+
+    [TestMethod]
+    public void Fails_closed_on_missing_tenant()
+    {
+        var r = _sut.Extract(Guid.Empty, new[] { Chunk(Text) });
+        Assert.IsFalse(r.Succeeded);
+        Assert.AreEqual(ClaimExtractionFailure.MissingTenant, r.Failure);
+        Assert.AreEqual(0, r.Claims.Count);
+    }
+
+    [TestMethod]
+    public void Fails_closed_on_digest_mismatch_or_incomplete_chunk_without_partial_claims()
+    {
+        var good = Chunk(Text);
+        var bad = good with { TextSha256 = new string('0', 64) };
+        var r = _sut.Extract(TenantA, new[] { good, bad });
+        Assert.IsFalse(r.Succeeded);
+        Assert.AreEqual("chunk_digest_mismatch", r.Reason);
+        Assert.AreEqual(0, r.Claims.Count);
+        Assert.AreEqual("incomplete_chunk", _sut.Extract(TenantA, new[] { good with { ElementId = " " } }).Reason);
+        Assert.AreEqual("incomplete_chunk", _sut.Extract(TenantA, new[] { good with { ParentEvidenceRef = "" } }).Reason);
+    }
+
+    [TestMethod]
+    public void No_normative_text_yields_no_claims()
+    {
+        var r = _sut.Extract(TenantA, new[] { Chunk("Plain background text. Nothing binding here.") });
+        Assert.IsTrue(r.Succeeded);
+        Assert.AreEqual(0, r.Claims.Count);
+    }
+
+    [TestMethod]
+    public void Verify_rejects_tampered_quotation_span_or_other_chunk()
+    {
+        var chunk = Chunk(Text);
+        var claim = _sut.Extract(TenantA, new[] { chunk }).Claims[0];
+        Assert.IsFalse(ClaimExtractionV1.Verify(claim with { Quotation = "The operator shall keep records" }, chunk));
+        Assert.IsFalse(ClaimExtractionV1.Verify(claim with { Span = claim.Span with { Start = 1 } }, chunk));
+        Assert.IsFalse(ClaimExtractionV1.Verify(claim with { Span = claim.Span with { Length = 9999 } }, chunk));
+        Assert.IsFalse(ClaimExtractionV1.Verify(claim, Chunk(Text, id: "s2")));
+        Assert.IsFalse(ClaimExtractionV1.Verify(claim, Chunk(Text, parent: "ev1:bb")));
+        Assert.IsFalse(ClaimExtractionV1.Verify(claim, chunk with { TextSha256 = new string('0', 64) }));
+    }
+
+    [TestMethod]
+    public void Unconfirmed_claims_are_never_answerable_and_confirmed_ones_only_for_their_tenant()
+    {
+        var chunk = Chunk(Text);
+        var claim = _sut.Extract(TenantA, new[] { chunk }).Claims[0];
+        Assert.IsFalse(ClaimExtractionV1.IsAnswerable(claim, TenantA, chunk));
+        var confirmed = ClaimExtractionV1.Confirm(claim);
+        Assert.IsTrue(ClaimExtractionV1.IsAnswerable(confirmed, TenantA, chunk));
+        Assert.IsFalse(ClaimExtractionV1.IsAnswerable(confirmed, TenantB, chunk));
+        Assert.IsFalse(ClaimExtractionV1.IsAnswerable(confirmed, Guid.Empty, chunk));
+        Assert.IsFalse(ClaimExtractionV1.IsAnswerable(confirmed with { Quotation = "forged" }, TenantA, chunk));
+    }
+
+    [TestMethod]
+    public void Abbreviation_periods_do_not_truncate_the_claim()
+    {
+        var chunk = Chunk("The operator must retain records, e.g. invoices and receipts. Other text.");
+        var r = _sut.Extract(TenantA, new[] { chunk });
+        Assert.AreEqual(1, r.Claims.Count);
+        Assert.AreEqual("The operator must retain records, e.g. invoices and receipts.", r.Claims[0].Quotation);
+        var r2 = _sut.Extract(TenantA, new[] { Chunk("Fees shall be paid, i.e. in full, per art. 5 hereof.") });
+        Assert.AreEqual("Fees shall be paid, i.e. in full, per art. 5 hereof.", r2.Claims[0].Quotation);
+    }
+
+    [TestMethod]
+    public void Verify_is_overflow_safe_for_extreme_spans()
+    {
+        var chunk = Chunk(Text);
+        var claim = _sut.Extract(TenantA, new[] { chunk }).Claims[0];
+        Assert.IsFalse(ClaimExtractionV1.Verify(claim with { Span = claim.Span with { Start = 1, Length = int.MaxValue } }, chunk));
+        Assert.IsFalse(ClaimExtractionV1.Verify(claim with { Span = claim.Span with { Start = int.MaxValue, Length = 2 } }, chunk));
+        Assert.IsFalse(ClaimExtractionV1.IsAnswerable(
+            ClaimExtractionV1.Confirm(claim with { Span = claim.Span with { Start = 1, Length = int.MaxValue } }), TenantA, chunk));
+    }
+
+    [TestMethod]
+    public void Punctuation_adjacent_normative_words_are_matched()
+    {
+        foreach (var text in new[] { "The operator shall, subject to notice, keep records.", "Records must; otherwise none.", "Keep records or you must.", "The operator may not, however, alter them." })
+        {
+            var r = _sut.Extract(TenantA, new[] { Chunk(text) });
+            Assert.AreEqual(1, r.Claims.Count, text);
+        }
+        Assert.AreEqual(0, _sut.Extract(TenantA, new[] { Chunk("It may be kept. Shallow text. Mustard.") }).Claims.Count);
+    }
+
+    [TestMethod]
+    public void Title_and_company_abbreviations_do_not_split_claims()
+    {
+        var text = "Dr. Smith of Acme Inc. shall file the report.";
+        var r = _sut.Extract(TenantA, new[] { Chunk(text) });
+        Assert.AreEqual(1, r.Claims.Count);
+        Assert.AreEqual(text, r.Claims[0].Quotation);
+    }
+
+    [TestMethod]
+    public void Empty_and_null_inputs_fail_closed_or_yield_nothing()
+    {
+        var empty = _sut.Extract(TenantA, Array.Empty<EvidenceChunk>());
+        Assert.IsTrue(empty.Succeeded);
+        Assert.AreEqual(0, empty.Claims.Count);
+        var withNull = _sut.Extract(TenantA, new EvidenceChunk[] { null! });
+        Assert.IsFalse(withNull.Succeeded);
+        Assert.AreEqual("incomplete_chunk", withNull.Reason);
+        Assert.IsFalse(_sut.Extract(TenantA, new[] { Chunk("") }).Succeeded);
+    }
+
+    [TestMethod]
+    public void Per_chunk_claim_limit_fails_closed_without_partial_claims()
+    {
+        var ok = string.Concat(Enumerable.Repeat("A shall b. ", ClaimExtractionV1.MaxClaimsPerChunk));
+        Assert.AreEqual(ClaimExtractionV1.MaxClaimsPerChunk, _sut.Extract(TenantA, new[] { Chunk(ok) }).Claims.Count);
+        var r = _sut.Extract(TenantA, new[] { Chunk(ok + "A shall b.") });
+        Assert.IsFalse(r.Succeeded);
+        Assert.AreEqual("too_many_claims", r.Reason);
+        Assert.AreEqual(0, r.Claims.Count);
+    }
+}
