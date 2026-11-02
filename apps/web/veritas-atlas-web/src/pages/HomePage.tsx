@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { AppSurface } from "../components/AppSurface";
+import { isMounted } from "../routeAudit";
 
 const cards = [
   {
@@ -67,7 +68,7 @@ export function HomePage() {
       </section>
 
       <section className="link-grid">
-        {cards.map((card) => (
+        {cards.filter((card) => isMounted(card.href, import.meta.env.DEV)).map((card) => (
           <Link key={card.href} to={card.href} className="link-card">
             <strong>{card.title}</strong>
             <span>{card.text}</span>
