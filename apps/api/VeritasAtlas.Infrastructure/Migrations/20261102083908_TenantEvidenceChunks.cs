@@ -1,11 +1,16 @@
 ﻿using System;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
+using VeritasAtlas.Infrastructure.Persistence;
 
 #nullable disable
 
 namespace VeritasAtlas.Infrastructure.Migrations
 {
-    /// <inheritdoc />
+    // The generated Designer file (target model snapshot, ~85 KB) is omitted to keep the PR
+    // reviewable; the model snapshot in VeritasAtlasDbContextModelSnapshot.cs stays authoritative.
+    [DbContext(typeof(VeritasAtlasDbContext))]
+    [Migration("20261102083908_TenantEvidenceChunks")]
     public partial class TenantEvidenceChunks : Migration
     {
         /// <inheritdoc />
