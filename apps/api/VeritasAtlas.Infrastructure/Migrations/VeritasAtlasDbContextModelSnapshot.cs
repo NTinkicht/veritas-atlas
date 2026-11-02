@@ -812,6 +812,82 @@ namespace VeritasAtlas.Infrastructure.Migrations
                         });
                 });
 
+            modelBuilder.Entity("VeritasAtlas.Infrastructure.Persistence.TenantEvidenceChunk", b =>
+                {
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<string>("ElementId")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("element_id");
+
+                    b.Property<int>("Ordinal")
+                        .HasColumnType("integer")
+                        .HasColumnName("ordinal");
+
+                    b.Property<string>("ParentEvidenceRef")
+                        .IsRequired()
+                        .HasMaxLength(68)
+                        .HasColumnType("character varying(68)")
+                        .HasColumnName("parent_evidence_ref");
+
+                    b.Property<Guid>("ParseRunId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("parse_run_id");
+
+                    b.Property<Guid>("RawRetrievalId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("raw_retrieval_id");
+
+                    b.Property<string>("Text")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("text");
+
+                    b.Property<string>("TextSha256")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("text_sha256");
+
+                    b.HasKey("TenantId", "Id")
+                        .HasName("pk_tenant_evidence_chunks");
+
+                    b.HasIndex("TenantId", "ParseRunId", "ElementId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_tenant_evidence_chunks_tenant_run_element");
+
+                    b.HasIndex("TenantId", "ParseRunId", "Ordinal")
+                        .IsUnique()
+                        .HasDatabaseName("ux_tenant_evidence_chunks_tenant_run_ordinal");
+
+                    b.ToTable("tenant_evidence_chunks", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_tenant_evidence_chunks_element_id_not_blank", "length(btrim(element_id)) > 0");
+
+                            t.HasCheckConstraint("ck_tenant_evidence_chunks_ordinal", "ordinal >= 0");
+
+                            t.HasCheckConstraint("ck_tenant_evidence_chunks_parent_evidence_ref_shape", "parent_evidence_ref ~ '^ev1:[0-9a-f]{64}$'");
+
+                            t.HasCheckConstraint("ck_tenant_evidence_chunks_tenant_id_not_empty", "tenant_id <> '00000000-0000-0000-0000-000000000000'::uuid");
+
+                            t.HasCheckConstraint("ck_tenant_evidence_chunks_text_not_blank", "length(btrim(text)) > 0");
+
+                            t.HasCheckConstraint("ck_tenant_evidence_chunks_text_sha256_shape", "text_sha256 ~ '^[0-9a-f]{64}$'");
+                        });
+                });
+
             modelBuilder.Entity("VeritasAtlas.Infrastructure.Persistence.TenantFetchAttempt", b =>
                 {
                     b.Property<Guid>("TenantId")
@@ -1705,6 +1781,16 @@ namespace VeritasAtlas.Infrastructure.Migrations
 
                     b.Navigation("Text")
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("VeritasAtlas.Infrastructure.Persistence.TenantEvidenceChunk", b =>
+                {
+                    b.HasOne("VeritasAtlas.Infrastructure.Persistence.TenantParseRun", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "ParseRunId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_tenant_evidence_chunks_tenant_parse_run");
                 });
 
             modelBuilder.Entity("VeritasAtlas.Infrastructure.Persistence.TenantFetchAttempt", b =>
