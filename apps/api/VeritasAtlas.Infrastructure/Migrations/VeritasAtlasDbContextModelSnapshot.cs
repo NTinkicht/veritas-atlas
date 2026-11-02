@@ -888,6 +888,53 @@ namespace VeritasAtlas.Infrastructure.Migrations
                         });
                 });
 
+            modelBuilder.Entity("VeritasAtlas.Infrastructure.Persistence.TenantEvidenceVerification", b =>
+                {
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("AttestationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("attestation_id");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<string>("ParentEvidenceRef")
+                        .IsRequired()
+                        .HasMaxLength(68)
+                        .HasColumnType("character varying(68)")
+                        .HasColumnName("parent_evidence_ref");
+
+                    b.Property<Guid>("ParseRunId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("parse_run_id");
+
+                    b.Property<Guid>("RawRetrievalId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("raw_retrieval_id");
+
+                    b.HasKey("TenantId", "Id")
+                        .HasName("pk_tenant_evidence_verifications");
+
+                    b.HasIndex("TenantId", "ParseRunId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_tenant_evidence_verifications_tenant_run");
+
+                    b.ToTable("tenant_evidence_verifications", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_tenant_evidence_verifications_parent_evidence_ref_shape", "parent_evidence_ref ~ '^ev1:[0-9a-f]{64}$'");
+
+                            t.HasCheckConstraint("ck_tenant_evidence_verifications_tenant_id_not_empty", "tenant_id <> '00000000-0000-0000-0000-000000000000'::uuid");
+                        });
+                });
+
             modelBuilder.Entity("VeritasAtlas.Infrastructure.Persistence.TenantFetchAttempt", b =>
                 {
                     b.Property<Guid>("TenantId")
@@ -1791,6 +1838,16 @@ namespace VeritasAtlas.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_tenant_evidence_chunks_tenant_parse_run");
+                });
+
+            modelBuilder.Entity("VeritasAtlas.Infrastructure.Persistence.TenantEvidenceVerification", b =>
+                {
+                    b.HasOne("VeritasAtlas.Infrastructure.Persistence.TenantParseRun", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "ParseRunId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_tenant_evidence_verifications_tenant_parse_run");
                 });
 
             modelBuilder.Entity("VeritasAtlas.Infrastructure.Persistence.TenantFetchAttempt", b =>
