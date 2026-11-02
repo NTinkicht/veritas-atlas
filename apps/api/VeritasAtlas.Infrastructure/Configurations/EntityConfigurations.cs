@@ -1153,6 +1153,44 @@ public sealed class TenantEvidenceChunkConfiguration : IEntityTypeConfiguration<
     }
 }
 
+public sealed class TenantEvidenceVerificationConfiguration : IEntityTypeConfiguration<VeritasAtlas.Infrastructure.Persistence.TenantEvidenceVerification>
+{
+    public void Configure(EntityTypeBuilder<VeritasAtlas.Infrastructure.Persistence.TenantEvidenceVerification> builder)
+    {
+        builder.ToTable("tenant_evidence_verifications", table =>
+        {
+            table.HasCheckConstraint(
+                "ck_tenant_evidence_verifications_tenant_id_not_empty",
+                "tenant_id <> '00000000-0000-0000-0000-000000000000'::uuid");
+            table.HasCheckConstraint(
+                "ck_tenant_evidence_verifications_parent_evidence_ref_shape",
+                "parent_evidence_ref ~ '^ev1:[0-9a-f]{64}$'");
+        });
+
+        builder.HasKey(x => new { x.TenantId, x.Id }).HasName("pk_tenant_evidence_verifications");
+        builder.Property(x => x.TenantId).HasColumnName("tenant_id").IsRequired();
+        builder.Property(x => x.Id).HasColumnName("id").ValueGeneratedNever().IsRequired();
+        builder.Property(x => x.ParseRunId).HasColumnName("parse_run_id").IsRequired();
+        builder.Property(x => x.RawRetrievalId).HasColumnName("raw_retrieval_id").IsRequired();
+        builder.Property(x => x.AttestationId).HasColumnName("attestation_id").IsRequired();
+        builder.Property(x => x.ParentEvidenceRef).HasColumnName("parent_evidence_ref").HasMaxLength(68).IsRequired();
+        builder.Property(x => x.CreatedAtUtc).HasColumnName("created_at_utc").IsRequired();
+
+        builder.HasIndex(x => new { x.TenantId, x.ParseRunId })
+            .IsUnique()
+            .HasDatabaseName("ux_tenant_evidence_verifications_tenant_run");
+
+        builder.HasOne<VeritasAtlas.Infrastructure.Persistence.TenantParseRun>()
+            .WithMany()
+            .HasForeignKey(x => new { x.TenantId, x.ParseRunId })
+            .HasPrincipalKey(x => new { x.TenantId, x.Id })
+            .HasConstraintName("fk_tenant_evidence_verifications_tenant_parse_run")
+            .OnDelete(DeleteBehavior.Restrict);
+        // No FK to the attestation: a FK would turn TRUNCATE of the append-only attestations
+        // table into a 0A000 error; the insert guard trigger checks the attestation instead.
+    }
+}
+
 public sealed class TenantRetrievalAttestationConfiguration : IEntityTypeConfiguration<VeritasAtlas.Infrastructure.Persistence.TenantRetrievalAttestation>
 {
     // Stored exactly as given: not blank, no surrounding whitespace and no
