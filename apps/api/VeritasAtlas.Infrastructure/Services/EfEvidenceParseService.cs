@@ -60,7 +60,7 @@ public sealed class EfEvidenceParseService : IEvidenceParseService
             ParserName = UkLegislationParserV1.Name,
             ParserVersion = UkLegislationParserV1.Version,
             Outcome = output.Succeeded ? "parsed_unverified" : "failed",
-            FailureClass = output.Succeeded ? null : ToDb(output.Failure!.Value),
+            FailureClass = FailureClassFor(output),
             StartedAtUtc = now,
             CreatedAtUtc = now
         };
@@ -145,6 +145,10 @@ public sealed class EfEvidenceParseService : IEvidenceParseService
     private Task<TenantParseRun?> FindRunAsync(Guid tenantId, string runKey, CancellationToken cancellationToken) =>
         _db.TenantParseRuns.AsNoTracking()
             .SingleOrDefaultAsync(x => x.TenantId == tenantId && x.RunKey == runKey, cancellationToken);
+
+    /// <summary>Null for a success; a failure without a parser class (an exception) is parser_error.</summary>
+    public static string? FailureClassFor(ParserOutput output) =>
+        output.Succeeded ? null : output.Failure is { } failure ? ToDb(failure) : "parser_error";
 
     private static string ToDb(ParserFailure failure) => failure switch
     {

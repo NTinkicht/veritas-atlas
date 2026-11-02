@@ -40,6 +40,15 @@ public sealed class EvidenceParseServiceTests
     }
 
     [TestMethod]
+    public void AnOutputWithoutAParserClassIsRecordedAsParserErrorNotACrash()
+    {
+        var thrown = new ParserOutput(false, null, "parser_error", null, Array.Empty<EvidenceChunk>());
+        Assert.AreEqual("parser_error", EfEvidenceParseService.FailureClassFor(thrown));
+        Assert.AreEqual("oversized", EfEvidenceParseService.FailureClassFor(ParserOutput.Fail(ParserFailure.Oversized, "x")));
+        Assert.IsNull(EfEvidenceParseService.FailureClassFor(new ParserOutput(true, null, null, "ev1:" + new string('a', 64), Array.Empty<EvidenceChunk>())));
+    }
+
+    [TestMethod]
     public async Task StoresRunAndChunksAtomicallyWithoutVerifyingAnything()
     {
         if (Database() is not { } cs) return;
