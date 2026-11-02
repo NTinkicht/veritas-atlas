@@ -13,6 +13,7 @@ The table mirrors `src/routeAudit.ts`. `src/routes.test.ts` fails when a route h
 | `/` | HomePage | REAL | none (navigation landing page, no data claims) |
 | `/dashboard` | DashboardPage | REAL | /api/v1/cases, /claims, /contradictions, /workflow-audit/entries (scenario snapshot only in Development) |
 | `/login` | LoginPage | REAL | /api/v1/auth/login |
+| `/evidence-search` | EvidenceSearchPage | REAL | /api/v1/tenant-evidence/search |
 | `/workflow-audit` | WorkflowAuditPage | REAL | /api/v1/workflow-audit/entries/clear |
 | `/persistence` | PersistenceConsolePage | SEEDED-OR-DEMO | /api/v1/persistence/snapshot/reset: scenario snapshot of the seeded workflow scenario |
 | `/persistence-console` | PersistenceConsolePage | SEEDED-OR-DEMO | /api/v1/persistence/snapshot/reset: scenario snapshot of the seeded workflow scenario |
@@ -125,4 +126,5 @@ The table mirrors `src/routeAudit.ts`. `src/routes.test.ts` fails when a route h
 - `/dashboard` is REAL for cases, claims, contradictions and workflow audit; its scenario Snapshot metric and panel are seeded content, so `DashboardPage` neither fetches nor renders them outside Development.
 - Removed the unused Vite starter `src/App.tsx`, `src/App.css`, and `src/assets/{hero.png,react.svg,vite.svg}`; a repo-wide search found no reference outside `App.tsx`. The legacy root `frontend/` is untouched.
 - DEAD and SEEDED-OR-DEMO pages stay in source (behind the Development-only mount) so the follow-up UI slice (#161) can replace or delete them one at a time with an audit row each; navigation shows only mounted routes.
+- `/evidence-search` (#161) is the analyst search and citation inspector; it reads only `/api/v1/tenant-evidence/search` and has no seeded fallback. The search hit carries no parser name/version, so the inspector says so rather than inventing one.
 - `/case-explorer`, `/case-scoreboard`: listed REAL because they call `/api/v1/cases`; neither reads seed modules (checked by search).
