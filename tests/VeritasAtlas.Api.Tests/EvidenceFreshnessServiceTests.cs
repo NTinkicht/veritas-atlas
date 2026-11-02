@@ -130,6 +130,21 @@ public sealed class EvidenceFreshnessServiceTests
     }
 
     [TestMethod]
+    public async Task FreshnessFollowsTheNewestVerifiedRetrievalOfIdenticalContent()
+    {
+        if (Database() is not { } cs) return;
+        await ResetAsync(cs);
+        await using var db = new VeritasAtlasDbContext(Options(cs));
+        var first = await SeedVerifiedAsync(db, TenantA, "r1");
+        var second = await SeedVerifiedAsync(db, TenantA, "r2", At.AddHours(1));
+        Assert.AreEqual(first, second);
+
+        var result = await Service(db, Policy, NoProof, At.AddMinutes(90)).EvaluateAsync(TenantA, first, null, CancellationToken.None);
+        Assert.AreEqual(FreshnessState.Current, result.Decision!.State);
+        Assert.AreEqual(1800, result.Decision.RetrievalAgeSeconds);
+    }
+
+    [TestMethod]
     public async Task UnverifiedUnknownAndCrossTenantReferencesAreIndistinguishablyNotFound()
     {
         if (Database() is not { } cs) return;
@@ -167,12 +182,13 @@ public sealed class EvidenceFreshnessServiceTests
             .Select(c => c.ParentEvidenceRef).FirstAsync();
     }
 
-    private static async Task<string> SeedVerifiedAsync(VeritasAtlasDbContext db, Guid tenant, string key)
+    private static async Task<string> SeedVerifiedAsync(VeritasAtlasDbContext db, Guid tenant, string key, DateTime? retrievedAt = null)
     {
+        var at = retrievedAt ?? At;
         var source = await new EfTenantSourceRegistry(db, TimeProvider.System)
             .CreateAsync(tenant, "https://example.test/" + key, "synthetic-seeder", CancellationToken.None);
         var recorded = await new EfTenantRawRetrievalLedger(db, TimeProvider.System).RecordAsync(
-            tenant, new RawRetrievalInput(source!.Id, key, Uri, At, Encoding.UTF8.GetBytes(Doc)),
+            tenant, new RawRetrievalInput(source!.Id, key, Uri, at, Encoding.UTF8.GetBytes(Doc)),
             "synthetic-seeder", CancellationToken.None);
         Assert.AreEqual(RawRetrievalRecordOutcome.Recorded, recorded.Outcome);
         var retrieval = recorded.Record!.Id;
@@ -181,8 +197,8 @@ public sealed class EvidenceFreshnessServiceTests
         var attested = await new EfTenantRetrievalAttestationLedger(db, TimeProvider.System).RecordAsync(
             tenant,
             new RetrievalAttestationInput(
-                retrieval, "k1", "synthetic-retriever", "synthetic-publisher", PublisherBindingMechanism.SourceRegistry,
-                "registry-entry-1", SourceAuthenticationResult.Authenticated, "gb-uk", AttestedSourceType.Statute, At.AddMinutes(5)),
+                retrieval, "k-" + key, "synthetic-retriever", "synthetic-publisher", PublisherBindingMechanism.SourceRegistry,
+                "registry-entry-1", SourceAuthenticationResult.Authenticated, "gb-uk", AttestedSourceType.Statute, at.AddMinutes(5)),
             "synthetic-seeder", CancellationToken.None);
         Assert.AreEqual(RetrievalAttestationRecordOutcome.Recorded, attested.Outcome);
         var verify = await new EfEvidenceVerificationService(db, new EchoVerifier(), new FixedTime(At.AddHours(2)))

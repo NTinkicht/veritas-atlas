@@ -36,17 +36,18 @@ public sealed class EfEvidenceFreshnessService : IEvidenceFreshnessService
         if (string.IsNullOrWhiteSpace(evidenceRef) || evidenceRef.Length > 512 || evidenceRef.Any(char.IsControl))
             throw new ArgumentException("Invalid evidence reference.", nameof(evidenceRef));
 
-        var verification = await _db.TenantEvidenceVerifications.AsNoTracking()
-            .Where(x => x.TenantId == tenantId && x.ParentEvidenceRef == evidenceRef)
-            .OrderBy(x => x.CreatedAtUtc).ThenBy(x => x.Id)
-            .FirstOrDefaultAsync(cancellationToken);
-        if (verification is null) return NotFound();
-
-        var retrieval = await _db.TenantRawRetrievals.AsNoTracking()
-            .Where(x => x.TenantId == tenantId && x.Id == verification.RawRetrievalId)
-            .Select(x => new { x.Id, x.SourceEntryId, x.RetrievedAtUtc })
-            .SingleOrDefaultAsync(cancellationToken);
-        if (retrieval is null) return NotFound();
+        // The reference excludes retrieval time, so one reference can be verified by several
+        // retrievals of unchanged content. Freshness follows the most recently retrieved verified one.
+        var candidates = await (
+            from v in _db.TenantEvidenceVerifications.AsNoTracking()
+            join r in _db.TenantRawRetrievals.AsNoTracking()
+                on new { v.TenantId, Id = v.RawRetrievalId } equals new { r.TenantId, r.Id }
+            where v.TenantId == tenantId && v.ParentEvidenceRef == evidenceRef
+            orderby r.RetrievedAtUtc descending, r.Id
+            select new { r.Id, r.SourceEntryId, r.RetrievedAtUtc })
+            .Take(1).ToListAsync(cancellationToken);
+        if (candidates.Count == 0) return NotFound();
+        var retrieval = candidates[0];
 
         var resolution = await _policies.ResolveAsync(tenantId, retrieval.SourceEntryId, cancellationToken);
         var revision = await _revisions.GetAsync(tenantId, retrieval.Id, cancellationToken)
