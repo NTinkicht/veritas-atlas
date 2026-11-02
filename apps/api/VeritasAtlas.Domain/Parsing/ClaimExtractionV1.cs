@@ -56,9 +56,6 @@ public sealed class ClaimExtractionV1 : IClaimExtractor
     public const string Version = "1.0.0";
     public const int MaxClaimsPerChunk = 200;
 
-    private static readonly string[] NormativePhrases =
-        { " shall ", " must ", " may not ", " must not ", " shall not " };
-
     public ClaimExtractionResult Extract(Guid tenantId, IReadOnlyList<EvidenceChunk> chunks)
     {
         ArgumentNullException.ThrowIfNull(chunks);
@@ -114,9 +111,20 @@ public sealed class ClaimExtractionV1 : IClaimExtractor
 
     private static bool IsNormative(string sentence)
     {
-        var padded = " " + sentence.ToLowerInvariant() + " ";
-        foreach (var p in NormativePhrases)
-            if (padded.Contains(p, StringComparison.Ordinal)) return true;
+        // Word-token match so punctuation ("shall,", "must.") does not hide a normative word.
+        var words = new List<string>();
+        var sb = new StringBuilder();
+        foreach (var ch in sentence)
+        {
+            if (char.IsLetter(ch) || ch == '\'') sb.Append(char.ToLowerInvariant(ch));
+            else if (sb.Length > 0) { words.Add(sb.ToString()); sb.Clear(); }
+        }
+        if (sb.Length > 0) words.Add(sb.ToString());
+        for (var i = 0; i < words.Count; i++)
+        {
+            if (words[i] == "shall" || words[i] == "must") return true;
+            if (words[i] == "may" && i + 1 < words.Count && words[i + 1] == "not") return true;
+        }
         return false;
     }
 
@@ -150,7 +158,7 @@ public sealed class ClaimExtractionV1 : IClaimExtractor
         }
     }
 
-    private static readonly string[] Abbreviations = { "e.g", "i.e", "etc", "cf", "vs", "no", "nos", "art", "s", "ss", "sch", "para" };
+    private static readonly string[] Abbreviations = { "e.g", "i.e", "etc", "cf", "vs", "no", "nos", "art", "s", "ss", "sch", "para", "mr", "mrs", "ms", "dr", "prof", "inc", "corp", "ltd", "co", "st", "ex", "approx", "reg", "regs" };
 
     private static bool EndsWithAbbreviation(string text, int dot)
     {

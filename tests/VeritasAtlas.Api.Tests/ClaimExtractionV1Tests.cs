@@ -129,4 +129,47 @@ public sealed class ClaimExtractionV1Tests
         Assert.IsFalse(ClaimExtractionV1.IsAnswerable(
             ClaimExtractionV1.Confirm(claim with { Span = claim.Span with { Start = 1, Length = int.MaxValue } }), TenantA, chunk));
     }
+
+    [TestMethod]
+    public void Punctuation_adjacent_normative_words_are_matched()
+    {
+        foreach (var text in new[] { "The operator shall, subject to notice, keep records.", "Records must; otherwise none.", "Keep records or you must.", "The operator may not, however, alter them." })
+        {
+            var r = _sut.Extract(TenantA, new[] { Chunk(text) });
+            Assert.AreEqual(1, r.Claims.Count, text);
+        }
+        Assert.AreEqual(0, _sut.Extract(TenantA, new[] { Chunk("It may be kept. Shallow text. Mustard.") }).Claims.Count);
+    }
+
+    [TestMethod]
+    public void Title_and_company_abbreviations_do_not_split_claims()
+    {
+        var text = "Dr. Smith of Acme Inc. shall file the report.";
+        var r = _sut.Extract(TenantA, new[] { Chunk(text) });
+        Assert.AreEqual(1, r.Claims.Count);
+        Assert.AreEqual(text, r.Claims[0].Quotation);
+    }
+
+    [TestMethod]
+    public void Empty_and_null_inputs_fail_closed_or_yield_nothing()
+    {
+        var empty = _sut.Extract(TenantA, Array.Empty<EvidenceChunk>());
+        Assert.IsTrue(empty.Succeeded);
+        Assert.AreEqual(0, empty.Claims.Count);
+        var withNull = _sut.Extract(TenantA, new EvidenceChunk[] { null! });
+        Assert.IsFalse(withNull.Succeeded);
+        Assert.AreEqual("incomplete_chunk", withNull.Reason);
+        Assert.IsFalse(_sut.Extract(TenantA, new[] { Chunk("") }).Succeeded);
+    }
+
+    [TestMethod]
+    public void Per_chunk_claim_limit_fails_closed_without_partial_claims()
+    {
+        var ok = string.Concat(Enumerable.Repeat("A shall b. ", ClaimExtractionV1.MaxClaimsPerChunk));
+        Assert.AreEqual(ClaimExtractionV1.MaxClaimsPerChunk, _sut.Extract(TenantA, new[] { Chunk(ok) }).Claims.Count);
+        var r = _sut.Extract(TenantA, new[] { Chunk(ok + "A shall b.") });
+        Assert.IsFalse(r.Succeeded);
+        Assert.AreEqual("too_many_claims", r.Reason);
+        Assert.AreEqual(0, r.Claims.Count);
+    }
 }
