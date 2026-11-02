@@ -1,0 +1,139 @@
+export type Verdict = "REAL" | "SEEDED-OR-DEMO" | "DEAD";
+
+export type RouteAudit = { verdict: Verdict; backing: string };
+
+// Source of truth for what each registered route is. Only REAL routes are mounted in
+// production (routes.tsx). docs/architecture/WEB_SURFACE_AUDIT.md mirrors this table.
+const REAL: Record<string, string> = {
+  "/": "none (navigation landing page, no data claims)",
+  "/dashboard": "/api/v1/cases, /claims, /contradictions, /workflow-audit/entries (scenario snapshot only in Development)",
+  "/login": "/api/v1/auth/login",
+  "/workflow-audit": "/api/v1/workflow-audit/entries|clear",
+  "/case-flow-map": "/api/v1/cases/status-counts",
+  "/cases": "/api/v1/cases",
+  "/cases/:id": "/api/v1/cases/{id}",
+  "/case-explorer": "/api/v1/cases",
+  "/case-scoreboard": "/api/v1/cases",
+  "/claims": "/api/v1/claims",
+  "/claims/:id": "/api/v1/claims/{id}",
+  "/contradictions": "/api/v1/contradictions",
+  "/contradictions/:id": "/api/v1/contradictions/{id}",
+};
+
+const SEEDED: Record<string, string> = {
+  "/persistence": "/api/v1/persistence/snapshot|reset: scenario snapshot of the seeded workflow scenario",
+  "/persistence-console": "/api/v1/persistence/snapshot|reset: scenario snapshot of the seeded workflow scenario",
+  "/operational-actions": "SeededWorkflowHarness runs the scripted seeded workflow (api/seededWorkflow.ts, api/workflowSeed.ts)",
+};
+
+// Placeholder shells: fixed "Stable production shell." text, no data fetch.
+const DEAD: string[] = [
+  "/global-search",
+  "/observability",
+  "/admin",
+  "/auth-diagnostics",
+  "/phase-12-data-center",
+  "/auth-me",
+  "/phase-11-auth-center",
+  "/role-policy",
+  "/audit-persistence",
+  "/phase-10-hardening-center",
+  "/phase-9-integrity-center",
+  "/seeded-lifecycle-runner",
+  "/workflow-validation",
+  "/integration-test-center",
+  "/lifecycle-seed",
+  "/workflow-diagnostics",
+  "/mutation-playground",
+  "/phase-7-closeout",
+  "/workflow-console",
+  "/decision-intelligence",
+  "/knowledge-graph-hub",
+  "/release-readiness-hub",
+  "/system-readiness-map",
+  "/platform-atlas",
+  "/app-surface-catalog",
+  "/ui-completion-center",
+  "/navigation-index",
+  "/frontend-closure",
+  "/workspace-map",
+  "/route-registry",
+  "/operator-cockpit",
+  "/final-control-center",
+  "/executive-readout-workspace",
+  "/operational-portfolio",
+  "/ops-finalization-workspace",
+  "/delivery-closeout",
+  "/ops-coordination-center",
+  "/publication-governance",
+  "/readiness-radar-workspace",
+  "/evidence-flow-studio",
+  "/operational-handoff",
+  "/decision-queue",
+  "/intelligence",
+  "/agents",
+  "/operations",
+  "/navigator",
+  "/operations-intelligence",
+  "/investigation-navigator",
+  "/analytics-center",
+  "/executive-overview",
+  "/delivery-control-tower",
+  "/workstream-board",
+  "/escalation-center",
+  "/agent-runs-board",
+  "/quality-radar",
+  "/persons",
+  "/persons/new",
+  "/persons/:id",
+  "/cases/new",
+  "/case-explorer/:id",
+  "/truth-review-studio",
+  "/global-search-workspace",
+  "/source-intelligence",
+  "/entity-graph",
+  "/review-audit",
+  "/review-decision-board",
+  "/publication-pipeline",
+  "/evidence-trace",
+  "/narrative-builder",
+  "/contradiction-resolution/:id",
+  "/reviews",
+  "/review-queue",
+  "/review-workspace",
+  "/publication-desk",
+  "/governance-console",
+  "/publication-readiness",
+  "/decision-log",
+  "/ingestion",
+  "/sources",
+  "/sources/new",
+  "/sources/:id",
+  "/documents",
+  "/documents/new",
+  "/documents/:id",
+  "/evidence",
+  "/evidence/new",
+  "/evidence/:id",
+  "/statements",
+  "/statements/new",
+  "/statements/:id",
+  "/claims/workspace",
+  "/contradictions/workspace",
+  "/resolution-board",
+];
+
+const entries = (verdict: Verdict, map: Record<string, string>): [string, RouteAudit][] =>
+  Object.entries(map).map(([p, backing]) => [p, { verdict, backing }]);
+
+export const ROUTE_AUDIT: Record<string, RouteAudit> = Object.fromEntries([
+  ...entries("REAL", REAL),
+  ...entries("SEEDED-OR-DEMO", SEEDED),
+  ...DEAD.map((p): [string, RouteAudit] => [p, { verdict: "DEAD", backing: "none (placeholder shell)" }]),
+]);
+
+export function isMounted(path: string, dev: boolean): boolean {
+  const entry = ROUTE_AUDIT[path];
+  if (!entry) return false;
+  return entry.verdict === "REAL" || dev;
+}

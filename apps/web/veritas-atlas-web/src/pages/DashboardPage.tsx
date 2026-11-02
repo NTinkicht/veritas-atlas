@@ -47,6 +47,10 @@ function normalizeAuditItems(value: unknown): WorkflowAuditEntry[] {
   return [];
 }
 
+// The scenario snapshot comes from the seeded workflow scenario (see WEB_SURFACE_AUDIT.md);
+// production builds neither fetch nor render it.
+const SHOW_SEEDED_SNAPSHOT = import.meta.env.DEV;
+
 export function DashboardPage() {
   const [data, setData] = useState<DashboardState>({
     cases: null,
@@ -77,7 +81,7 @@ export function DashboardPage() {
       try {
         const [auditResult, snapshotResult] = await Promise.all([
           getWorkflowAuditEntries(),
-          getScenarioSnapshot(),
+          SHOW_SEEDED_SNAPSHOT ? getScenarioSnapshot() : Promise.resolve(null),
         ]);
 
         audit = normalizeAuditItems(auditResult).slice(0, 5);
@@ -143,10 +147,12 @@ export function DashboardPage() {
           <div className="metric-label">Contradictions</div>
           <div className="metric-value">{data.contradictions?.totalCount ?? 0}</div>
         </div>
-        <div className="metric-card">
-          <div className="metric-label">Snapshot</div>
-          <div className="metric-value">{data.snapshot?.exists ? "Yes" : "No"}</div>
-        </div>
+        {SHOW_SEEDED_SNAPSHOT && (
+          <div className="metric-card">
+            <div className="metric-label">Snapshot</div>
+            <div className="metric-value">{data.snapshot?.exists ? "Yes" : "No"}</div>
+          </div>
+        )}
       </section>
 
       {loading ? (
@@ -185,23 +191,25 @@ export function DashboardPage() {
               )}
             </div>
 
-            <div className="panel">
-              <div className="panel-header">
-                <h2 className="panel-title">Snapshot</h2>
-              </div>
-              {data.snapshot?.exists ? (
-                <div className="kv-grid">
-                  <div className="kv-row"><div className="kv-label">Case</div><div className="kv-value">{data.snapshot.caseId}</div></div>
-                  <div className="kv-row"><div className="kv-label">Claim A</div><div className="kv-value">{data.snapshot.claimAId}</div></div>
-                  <div className="kv-row"><div className="kv-label">Claim B</div><div className="kv-value">{data.snapshot.claimBId}</div></div>
-                  <div className="kv-row"><div className="kv-label">Contradiction</div><div className="kv-value">{data.snapshot.contradictionId}</div></div>
-                  <div className="kv-row"><div className="kv-label">Case Status</div><div className="kv-value">{data.snapshot.caseStatus ?? "N/A"}</div></div>
-                  <div className="kv-row"><div className="kv-label">Contradiction Status</div><div className="kv-value">{data.snapshot.contradictionStatus ?? "N/A"}</div></div>
+            {SHOW_SEEDED_SNAPSHOT && (
+              <div className="panel">
+                <div className="panel-header">
+                  <h2 className="panel-title">Snapshot</h2>
                 </div>
-              ) : (
-                <EmptyState message="No active snapshot." />
-              )}
-            </div>
+                {data.snapshot?.exists ? (
+                  <div className="kv-grid">
+                    <div className="kv-row"><div className="kv-label">Case</div><div className="kv-value">{data.snapshot.caseId}</div></div>
+                    <div className="kv-row"><div className="kv-label">Claim A</div><div className="kv-value">{data.snapshot.claimAId}</div></div>
+                    <div className="kv-row"><div className="kv-label">Claim B</div><div className="kv-value">{data.snapshot.claimBId}</div></div>
+                    <div className="kv-row"><div className="kv-label">Contradiction</div><div className="kv-value">{data.snapshot.contradictionId}</div></div>
+                    <div className="kv-row"><div className="kv-label">Case Status</div><div className="kv-value">{data.snapshot.caseStatus ?? "N/A"}</div></div>
+                    <div className="kv-row"><div className="kv-label">Contradiction Status</div><div className="kv-value">{data.snapshot.contradictionStatus ?? "N/A"}</div></div>
+                  </div>
+                ) : (
+                  <EmptyState message="No active snapshot." />
+                )}
+              </div>
+            )}
           </section>
 
           <section className="panel">
