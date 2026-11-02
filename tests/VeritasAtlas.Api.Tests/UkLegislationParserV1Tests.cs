@@ -45,6 +45,17 @@ public sealed class UkLegislationParserV1Tests
     }
 
     [TestMethod]
+    public void Utf8_Bom_Is_Accepted_And_Digest_Covers_Original_Bytes()
+    {
+        var bytes = new byte[] { 0xEF, 0xBB, 0xBF }.Concat(Encoding.UTF8.GetBytes(Doc)).ToArray();
+        var sha = Convert.ToHexStringLower(SHA256.HashData(bytes));
+        var o = UkLegislationParserV1.Parse(bytes, Uri, Record, sha);
+        Assert.IsTrue(o.Succeeded);
+        Assert.AreEqual(2, o.Chunks.Count);
+        Assert.AreNotEqual(Run(Doc).ParentEvidenceRef, o.ParentEvidenceRef);
+    }
+
+    [TestMethod]
     public void Changed_Bytes_Or_Parser_Version_Change_The_Reference()
     {
         var (b, sha) = Raw(Doc);

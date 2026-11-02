@@ -67,6 +67,9 @@ public static class UkLegislationParserV1
             return ParserOutput.Fail(ParserFailure.Malformed, "invalid_utf8");
         }
 
+        // A valid UTF-8 BOM decodes to U+FEFF, which XmlReader rejects on a string; the digest is of the original bytes.
+        if (text.Length > 0 && text[0] == '\uFEFF') text = text[1..];
+
         var settings = new XmlReaderSettings
         {
             DtdProcessing = DtdProcessing.Prohibit,
