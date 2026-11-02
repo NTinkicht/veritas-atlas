@@ -49,6 +49,9 @@ public static class UkLegislationParserV1
         byte[] rawBytes, string sourceUri, string recordId, string contentSha256)
     {
         ArgumentNullException.ThrowIfNull(rawBytes);
+        if (string.IsNullOrWhiteSpace(sourceUri) || string.IsNullOrWhiteSpace(recordId)
+            || string.IsNullOrWhiteSpace(contentSha256))
+            return ParserOutput.Fail(ParserFailure.Malformed, "missing_identity_input");
         if (rawBytes.Length > MaxBytes) return ParserOutput.Fail(ParserFailure.Oversized, "raw_too_large");
         if (rawBytes.Length == 0) return ParserOutput.Fail(ParserFailure.Malformed, "empty_input");
 
@@ -151,6 +154,8 @@ public static class UkLegislationParserV1
         ParserOutput output, EvidenceEnvelope envelope, EvidenceTrust trust)
     {
         ArgumentNullException.ThrowIfNull(output);
+        ArgumentNullException.ThrowIfNull(envelope);
+        ArgumentNullException.ThrowIfNull(trust);
         if (!output.Succeeded || output.ParentEvidenceRef is null)
             return EvidenceVerification.Reject("parse_failed");
         if (envelope.ParserName != Name || envelope.ParserVersion != Version)

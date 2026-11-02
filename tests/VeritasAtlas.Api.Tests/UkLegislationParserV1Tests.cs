@@ -146,4 +146,48 @@ public sealed class UkLegislationParserV1Tests
         Assert.AreEqual("parse_failed",
             UkLegislationParserV1.Verify(Run("<x/>"), Envelope(o, sha), trusted).Reason);
     }
+
+    [TestMethod]
+    public void Null_Inputs_Fail_Closed_Or_Throw_Argument_Null()
+    {
+        var (b, sha) = Raw(Doc);
+        foreach (var o in new[]
+        {
+            UkLegislationParserV1.Parse(b, null!, Record, sha),
+            UkLegislationParserV1.Parse(b, Uri, null!, sha),
+            UkLegislationParserV1.Parse(b, Uri, Record, null!)
+        })
+        {
+            Assert.IsFalse(o.Succeeded);
+            Assert.AreEqual("missing_identity_input", o.Reason);
+        }
+        Assert.ThrowsExactly<ArgumentNullException>(() => UkLegislationParserV1.Parse(null!, Uri, Record, sha));
+        var ok = Run(Doc);
+        Assert.ThrowsExactly<ArgumentNullException>(() =>
+            UkLegislationParserV1.Verify(ok, null!, new EvidenceTrust(true, true, true)));
+        Assert.ThrowsExactly<ArgumentNullException>(() =>
+            UkLegislationParserV1.Verify(ok, Envelope(ok, sha), null!));
+    }
+
+    [TestMethod]
+    public void Limit_Boundaries_Are_Inclusive()
+    {
+        var maxChunk = Run($"<Legislation SchemaVersion=\"1\"><P1 id=\"a\">{new string('x', UkLegislationParserV1.MaxChunkChars)}</P1></Legislation>");
+        Assert.IsTrue(maxChunk.Succeeded);
+        Assert.IsTrue(Run($"<Legislation SchemaVersion=\"1\"><P1 id=\"{new string('i', 128)}\">x</P1></Legislation>").Succeeded);
+        Assert.AreEqual("missing_or_invalid_chunk_id",
+            Run($"<Legislation SchemaVersion=\"1\"><P1 id=\"{new string('i', 129)}\">x</P1></Legislation>").Reason);
+
+        string Many(int n) => "<Legislation SchemaVersion=\"1\">"
+            + string.Concat(Enumerable.Range(0, n).Select(i => $"<P1 id=\"c{i}\">t</P1>")) + "</Legislation>";
+        Assert.AreEqual(UkLegislationParserV1.MaxChunks, Run(Many(UkLegislationParserV1.MaxChunks)).Chunks.Count);
+        Assert.AreEqual("too_many_chunks", Run(Many(UkLegislationParserV1.MaxChunks + 1)).Reason);
+
+        var head = "<Legislation SchemaVersion=\"1\"><P1 id=\"a\">";
+        var tail = "</P1></Legislation>";
+        var pad = UkLegislationParserV1.MaxBytes - head.Length - tail.Length;
+        // exactly MaxBytes passes the size gate (it then fails only on chunk size, not raw size)
+        Assert.AreEqual("chunk_too_large", Run(head + new string('x', pad) + tail).Reason);
+        Assert.AreEqual("raw_too_large", Run(head + new string('x', pad + 1) + tail).Reason);
+    }
 }
