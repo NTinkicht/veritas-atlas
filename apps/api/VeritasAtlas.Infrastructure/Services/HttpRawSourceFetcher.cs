@@ -16,6 +16,7 @@ namespace VeritasAtlas.Infrastructure.Services;
 public sealed class HttpRawSourceFetcher : IRawSourceFetcher
 {
     private const int ReadChunk = 16 * 1024;
+    private const int MaxDedupLookback = 20;
 
     private readonly HttpClient _http;
     private readonly IHostAddressResolver _resolver;
@@ -55,6 +56,8 @@ public sealed class HttpRawSourceFetcher : IRawSourceFetcher
         var policy = current.Policy;
 
         var prior = await _attempts.ListForSourceAsync(tenantId, request.SourceEntryId, cancellationToken);
+        if (prior.Any(a => string.Equals(a.AttemptKey, request.AttemptKey, StringComparison.Ordinal)))
+            return Result(RawSourceFetchStatus.IdempotencyConflict, "attempt_key_conflict");
         var attemptNumber = 1 + prior.Reverse().TakeWhile(a => a.Outcome == FetchAttemptOutcome.Failed).Count();
         var requestedUri = Sanitize(request.RequestedUri);
 
@@ -77,12 +80,17 @@ public sealed class HttpRawSourceFetcher : IRawSourceFetcher
 
         string? latestDigest = null;
         Guid? latestId = null;
-        var lastSuccess = prior.LastOrDefault(a => a.Outcome == FetchAttemptOutcome.Succeeded && a.RawRetrievalId is not null);
-        if (lastSuccess is not null)
+        // Only a prior retrieval of the same source AND the same final URI may be deduplicated against.
+        foreach (var success in prior.Where(a => a.Outcome == FetchAttemptOutcome.Succeeded && a.RawRetrievalId is not null)
+                     .Reverse().Take(MaxDedupLookback))
         {
-            var existing = await _raw.GetAsync(tenantId, lastSuccess.RawRetrievalId!.Value, cancellationToken);
-            latestDigest = existing?.ContentSha256;
-            latestId = existing?.Id;
+            var existing = await _raw.GetAsync(tenantId, success.RawRetrievalId!.Value, cancellationToken);
+            if (existing is not null && string.Equals(existing.FinalUri, outcome.FinalUri, StringComparison.Ordinal))
+            {
+                latestDigest = existing.ContentSha256;
+                latestId = existing.Id;
+                break;
+            }
         }
 
         var dedup = RawRetrievalDedup.Decide(latestDigest, digest);
@@ -136,13 +144,16 @@ public sealed class HttpRawSourceFetcher : IRawSourceFetcher
         if (recorded.Outcome == FetchAttemptRecordOutcome.IdempotencyConflict)
             return Result(RawSourceFetchStatus.IdempotencyConflict, "attempt_key_conflict");
 
-        DateTimeOffset? due = null;
-        if (outcome.HttpStatus is { } status)
-        {
-            var observation = FetchRetryObservationFactory.FromHttpResponse(attemptNumber, status, outcome.RetryAfter, now);
-            var decision = FetchRetryPolicy.Decide(SourceFetchRetrySchedule.Default, observation);
-            due = FetchRetryDueTime.From(now, decision);
-        }
+        FetchRetryObservation? observation = outcome.HttpStatus is { } status
+            ? FetchRetryObservationFactory.FromHttpResponse(attemptNumber, status, outcome.RetryAfter, now)
+            : outcome.FailureClass switch
+            {
+                FetchFailureClass.Network => FetchRetryObservationFactory.FromTransportFailure(attemptNumber, FetchRetryFailure.Network),
+                FetchFailureClass.Timeout => FetchRetryObservationFactory.FromTransportFailure(attemptNumber, FetchRetryFailure.Timeout),
+                FetchFailureClass.SizeLimit => FetchRetryObservationFactory.FromTransportFailure(attemptNumber, FetchRetryFailure.SizeLimit),
+                _ => FetchRetryObservationFactory.FromTransportFailure(attemptNumber, FetchRetryFailure.PolicyDenied),
+            };
+        var due = FetchRetryDueTime.From(now, FetchRetryPolicy.Decide(SourceFetchRetrySchedule.Default, observation));
         return new RawSourceFetchResult(
             due is null ? RawSourceFetchStatus.Refused : RawSourceFetchStatus.RetryLater,
             outcome.Reason, null, null, due);
@@ -152,9 +163,12 @@ public sealed class HttpRawSourceFetcher : IRawSourceFetcher
         SourceFetchPolicy policy, RawSourceFetchRequest request, CancellationToken cancellationToken)
     {
         var limits = request.Limits;
+        // Validate limits before any DNS or network I/O, and only then install the deadline.
+        var admitted = FetchResponseLimitGuard.CheckProgress(limits, null, 0, TimeSpan.Zero);
+        if (!admitted.Admitted) return Failed(admitted.Reason ?? "invalid_limits", FetchFailureClass.PolicyDenied, null, null);
         var started = _time.GetTimestamp();
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        if (limits is not null && limits.MaxTotalDuration > TimeSpan.Zero) deadline.CancelAfter(limits.MaxTotalDuration);
+        deadline.CancelAfter(limits.MaxTotalDuration);
         var token = deadline.Token;
 
         try
@@ -211,7 +225,7 @@ public sealed class HttpRawSourceFetcher : IRawSourceFetcher
         {
             return Failed("fetch_timeout", FetchFailureClass.Timeout, null, null);
         }
-        catch (HttpRequestException)
+        catch (Exception e) when (e is HttpRequestException or IOException)
         {
             return Failed("network_error", FetchFailureClass.Network, null, null);
         }

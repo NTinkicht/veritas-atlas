@@ -371,6 +371,76 @@ public sealed class HttpRawSourceFetcherTests
         Assert.AreEqual("invalid:uri", HttpRawSourceFetcher.Sanitize("not a uri"));
     }
 
+    [TestMethod]
+    public async Task ReusedAttemptKeyIsRejectedBeforeAnyRawContentIsPersisted()
+    {
+        var rig = new Rig();
+        rig.Respond = _ => Task.FromResult(new HttpResponseMessage(HttpStatusCode.NotFound));
+        await rig.Fetch(key: "same");
+        rig.Respond = _ => Task.FromResult(Ok("<p>act</p>"));
+        var reused = await rig.Fetch(key: "same");
+        Assert.AreEqual(RawSourceFetchStatus.IdempotencyConflict, reused.Status);
+        Assert.AreEqual(0, rig.Raw.Items.Count);
+        Assert.AreEqual(1, rig.Attempts.Items.Count);
+    }
+
+    [TestMethod]
+    public async Task TransportFailuresGetBoundedRetryDueTimes()
+    {
+        var rig = new Rig();
+        rig.Respond = _ => throw new HttpRequestException("reset");
+        var first = await rig.Fetch(key: "k1");
+        Assert.AreEqual(RawSourceFetchStatus.RetryLater, first.Status);
+        Assert.IsNotNull(first.RetryDueAtUtc);
+        await rig.Fetch(key: "k2");
+        var third = await rig.Fetch(key: "k3");
+        Assert.AreEqual(RawSourceFetchStatus.Refused, third.Status);
+        Assert.IsNull(third.RetryDueAtUtc);
+    }
+
+    [TestMethod]
+    public async Task BodyReadIoFailureIsRecordedNotThrown()
+    {
+        var rig = new Rig();
+        rig.Respond = _ => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new ThrowingContent() });
+        var result = await rig.Fetch();
+        Assert.AreEqual("network_error", result.Reason);
+        Assert.AreEqual(FetchFailureClass.Network, rig.Attempts.Items.Single().FailureClass);
+        Assert.AreEqual(0, rig.Raw.Items.Count);
+    }
+
+    private sealed class ThrowingContent : HttpContent
+    {
+        protected override Task SerializeToStreamAsync(Stream stream, System.Net.TransportContext? context) =>
+            throw new IOException("connection reset mid-body");
+        protected override bool TryComputeLength(out long length) { length = 0; return false; }
+    }
+
+    [TestMethod]
+    public async Task DuplicateDetectionIsScopedToTheFinalUri()
+    {
+        var rig = new Rig();
+        await rig.Fetch(key: "k1");
+        rig.Respond = r => Task.FromResult(r.RequestUri!.Host == "legislation.example.test"
+            ? Redirect("https://mirror.example.test/act/1") : Ok("<p>act</p>"));
+        var viaMirror = await rig.Fetch(key: "k2");
+        Assert.AreEqual(RawSourceFetchStatus.Stored, viaMirror.Status);
+        Assert.AreEqual(2, rig.Raw.Items.Count);
+        Assert.AreEqual("https://mirror.example.test/act/1", rig.Raw.Items[1].Model.FinalUri);
+    }
+
+    [TestMethod]
+    public async Task InvalidLimitsAreRefusedBeforeAnyLookupOrRequest()
+    {
+        var rig = new Rig();
+        foreach (var limits in new[] { new SourceFetchLimits(1024, TimeSpan.Zero), new SourceFetchLimits(1024, TimeSpan.FromMinutes(10)), new SourceFetchLimits(0, TimeSpan.FromSeconds(5)) })
+        {
+            var result = await rig.Fetch(key: "k" + rig.Attempts.Items.Count, limits: limits);
+            Assert.AreEqual("invalid_limits", result.Reason);
+        }
+        Assert.AreEqual(0, rig.Sent.Count);
+    }
+
     // ---- real PostgreSQL: the whole composition against the real ledgers --------------------
 
     [TestMethod]
