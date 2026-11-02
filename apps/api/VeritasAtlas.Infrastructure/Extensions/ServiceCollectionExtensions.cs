@@ -45,6 +45,27 @@ public static class ServiceCollectionExtensions
         services.AddScoped<ITenantSourceFetchPolicyRegistry, EfTenantSourceFetchPolicyRegistry>();
         services.AddScoped<ITenantRawRetrievalLedger, EfTenantRawRetrievalLedger>();
         services.AddScoped<ITenantFetchAttemptLedger, EfTenantFetchAttemptLedger>();
+        services.AddSingleton<IHostAddressResolver, SystemHostAddressResolver>();
+        services.AddSingleton<RawSourceHttpClient>(sp =>
+        {
+            var resolver = sp.GetRequiredService<IHostAddressResolver>();
+            return new RawSourceHttpClient(new HttpClient(new SocketsHttpHandler
+            {
+                AllowAutoRedirect = false,
+                UseCookies = false,
+                UseProxy = false,
+                PooledConnectionLifetime = TimeSpan.FromMinutes(2),
+                ConnectCallback = async (context, ct) =>
+                    await GuardedConnect.ConnectAsync(context.DnsEndPoint, resolver, ct),
+            }) { Timeout = Timeout.InfiniteTimeSpan });
+        });
+        services.AddScoped<IRawSourceFetcher>(sp => new HttpRawSourceFetcher(
+            sp.GetRequiredService<RawSourceHttpClient>().Client,
+            sp.GetRequiredService<IHostAddressResolver>(),
+            sp.GetRequiredService<ITenantSourceFetchPolicyRegistry>(),
+            sp.GetRequiredService<ITenantFetchAttemptLedger>(),
+            sp.GetRequiredService<ITenantRawRetrievalLedger>(),
+            sp.GetService<TimeProvider>() ?? TimeProvider.System));
         services.AddScoped<ITenantParseRunLedger, EfTenantParseRunLedger>();
         services.AddScoped<ITenantRetrievalAttestationLedger, EfTenantRetrievalAttestationLedger>();
         services.AddScoped<ITenantInvestigationStore, EfTenantInvestigationStore>();
