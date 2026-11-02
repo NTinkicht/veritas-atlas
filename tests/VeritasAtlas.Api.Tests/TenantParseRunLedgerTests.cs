@@ -148,6 +148,10 @@ public sealed class TenantParseRunLedgerTests
         // The same key in another tenant is a distinct run.
         Assert.AreEqual(ParseRunRecordOutcome.Recorded,
             (await ledger.RecordAsync(TenantB, Failed(retrievalB), Actor, CancellationToken.None)).Outcome);
+        var plainTruncate = await Assert.ThrowsExactlyAsync<PostgresException>(
+            () => db.Database.ExecuteSqlRawAsync("TRUNCATE tenant_parse_runs"));
+        Assert.AreEqual("0A000", plainTruncate.SqlState, "TRUNCATE of a table referenced by a foreign key");
+
         Assert.AreEqual(2, await db.TenantParseRuns.CountAsync());
     }
 
@@ -222,7 +226,9 @@ public sealed class TenantParseRunLedgerTests
                      "UPDATE tenant_parse_runs SET outcome = 'parsed_unverified', failure_class = NULL",
                      "UPDATE tenant_parse_runs SET parser_version = '9.9.9'",
                      "DELETE FROM tenant_parse_runs",
-                     "TRUNCATE tenant_parse_runs"
+                     // The cascade reaches the trigger; a plain TRUNCATE is refused by
+                     // PostgreSQL itself since tenant_evidence_chunks references this table.
+                     "TRUNCATE tenant_parse_runs CASCADE"
                  })
         {
             var error = await Assert.ThrowsExactlyAsync<PostgresException>(() => db.Database.ExecuteSqlRawAsync(mutation));
