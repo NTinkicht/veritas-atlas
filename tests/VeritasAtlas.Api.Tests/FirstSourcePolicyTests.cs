@@ -48,6 +48,10 @@ public sealed class FirstSourcePolicyTests
         if (!Strings(e, "allowed_schemes").SequenceEqual(["https"], StringComparer.Ordinal))
             reasons.Add("scheme_not_pinned");
         if (e["jurisdiction"]!.GetValue<string>() != "uk") reasons.Add("jurisdiction_not_pinned");
+        if (!e["allowed_ports"]!.AsArray().Select(n => n!.GetValue<int>()).SequenceEqual([443]))
+            reasons.Add("port_not_pinned");
+        if (e["max_redirects"]!.GetValue<int>() > 3) reasons.Add("redirects_not_pinned");
+        if (e["plaintext_http_exception"]!.GetValue<bool>()) reasons.Add("plaintext_exception_not_pinned");
         var licence = e["licence"]?.AsObject();
         if (licence is null || licence["attribution_required"]?.GetValue<bool>() != true
             || string.IsNullOrWhiteSpace(licence["attribution_text"]?.GetValue<string>()))
@@ -109,6 +113,25 @@ public sealed class FirstSourcePolicyTests
         CollectionAssert.Contains(Gate(blank), "attribution_missing");
         var notRequired = Mutate(e => e["licence"]!["attribution_required"] = false);
         CollectionAssert.Contains(Gate(notRequired), "attribution_missing");
+    }
+
+    [TestMethod]
+    public void ExtraPortsMoreRedirectsAndPlaintextExceptionAreRefused()
+    {
+        var port = Mutate(e => e["allowed_ports"]!.AsArray().Add(8080));
+        CollectionAssert.Contains(Gate(port), "port_not_pinned");
+        var otherPort = Mutate(e => e["allowed_ports"] = new JsonArray(80));
+        CollectionAssert.Contains(Gate(otherPort), "port_not_pinned");
+        var redirects = Mutate(e => e["max_redirects"] = 4);
+        CollectionAssert.Contains(Gate(redirects), "redirects_not_pinned");
+        var plaintext = Mutate(e =>
+        {
+            e["allowed_schemes"] = new JsonArray("https", "http");
+            e["plaintext_http_exception"] = true;
+        });
+        var reasons = Gate(plaintext);
+        CollectionAssert.Contains(reasons, "plaintext_exception_not_pinned");
+        CollectionAssert.Contains(reasons, "scheme_not_pinned");
     }
 
     [TestMethod]
