@@ -1100,6 +1100,59 @@ public sealed class TenantParseRunConfiguration : IEntityTypeConfiguration<Verit
     }
 }
 
+public sealed class TenantEvidenceChunkConfiguration : IEntityTypeConfiguration<VeritasAtlas.Infrastructure.Persistence.TenantEvidenceChunk>
+{
+    public void Configure(EntityTypeBuilder<VeritasAtlas.Infrastructure.Persistence.TenantEvidenceChunk> builder)
+    {
+        builder.ToTable("tenant_evidence_chunks", table =>
+        {
+            table.HasCheckConstraint(
+                "ck_tenant_evidence_chunks_tenant_id_not_empty",
+                "tenant_id <> '00000000-0000-0000-0000-000000000000'::uuid");
+            table.HasCheckConstraint(
+                "ck_tenant_evidence_chunks_parent_evidence_ref_shape",
+                "parent_evidence_ref ~ '^ev1:[0-9a-f]{64}$'");
+            table.HasCheckConstraint("ck_tenant_evidence_chunks_ordinal", "ordinal >= 0");
+            table.HasCheckConstraint(
+                "ck_tenant_evidence_chunks_element_id_not_blank",
+                "length(btrim(element_id)) > 0");
+            table.HasCheckConstraint(
+                "ck_tenant_evidence_chunks_text_not_blank",
+                "length(btrim(text)) > 0");
+            table.HasCheckConstraint(
+                "ck_tenant_evidence_chunks_text_sha256_shape",
+                "text_sha256 ~ '^[0-9a-f]{64}$'");
+        });
+
+        builder.HasKey(x => new { x.TenantId, x.Id }).HasName("pk_tenant_evidence_chunks");
+        builder.Property(x => x.TenantId).HasColumnName("tenant_id").IsRequired();
+        builder.Property(x => x.Id).HasColumnName("id").ValueGeneratedNever().IsRequired();
+        builder.Property(x => x.ParseRunId).HasColumnName("parse_run_id").IsRequired();
+        builder.Property(x => x.RawRetrievalId).HasColumnName("raw_retrieval_id").IsRequired();
+        builder.Property(x => x.ParentEvidenceRef).HasColumnName("parent_evidence_ref").HasMaxLength(68).IsRequired();
+        builder.Property(x => x.Ordinal).HasColumnName("ordinal").IsRequired();
+        builder.Property(x => x.ElementId).HasColumnName("element_id").HasMaxLength(256).IsRequired();
+        builder.Property(x => x.Text).HasColumnName("text").IsRequired();
+        builder.Property(x => x.TextSha256).HasColumnName("text_sha256").HasMaxLength(64).IsRequired();
+        builder.Property(x => x.CreatedAtUtc).HasColumnName("created_at_utc").IsRequired();
+
+        builder.HasIndex(x => new { x.TenantId, x.ParseRunId, x.Ordinal })
+            .IsUnique()
+            .HasDatabaseName("ux_tenant_evidence_chunks_tenant_run_ordinal");
+        builder.HasIndex(x => new { x.TenantId, x.ParseRunId, x.ElementId })
+            .IsUnique()
+            .HasDatabaseName("ux_tenant_evidence_chunks_tenant_run_element");
+
+        // Composite key: a chunk can only point at its own tenant's parse run.
+        builder.HasOne<VeritasAtlas.Infrastructure.Persistence.TenantParseRun>()
+            .WithMany()
+            .HasForeignKey(x => new { x.TenantId, x.ParseRunId })
+            .HasPrincipalKey(x => new { x.TenantId, x.Id })
+            .HasConstraintName("fk_tenant_evidence_chunks_tenant_parse_run")
+            .OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
 public sealed class TenantRetrievalAttestationConfiguration : IEntityTypeConfiguration<VeritasAtlas.Infrastructure.Persistence.TenantRetrievalAttestation>
 {
     // Stored exactly as given: not blank, no surrounding whitespace and no
