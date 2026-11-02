@@ -78,6 +78,13 @@ describe("states", () => {
     expect(html).not.toContain("es-hit");
   });
 
+  it("keeps load-more on an empty page that still has a continuation cursor", () => {
+    const html = results(loaded([], "c"));
+    expect(html).toContain("Load more results");
+    expect(html).toContain("More may exist");
+    expect(html).not.toContain("No verified evidence matched");
+  });
+
   it("offers more results only with a next cursor", () => {
     expect(results(loaded([base], "c"))).toContain("Load more results");
     expect(results(loaded([base]))).not.toContain("Load more results");

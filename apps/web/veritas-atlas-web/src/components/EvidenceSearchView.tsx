@@ -60,7 +60,7 @@ export function EvidenceResults({ view, selectedRef, onSelect, onMore, signInHre
       </div>
     );
   }
-  if (view.hits.length === 0) {
+  if (view.hits.length === 0 && !view.nextCursor) {
     return (
       <p className="empty-card" role="status">
         No verified evidence matched. Nothing is shown from unverified or other-organization sources.
@@ -69,6 +69,11 @@ export function EvidenceResults({ view, selectedRef, onSelect, onMore, signInHre
   }
   return (
     <div>
+      {view.hits.length === 0 ? (
+        <p className="empty-card" role="status">
+          No verified evidence in the portion searched so far. More may exist: load more results to continue.
+        </p>
+      ) : null}
       <ol className="es-list" aria-label="Search results">
         {view.hits.map((hit) => (
           <li key={hit.evidenceRef} className="panel es-hit">
