@@ -132,7 +132,8 @@ export function CitationInspector({ hit }: { hit: EvidenceHit | null }) {
     ["Freshness evaluated (UTC)", formatInstant(hit.freshnessEvaluatedAt)],
     ["Eligible as current", hit.freshnessEligible ? "yes" : "no"],
     ["Freshness reason", hit.freshnessReason ?? "none given"],
-    ["Parser name and version", "not provided by the search service"],
+    ["Parser name", hit.parserName ?? "not recorded"],
+    ["Parser version", hit.parserVersion ?? "not recorded"],
   ];
   return (
     <section className="panel es-inspector" aria-labelledby="es-inspector-title">

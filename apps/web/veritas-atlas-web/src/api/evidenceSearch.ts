@@ -17,6 +17,8 @@ export type EvidenceHit = {
   freshnessEligible: boolean;
   freshnessReason: string | null;
   freshnessEvaluatedAt: string | null;
+  parserName: string | null;
+  parserVersion: string | null;
 };
 
 export type EvidencePage = { hits: EvidenceHit[]; nextCursor: string | null };
@@ -111,6 +113,8 @@ export function parseSearchResponse(raw: unknown): EvidencePage {
       freshnessEligible: record.freshnessEligible,
       freshnessReason: optionalText(record, "freshnessReason"),
       freshnessEvaluatedAt: optionalText(record, "freshnessEvaluatedAt"),
+      parserName: optionalText(record, "parserName"),
+      parserVersion: optionalText(record, "parserVersion"),
     };
   });
   const next = body.nextCursor;

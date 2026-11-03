@@ -75,7 +75,8 @@ public sealed class EfEvidenceSearchService : IEvidenceSearchService
                 hits.Add(new EvidenceSearchHit(
                     evidenceRef, row.FinalUri, row.SourceEntryId, row.Jurisdiction, row.SourceType,
                     row.AuthenticationResult, DateTime.SpecifyKind(row.RetrievedAtUtc, DateTimeKind.Utc),
-                    decision.State, decision.Eligible, decision.Reason, decision.EvaluatedAt));
+                    decision.State, decision.Eligible, decision.Reason, decision.EvaluatedAt,
+                    row.ParserName, row.ParserVersion));
                 if (hits.Count > request.PageSize) break;
             }
 
@@ -98,7 +99,8 @@ public sealed class EfEvidenceSearchService : IEvidenceSearchService
 
     private sealed record LatestRow(
         string FinalUri, Guid SourceEntryId, string Jurisdiction, string SourceType,
-        string AuthenticationResult, DateTime RetrievedAtUtc);
+        string AuthenticationResult, DateTime RetrievedAtUtc,
+        string? ParserName, string? ParserVersion);
 
     private async Task<Dictionary<string, LatestRow>> LoadLatestAsync(
         Guid tenantId, List<string> refs, CancellationToken cancellationToken)
@@ -109,11 +111,17 @@ public sealed class EfEvidenceSearchService : IEvidenceSearchService
                 on new { v.TenantId, Id = v.RawRetrievalId } equals new { r.TenantId, r.Id }
             join a in _db.TenantRetrievalAttestations.AsNoTracking()
                 on new { v.TenantId, Id = v.AttestationId } equals new { a.TenantId, a.Id }
+            join p in _db.TenantParseRuns.AsNoTracking()
+                on new { v.TenantId, Id = v.ParseRunId } equals new { p.TenantId, p.Id } into runs
+            from p in runs.DefaultIfEmpty()
             where v.TenantId == tenantId && refs.Contains(v.ParentEvidenceRef)
             select new
             {
                 v.ParentEvidenceRef, r.Id, r.FinalUri, r.SourceEntryId, r.RetrievedAtUtc,
-                a.Jurisdiction, a.SourceType, a.AuthenticationResult
+                a.Jurisdiction, a.SourceType, a.AuthenticationResult,
+                // Parser identity comes only from the stored parse run behind the verification (#180).
+                ParserName = p == null ? null : p.ParserName,
+                ParserVersion = p == null ? null : p.ParserVersion
             }).ToListAsync(cancellationToken);
 
         // Same rule as the freshness service: the most recently retrieved verified copy is authoritative.
@@ -126,7 +134,7 @@ public sealed class EfEvidenceSearchService : IEvidenceSearchService
                     var best = g.OrderByDescending(x => x.RetrievedAtUtc).ThenBy(x => x.Id).First();
                     return new LatestRow(
                         best.FinalUri, best.SourceEntryId, best.Jurisdiction, best.SourceType,
-                        best.AuthenticationResult, best.RetrievedAtUtc);
+                        best.AuthenticationResult, best.RetrievedAtUtc, best.ParserName, best.ParserVersion);
                 });
     }
 

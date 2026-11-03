@@ -107,6 +107,8 @@ public sealed class EvidenceSearchTests
         Assert.AreEqual(Uri, page.Hits[0].SourceUri);
         Assert.AreEqual("gb-uk", page.Hits[0].Jurisdiction);
         Assert.AreEqual("Authenticated", page.Hits[0].AttestationState, ignoreCase: true);
+        Assert.AreEqual(VeritasAtlas.Domain.Parsing.UkLegislationParserV1.Name, page.Hits[0].ParserName);
+        Assert.AreEqual(VeritasAtlas.Domain.Parsing.UkLegislationParserV1.Version, page.Hits[0].ParserVersion);
         Assert.IsNull(page.NextCursor);
 
         var foreign = await Search(db, time, Policy).SearchAsync(TenantB, Req(), CancellationToken.None);
@@ -301,7 +303,8 @@ public sealed class EvidenceSearchTests
                 EvidenceSearchOutcome.Ok,
                 [new EvidenceSearchHit(
                     "synthetic-ref-1", Uri, Guid.Parse("c3333333-3333-4333-8333-333333333333"), "gb-uk", "statute",
-                    "Verified", At, FreshnessState.Superseded, false, "superseded-by-newer-revision", "2026-11-02T11:00:00Z")],
+                    "Verified", At, FreshnessState.Superseded, false, "superseded-by-newer-revision", "2026-11-02T11:00:00Z",
+                    "synthetic-parser", "9.9")],
                 "next-cursor"));
     }
 
@@ -329,12 +332,15 @@ public sealed class EvidenceSearchTests
             {
                 "evidenceRef", "sourceUri", "sourceEntryId", "jurisdiction", "sourceType", "attestationState",
                 "retrievedAtUtc", "freshness", "freshnessEligible", "freshnessReason", "freshnessEvaluatedAt",
+                "parserName", "parserVersion",
             },
             hit.EnumerateObject().Select(p => p.Name).ToArray());
         Assert.AreEqual(System.Text.Json.JsonValueKind.Number, hit.GetProperty("freshness").ValueKind);
         Assert.AreEqual(3, hit.GetProperty("freshness").GetInt32(), "Superseded");
         Assert.IsFalse(hit.GetProperty("freshnessEligible").GetBoolean());
         Assert.AreEqual("superseded-by-newer-revision", hit.GetProperty("freshnessReason").GetString());
+        Assert.AreEqual("synthetic-parser", hit.GetProperty("parserName").GetString());
+        Assert.AreEqual("9.9", hit.GetProperty("parserVersion").GetString());
     }
 
     private static async Task<HttpResponseMessage> Get(HttpClient client, string path, string bearer)
