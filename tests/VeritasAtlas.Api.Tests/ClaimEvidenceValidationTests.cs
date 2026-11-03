@@ -267,6 +267,27 @@ public sealed class ClaimEvidenceValidationTests
         }
     }
 
+    private sealed class UnevaluableFreshness : IEvidenceFreshnessService
+    {
+        public Task<EvidenceFreshnessResult> EvaluateAsync(
+            Guid tenantId, string evidenceRef, SourceFreshnessClaimPolicy? claimPolicy, CancellationToken cancellationToken) =>
+            Task.FromResult(new EvidenceFreshnessResult(EvidenceFreshnessOutcome.NotFound, null));
+    }
+
+    [TestMethod]
+    public async Task ExistingEvidenceWhoseFreshnessCannotBeEvaluatedIsFreshnessUnknownNotNotFound()
+    {
+        if (Database() is not { } cs) return;
+        await ResetAsync(cs);
+        await using var db = new VeritasAtlasDbContext(Options(cs));
+        var r1 = await SeedAsync(db, TenantA, "r1", "alpha", verify: true);
+
+        var result = await new EfClaimEvidenceValidationService(db, new UnevaluableFreshness())
+            .ValidateAsync(TenantA, Claim(true, null, Cite(r1)), CancellationToken.None);
+        Assert.IsFalse(result.Valid);
+        Assert.AreEqual(ClaimEvidenceCodes.FreshnessUnknown, result.Code);
+    }
+
     private sealed class RecordingValidator(bool valid) : IClaimEvidenceValidationService
     {
         public int Calls { get; private set; }
@@ -318,6 +339,11 @@ public sealed class ClaimEvidenceValidationTests
 
         using (var missing = await Post(client, Path, good, new { evidenceRequired = true }))
             Assert.AreEqual(HttpStatusCode.BadRequest, missing.StatusCode);
+
+        var callsBefore = ok.Calls;
+        using (var nullItem = await Post(client, Path, good, new { evidenceRequired = true, citations = new object?[] { null } }))
+            Assert.AreEqual(HttpStatusCode.BadRequest, nullItem.StatusCode);
+        Assert.AreEqual(callsBefore, ok.Calls, "a null citation must be refused before validation");
 
         var rejecting = new RecordingValidator(false);
         using var rejectingFactory = new ApiFactory(rejecting);

@@ -39,15 +39,15 @@ public sealed class TenantClaimEvidenceValidationController : ControllerBase
                 "tenant_required", "The access token carries no valid organization tenant."));
         }
 
-        if (body?.Citations is null)
+        if (body?.Citations is null || body.Citations.Any(c => c is null))
             return BadRequest(new ClaimEvidenceValidationError("invalid_claim_evidence_request", "The request is invalid."));
 
         var request = new ClaimEvidenceValidationRequest(
             body.EvidenceRequired,
             new SourceFreshnessClaimPolicy(body.HistoricalEvidenceAllowed, body.HistoricalTimeContextPreserved),
-            body.Citations.Select(c => c is null
-                ? null!
-                : new ClaimEvidenceCitation(c.EvidenceRef, c.ParserName, c.ParserVersion, c.ScopeSourceEntryId)).ToList());
+            body.Citations
+                .Select(c => new ClaimEvidenceCitation(c.EvidenceRef, c.ParserName, c.ParserVersion, c.ScopeSourceEntryId))
+                .ToList());
         var result = await _validator.ValidateAsync(tenantId, request, cancellationToken);
         return result.Outcome switch
         {

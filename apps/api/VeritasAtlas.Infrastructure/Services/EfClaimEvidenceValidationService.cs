@@ -90,8 +90,9 @@ public sealed class EfClaimEvidenceValidationService : IClaimEvidenceValidationS
             return Reject(evidenceRef, ClaimEvidenceCodes.ParserMismatch);
 
         var freshness = await _freshness.EvaluateAsync(tenantId, evidenceRef, policy, ct);
+        // The evidence exists in this tenant but its freshness could not be evaluated: fail closed as unknown.
         if (freshness.Outcome != EvidenceFreshnessOutcome.Evaluated || freshness.Decision is not { } decision)
-            return Reject(evidenceRef, ClaimEvidenceCodes.NotFound);
+            return Reject(evidenceRef, ClaimEvidenceCodes.FreshnessUnknown);
 
         if (!decision.Eligible)
         {
