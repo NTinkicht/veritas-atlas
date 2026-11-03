@@ -23,7 +23,20 @@ public sealed class ClaimRelationClassifierTests
 
     [TestMethod]
     public void Negation_SameValue_Conflicts() =>
-        Assert.AreEqual(ClaimRelationReasons.PolarityConflict, K(C("a"), C("b", neg: true)).Reason);
+        Assert.AreEqual(ClaimRelationReasons.PolarityConflict, K(C("a", asOf: D1), C("b", neg: true, asOf: D1)).Reason);
+
+    [TestMethod]
+    public void Negation_DifferentDates_IsSupersession_NotConflict_BothOrders()
+    {
+        foreach (var (x, y) in new[] { (C("old", asOf: D1), C("new", neg: true, asOf: D2)), (C("new", neg: true, asOf: D2), C("old", asOf: D1)) })
+        {
+            var r = K(x, y);
+            Assert.AreEqual(ClaimRelation.Superseded, r.Relation);
+            Assert.AreEqual("old", r.SupersededClaimId);
+            Assert.AreEqual("new", r.SupersedingClaimId);
+        }
+        Assert.AreEqual(ClaimRelation.Unresolved, K(C("a", asOf: D1), C("b", neg: true)).Relation);
+    }
 
     [TestMethod]
     public void SameAsOf_DifferentValue_Conflicts() =>

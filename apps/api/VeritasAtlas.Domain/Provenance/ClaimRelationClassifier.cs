@@ -56,9 +56,14 @@ public static class ClaimRelationClassifier
 
         var sameValue = Norm(a.Value) == Norm(b.Value);
         if (sameValue)
-            return a.Negated == b.Negated
-                ? R(a, b, ClaimRelation.Agreeing, ClaimRelationReasons.SameValueSamePolarity)
-                : R(a, b, ClaimRelation.Conflicting, ClaimRelationReasons.PolarityConflict);
+        {
+            if (a.Negated == b.Negated) return R(a, b, ClaimRelation.Agreeing, ClaimRelationReasons.SameValueSamePolarity);
+            // Opposite polarity may describe a change over time, so apply temporal disambiguation first.
+            if (a.AsOf is null || b.AsOf is null) return R(a, b, ClaimRelation.Unresolved, ClaimRelationReasons.AsOfMissing);
+            if (a.AsOf == b.AsOf) return R(a, b, ClaimRelation.Conflicting, ClaimRelationReasons.PolarityConflict);
+            var (o, n) = a.AsOf < b.AsOf ? (a, b) : (b, a);
+            return R(a, b, ClaimRelation.Superseded, ClaimRelationReasons.LaterAsOfSupersedes, o.ClaimId, n.ClaimId);
+        }
 
         // Different values. Two negations of different values do not contradict each other.
         if (a.Negated && b.Negated) return R(a, b, ClaimRelation.Unresolved, ClaimRelationReasons.BothNegatedDifferentValue);
