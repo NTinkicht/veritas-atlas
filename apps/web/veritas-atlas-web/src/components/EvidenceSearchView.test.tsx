@@ -19,6 +19,8 @@ const base: EvidenceHit = {
   freshnessEligible: true,
   freshnessReason: null,
   freshnessEvaluatedAt: "2026-11-02T11:00:00Z",
+  parserName: "uk-legislation-xml",
+  parserVersion: "1.0.0",
 };
 
 const noop = () => undefined;
@@ -108,7 +110,7 @@ describe("source text is rendered as text, never HTML", () => {
 });
 
 describe("citation inspector", () => {
-  it("shows every provenance field and is honest about the missing parser", () => {
+  it("shows every provenance field and shows the stored parser identity and is explicit when absent", () => {
     const html = renderToStaticMarkup(<CitationInspector hit={base} />);
     for (const text of [
       "Evidence reference",
@@ -119,12 +121,20 @@ describe("citation inspector", () => {
       "2026-11-02T09:00:00Z",
       "Freshness evaluated (UTC)",
       "2026-11-02T11:00:00Z",
-      "Parser name and version",
-      "not provided by the search service",
+      "Parser name",
+      "uk-legislation-xml",
+      "Parser version",
+      "1.0.0",
     ]) {
       expect(html).toContain(text);
     }
     expect(html).toContain('aria-labelledby="es-inspector-title"');
+  });
+
+  it("states that the parser is not recorded instead of inventing a value", () => {
+    const html = renderToStaticMarkup(<CitationInspector hit={{ ...base, parserName: null, parserVersion: null }} />);
+    expect(html).toContain("not recorded");
+    expect(html).not.toContain("uk-legislation-xml");
   });
 
   it("prompts for a selection when nothing is selected", () => {

@@ -20,6 +20,8 @@ const hit = {
   freshnessEligible: true,
   freshnessReason: null,
   freshnessEvaluatedAt: "2026-11-02T11:00:00Z",
+  parserName: "uk-legislation-xml",
+  parserVersion: "1.0.0",
 };
 
 describe("freshness mapping", () => {
@@ -55,7 +57,15 @@ describe("parseSearchResponse", () => {
   it("parses hits and the next cursor", () => {
     const page = parseSearchResponse({ results: [hit], nextCursor: "c1" });
     expect(page.nextCursor).toBe("c1");
-    expect(page.hits[0]).toMatchObject({ evidenceRef: "synthetic-ref-1", freshness: "CURRENT", freshnessReason: null });
+    expect(page.hits[0]).toMatchObject({ evidenceRef: "synthetic-ref-1", freshness: "CURRENT", freshnessReason: null, parserName: "uk-legislation-xml", parserVersion: "1.0.0" });
+  });
+
+  it("keeps absent parser identity null and rejects non-text values", () => {
+    const bare: Record<string, unknown> = { ...hit };
+    delete bare.parserName;
+    delete bare.parserVersion;
+    expect(parseSearchResponse({ results: [bare] }).hits[0]).toMatchObject({ parserName: null, parserVersion: null });
+    expect(() => parseSearchResponse({ results: [{ ...hit, parserName: 5 }] })).toThrow(MalformedSearchResponse);
   });
 
   it("treats a missing or empty cursor as the last page", () => {

@@ -38,7 +38,9 @@ public sealed record EvidenceSearchHit(
     FreshnessState Freshness,
     bool FreshnessEligible,
     string? FreshnessReason,
-    string? FreshnessEvaluatedAt);
+    string? FreshnessEvaluatedAt,
+    string? ParserName = null,
+    string? ParserVersion = null);
 
 public enum EvidenceSearchOutcome
 {
