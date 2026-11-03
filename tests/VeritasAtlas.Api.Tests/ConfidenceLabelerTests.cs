@@ -80,6 +80,23 @@ public sealed class ConfidenceLabelerTests
     }
 
     [TestMethod]
+    public void ReasonCodes_ExactAndOrdered_ForEachSignal()
+    {
+        static List<string> R(ConfidenceInputs x) => ConfidenceLabeler.Label(x).Reasons.ToList();
+        CollectionAssert.AreEqual(new[] { ConfidenceReasons.SingleIndependentSource }, R(I(src: 1)));
+        CollectionAssert.AreEqual(new[] { ConfidenceReasons.MultipleIndependentSources, ConfidenceReasons.ConflictingEvidence }, R(I(con: 1)));
+        CollectionAssert.AreEqual(new[] { ConfidenceReasons.MultipleIndependentSources, ConfidenceReasons.SupersededEvidence }, R(I(sps: 1)));
+        CollectionAssert.AreEqual(new[] { ConfidenceReasons.MultipleIndependentSources, ConfidenceReasons.StaleEvidence }, R(I(stale: 1)));
+        CollectionAssert.AreEqual(new[] { ConfidenceReasons.MultipleIndependentSources, ConfidenceReasons.UnknownFreshness }, R(I(unk: 1)));
+        CollectionAssert.AreEqual(new[] { ConfidenceReasons.MultipleIndependentSources, ConfidenceReasons.UnresolvedRelations }, R(I(unres: 1)));
+        CollectionAssert.AreEqual(new[]
+        {
+            ConfidenceReasons.SingleIndependentSource, ConfidenceReasons.ConflictingEvidence, ConfidenceReasons.SupersededEvidence,
+            ConfidenceReasons.StaleEvidence, ConfidenceReasons.UnknownFreshness, ConfidenceReasons.UnresolvedRelations,
+        }, R(I(src: 1, con: 1, sps: 1, stale: 1, unk: 1, unres: 1)));
+    }
+
+    [TestMethod]
     public void NegativeCounts_Rejected() =>
         Assert.ThrowsExactly<ArgumentOutOfRangeException>(() => ConfidenceLabeler.Label(I(con: -1)));
 
