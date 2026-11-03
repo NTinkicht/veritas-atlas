@@ -78,6 +78,7 @@ public static class ServiceCollectionExtensions
             sp.GetRequiredService<ISourceRevisionEvidenceProvider>(),
             sp.GetService<TimeProvider>() ?? TimeProvider.System));
         services.AddScoped<IEvidenceSearchService, EfEvidenceSearchService>();
+        services.AddScoped<IClaimEvidenceValidationService, EfClaimEvidenceValidationService>();
         services.AddScoped<ITenantAuditEventStore, EfTenantAuditEventStore>();
 
         return services;
