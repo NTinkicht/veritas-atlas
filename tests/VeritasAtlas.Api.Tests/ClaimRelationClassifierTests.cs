@@ -73,8 +73,12 @@ public sealed class ClaimRelationClassifierTests
     [TestMethod]
     public void NegationOfDifferentValue_IsNotAContradiction()
     {
-        Assert.AreEqual(ClaimRelation.Unresolved, K(C("a", "5", neg: true), C("b", "9", neg: true)).Relation);
-        Assert.AreEqual(ClaimRelation.Unresolved, K(C("a", "5", neg: true), C("b", "9")).Relation);
+        var both = K(C("a", "5", neg: true), C("b", "9", neg: true));
+        Assert.AreEqual(ClaimRelation.Unresolved, both.Relation);
+        Assert.AreEqual(ClaimRelationReasons.BothNegatedDifferentValue, both.Reason);
+        var opp = K(C("a", "5", neg: true), C("b", "9"));
+        Assert.AreEqual(ClaimRelation.Unresolved, opp.Relation);
+        Assert.AreEqual(ClaimRelationReasons.OppositePolarityDifferentValue, opp.Reason);
     }
 
     [TestMethod]

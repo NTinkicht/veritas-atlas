@@ -17,6 +17,7 @@ public static class ClaimRelationReasons
     public const string LaterAsOfSupersedes = "later_as_of_supersedes";
     public const string AsOfMissing = "as_of_missing";
     public const string BothNegatedDifferentValue = "both_negated_different_value";
+    public const string OppositePolarityDifferentValue = "opposite_polarity_different_value";
 }
 
 /// <summary>A structured, tenant-scoped factual claim. <see cref="EntityKey"/> is the resolved canonical entity id, if any.</summary>
@@ -68,7 +69,7 @@ public static class ClaimRelationClassifier
         // Different values. Two negations of different values do not contradict each other.
         if (a.Negated && b.Negated) return R(a, b, ClaimRelation.Unresolved, ClaimRelationReasons.BothNegatedDifferentValue);
         // Opposite polarity with different values is not a direct contradiction either.
-        if (a.Negated != b.Negated) return R(a, b, ClaimRelation.Unresolved, ClaimRelationReasons.BothNegatedDifferentValue);
+        if (a.Negated != b.Negated) return R(a, b, ClaimRelation.Unresolved, ClaimRelationReasons.OppositePolarityDifferentValue);
 
         if (a.AsOf is null || b.AsOf is null) return R(a, b, ClaimRelation.Unresolved, ClaimRelationReasons.AsOfMissing);
         if (a.AsOf == b.AsOf) return R(a, b, ClaimRelation.Conflicting, ClaimRelationReasons.ValueConflictSameAsOf);
