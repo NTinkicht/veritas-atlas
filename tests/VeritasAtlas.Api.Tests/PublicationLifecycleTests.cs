@@ -43,6 +43,10 @@ public sealed class PublicationLifecycleTests
     }
 
     [TestMethod]
+    public void Submit_ByAnalystWhoIsNotTheAuthor_IsDeniedAsNotAuthor() =>
+        Denied(R(LifecycleState.Draft, LifecycleAction.Submit, LifecycleRole.Analyst, actor: "u9"), LifecycleDenials.NotAuthor);
+
+    [TestMethod]
     public void SelfApproval_IsDenied_ForApproveAndRequestChanges()
     {
         Denied(R(LifecycleState.Submitted, LifecycleAction.Approve, LifecycleRole.Reviewer, actor: "u1"), LifecycleDenials.SelfApprovalDenied);
