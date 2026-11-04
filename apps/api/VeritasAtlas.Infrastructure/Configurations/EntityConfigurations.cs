@@ -1520,3 +1520,68 @@ public sealed class TenantRetrievalCheckpointConfiguration : IEntityTypeConfigur
             .OnDelete(DeleteBehavior.Restrict);
     }
 }
+
+public sealed class TenantPublicationRevisionConfiguration : IEntityTypeConfiguration<VeritasAtlas.Infrastructure.Persistence.TenantPublicationRevision>
+{
+    public void Configure(EntityTypeBuilder<VeritasAtlas.Infrastructure.Persistence.TenantPublicationRevision> builder)
+    {
+        builder.ToTable("tenant_publication_revisions", table =>
+        {
+            table.HasCheckConstraint("ck_tenant_publication_revisions_tenant_id_not_empty", "tenant_id <> '00000000-0000-0000-0000-000000000000'::uuid");
+            table.HasCheckConstraint("ck_tenant_publication_revisions_state", "state IN ('Draft','Submitted','ChangesRequested','Approved','Published','Withdrawn')");
+            table.HasCheckConstraint("ck_tenant_publication_revisions_version_nonnegative", "version >= 0");
+            table.HasCheckConstraint("ck_tenant_publication_revisions_author_not_blank", "length(btrim(author_id)) > 0");
+            table.HasCheckConstraint("ck_tenant_publication_revisions_digest_not_blank", "length(btrim(content_digest)) > 0");
+            // Publication authority needs the approved digest to exist and equal the content digest.
+            table.HasCheckConstraint("ck_tenant_publication_revisions_published_bound",
+                "state NOT IN ('Approved','Published') OR (approved_digest IS NOT NULL AND approved_digest = content_digest)");
+            table.HasCheckConstraint("ck_tenant_publication_revisions_published_permitted",
+                "state <> 'Published' OR policy_permits_public_display");
+        });
+
+        builder.HasKey(x => new { x.TenantId, x.Id }).HasName("pk_tenant_publication_revisions");
+        builder.Property(x => x.TenantId).HasColumnName("tenant_id").IsRequired();
+        builder.Property(x => x.Id).HasColumnName("id").IsRequired();
+        builder.Property(x => x.AuthorId).HasColumnName("author_id").HasMaxLength(200).IsRequired();
+        builder.Property(x => x.ContentDigest).HasColumnName("content_digest").HasMaxLength(200).IsRequired();
+        builder.Property(x => x.ApprovedDigest).HasColumnName("approved_digest").HasMaxLength(200);
+        builder.Property(x => x.PolicyPermitsPublicDisplay).HasColumnName("policy_permits_public_display").IsRequired();
+        builder.Property(x => x.State).HasColumnName("state").HasMaxLength(20).IsRequired();
+        builder.Property(x => x.Version).HasColumnName("version").IsRequired();
+        builder.Property(x => x.LastOperationId).HasColumnName("last_operation_id").HasMaxLength(200);
+        builder.Property(x => x.LastAction).HasColumnName("last_action").HasMaxLength(20);
+    }
+}
+
+public sealed class TenantPublicationTransitionConfiguration : IEntityTypeConfiguration<VeritasAtlas.Infrastructure.Persistence.TenantPublicationTransition>
+{
+    public void Configure(EntityTypeBuilder<VeritasAtlas.Infrastructure.Persistence.TenantPublicationTransition> builder)
+    {
+        builder.ToTable("tenant_publication_transitions", table =>
+        {
+            table.HasCheckConstraint("ck_tenant_publication_transitions_version_positive", "version >= 1");
+            table.HasCheckConstraint("ck_tenant_publication_transitions_text_not_blank",
+                "length(btrim(operation_id)) > 0 AND length(btrim(actor_id)) > 0 AND length(btrim(actor_role)) > 0");
+        });
+
+        builder.HasKey(x => new { x.TenantId, x.RevisionId, x.Version }).HasName("pk_tenant_publication_transitions");
+        builder.HasIndex(x => new { x.TenantId, x.RevisionId, x.OperationId }).IsUnique()
+            .HasDatabaseName("ux_tenant_publication_transitions_operation");
+        builder.Property(x => x.TenantId).HasColumnName("tenant_id").IsRequired();
+        builder.Property(x => x.RevisionId).HasColumnName("revision_id").IsRequired();
+        builder.Property(x => x.Version).HasColumnName("version").IsRequired();
+        builder.Property(x => x.OperationId).HasColumnName("operation_id").HasMaxLength(200).IsRequired();
+        builder.Property(x => x.Action).HasColumnName("action").HasMaxLength(20).IsRequired();
+        builder.Property(x => x.FromState).HasColumnName("from_state").HasMaxLength(20).IsRequired();
+        builder.Property(x => x.ToState).HasColumnName("to_state").HasMaxLength(20).IsRequired();
+        builder.Property(x => x.ActorId).HasColumnName("actor_id").HasMaxLength(200).IsRequired();
+        builder.Property(x => x.ActorRole).HasColumnName("actor_role").HasMaxLength(20).IsRequired();
+        builder.Property(x => x.OccurredAtUtc).HasColumnName("occurred_at_utc").IsRequired();
+
+        builder.HasOne<VeritasAtlas.Infrastructure.Persistence.TenantPublicationRevision>()
+            .WithMany()
+            .HasForeignKey(x => new { x.TenantId, x.RevisionId })
+            .HasConstraintName("fk_tenant_publication_transitions_tenant_revision")
+            .OnDelete(DeleteBehavior.Restrict);
+    }
+}
