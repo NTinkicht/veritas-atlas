@@ -76,6 +76,18 @@ public sealed class PublicationVersionGuardTests
         Is(R(action: LifecycleAction.Publish, approved: approved, digest: current), GuardOutcome.Deny, GuardDenials.ApprovalDigestMismatch);
 
     [TestMethod]
+    public void Publish_Replay_WithMatchingDigests_IsReplay() =>
+        Is(R(expected: 3, current: 4, action: LifecycleAction.Publish, priorOp: "op-1", priorAction: LifecycleAction.Publish), GuardOutcome.Replay);
+
+    [TestMethod]
+    [DataRow("d1", "d2")]
+    [DataRow(null, "d1")]
+    [DataRow("d1", null)]
+    public void Publish_Replay_WithMismatchedDigests_IsDenied(string? approved, string? current) =>
+        Is(R(expected: 3, current: 4, action: LifecycleAction.Publish, priorOp: "op-1", priorAction: LifecycleAction.Publish, approved: approved, digest: current),
+            GuardOutcome.Deny, GuardDenials.ApprovalDigestMismatch);
+
+    [TestMethod]
     public void NonPublishActions_DoNotRequireDigest() =>
         Is(R(action: LifecycleAction.Withdraw, approved: null, digest: null), GuardOutcome.Apply);
 

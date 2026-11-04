@@ -32,6 +32,13 @@ public static class PublicationVersionGuard
         ArgumentNullException.ThrowIfNull(r);
         if (string.IsNullOrWhiteSpace(r.OperationId)) return Deny(GuardDenials.OperationIdMissing);
 
+        // Publish authority is bound to the approved content on every path, including an exact retry: a replay
+        // never reports success for content that no longer matches its approval.
+        if (r.Action == LifecycleAction.Publish &&
+            (string.IsNullOrWhiteSpace(r.ApprovedDigest) || string.IsNullOrWhiteSpace(r.CurrentDigest) ||
+             !string.Equals(r.ApprovedDigest, r.CurrentDigest, StringComparison.Ordinal)))
+            return Deny(GuardDenials.ApprovalDigestMismatch);
+
         if (r.PriorOperationId is not null && string.Equals(r.PriorOperationId, r.OperationId, StringComparison.Ordinal))
         {
             // Exact retry of the committed operation: same action and the version it produced.
@@ -41,11 +48,6 @@ public static class PublicationVersionGuard
         }
 
         if (r.ExpectedVersion < 0 || r.CurrentVersion < 0 || r.ExpectedVersion != r.CurrentVersion) return Deny(GuardDenials.StaleVersion);
-
-        if (r.Action == LifecycleAction.Publish &&
-            (string.IsNullOrWhiteSpace(r.ApprovedDigest) || string.IsNullOrWhiteSpace(r.CurrentDigest) ||
-             !string.Equals(r.ApprovedDigest, r.CurrentDigest, StringComparison.Ordinal)))
-            return Deny(GuardDenials.ApprovalDigestMismatch);
 
         return new(GuardOutcome.Apply, null);
     }
