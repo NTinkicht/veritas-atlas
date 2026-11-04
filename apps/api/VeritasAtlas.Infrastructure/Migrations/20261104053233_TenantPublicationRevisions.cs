@@ -85,7 +85,12 @@ BEGIN
      AND NEW.tenant_id = OLD.tenant_id AND NEW.id = OLD.id AND NEW.author_id = OLD.author_id
      AND NEW.content_digest = OLD.content_digest
      AND NEW.policy_permits_public_display = OLD.policy_permits_public_display
-     AND NEW.version = OLD.version + 1 AND NEW.last_operation_id IS NOT NULL AND NEW.last_action IS NOT NULL THEN
+     AND NEW.version = OLD.version + 1 AND NEW.last_operation_id IS NOT NULL AND NEW.last_action IS NOT NULL
+     AND (OLD.state, NEW.last_action, NEW.state) IN (
+       ('Draft','Submit','Submitted'), ('Submitted','RequestChanges','ChangesRequested'),
+       ('Submitted','Approve','Approved'), ('ChangesRequested','Revise','Draft'),
+       ('Approved','Publish','Published'), ('Approved','Withdraw','Withdrawn'),
+       ('Published','Withdraw','Withdrawn')) THEN
     RETURN NEW;
   END IF;
   RAISE EXCEPTION 'tenant_publication_revisions only allows a Draft v0 insert and one-step updates of state and version' USING ERRCODE = '55000';
@@ -97,6 +102,24 @@ FOR EACH ROW EXECUTE FUNCTION tenant_publication_revisions_guard();");
             migrationBuilder.Sql(@"CREATE TRIGGER tr_tenant_publication_revisions_no_truncate
 BEFORE TRUNCATE ON tenant_publication_revisions
 FOR EACH STATEMENT EXECUTE FUNCTION tenant_publication_revisions_guard();");
+            // Every revision change must be backed, at commit, by the audit row of the exact transition it claims.
+            migrationBuilder.Sql(@"CREATE FUNCTION tenant_publication_revisions_audit_check() RETURNS trigger
+LANGUAGE plpgsql AS $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM tenant_publication_transitions t
+    WHERE t.tenant_id = NEW.tenant_id AND t.revision_id = NEW.id AND t.version = NEW.version
+      AND t.operation_id = NEW.last_operation_id AND t.action = NEW.last_action
+      AND t.from_state = OLD.state AND t.to_state = NEW.state) THEN
+    RAISE EXCEPTION 'tenant_publication_revisions change has no matching audit transition' USING ERRCODE = '55000';
+  END IF;
+  RETURN NULL;
+END;
+$$;");
+            migrationBuilder.Sql(@"CREATE CONSTRAINT TRIGGER tr_tenant_publication_revisions_audit_check
+AFTER UPDATE ON tenant_publication_revisions
+DEFERRABLE INITIALLY DEFERRED
+FOR EACH ROW EXECUTE FUNCTION tenant_publication_revisions_audit_check();");
             migrationBuilder.Sql(@"CREATE FUNCTION tenant_publication_transitions_append_only() RETURNS trigger
 LANGUAGE plpgsql AS $$
 BEGIN
@@ -117,6 +140,7 @@ FOR EACH STATEMENT EXECUTE FUNCTION tenant_publication_transitions_append_only()
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
+            migrationBuilder.Sql("DROP TRIGGER IF EXISTS tr_tenant_publication_revisions_audit_check ON tenant_publication_revisions;");
             migrationBuilder.Sql("DROP TRIGGER IF EXISTS tr_tenant_publication_transitions_no_truncate ON tenant_publication_transitions;");
             migrationBuilder.Sql("DROP TRIGGER IF EXISTS tr_tenant_publication_transitions_append_only ON tenant_publication_transitions;");
             migrationBuilder.Sql("DROP TRIGGER IF EXISTS tr_tenant_publication_revisions_no_truncate ON tenant_publication_revisions;");
@@ -128,6 +152,7 @@ FOR EACH STATEMENT EXECUTE FUNCTION tenant_publication_transitions_append_only()
                 name: "tenant_publication_revisions");
             migrationBuilder.Sql("DROP FUNCTION IF EXISTS tenant_publication_transitions_append_only();");
             migrationBuilder.Sql("DROP FUNCTION IF EXISTS tenant_publication_revisions_guard();");
+            migrationBuilder.Sql("DROP FUNCTION IF EXISTS tenant_publication_revisions_audit_check();");
         }
     }
 }

@@ -168,6 +168,8 @@ public sealed class TenantPublicationRevisionStoreTests
                  {
                      "UPDATE tenant_publication_revisions SET state = 'Approved', version = version + 1, last_operation_id = 'x', last_action = 'Approve'",
                      "UPDATE tenant_publication_revisions SET state = 'Published', version = version + 2, approved_digest = content_digest, last_operation_id = 'x', last_action = 'Publish'",
+                     // Lifecycle-skipping and audit-less one-step updates (Codex P2 on #197).
+                     "UPDATE tenant_publication_revisions SET state = 'Approved', approved_digest = content_digest, version = version + 1, last_operation_id = 'x', last_action = 'Approve'",
                      "UPDATE tenant_publication_revisions SET content_digest = 'sha256:evil', version = version + 1, last_operation_id = 'x', last_action = 'Revise'",
                      "UPDATE tenant_publication_revisions SET author_id = 'other', version = version + 1, last_operation_id = 'x', last_action = 'Revise'",
                      "UPDATE tenant_publication_revisions SET policy_permits_public_display = false, version = version + 1, last_operation_id = 'x', last_action = 'Revise'",
@@ -183,11 +185,22 @@ public sealed class TenantPublicationRevisionStoreTests
             Assert.IsTrue(ex.SqlState is "55000" or "23514" or "0A000", sql + " -> " + ex.SqlState);
         }
 
+        // A lifecycle-skipping jump from a real Draft is refused by the combination check.
+        var draft = (await store.CreateDraftAsync(TenantA, "author", "sha256:ccc", true, default)).Id;
+        var skip = await Assert.ThrowsAsync<PostgresException>(() => db.Database.ExecuteSqlRawAsync(
+            "UPDATE tenant_publication_revisions SET state = 'Published', approved_digest = content_digest, version = 1, last_operation_id = 'x', last_action = 'Publish' WHERE id = {0}", draft));
+        Assert.AreEqual("55000", skip.SqlState);
+
+        // A legal-looking step with no matching audit row is refused at commit.
+        var noAudit = await Assert.ThrowsAsync<PostgresException>(() => db.Database.ExecuteSqlRawAsync(
+            "UPDATE tenant_publication_revisions SET state = 'Submitted', version = 1, last_operation_id = 'x', last_action = 'Submit' WHERE id = {0}", draft));
+        Assert.AreEqual("55000", noAudit.SqlState);
+
         // A revision that is Approved/Published without a bound approved digest violates the check constraint.
         var fresh = (await store.CreateDraftAsync(TenantA, "author", "sha256:bbb", true, default)).Id;
         var bad = await Assert.ThrowsAsync<PostgresException>(() => db.Database.ExecuteSqlRawAsync(
             "UPDATE tenant_publication_revisions SET state = 'Approved', version = 1, last_operation_id = 'x', last_action = 'Approve' WHERE id = {0}", fresh));
-        Assert.AreEqual("23514", bad.SqlState);
+        Assert.IsTrue(bad.SqlState is "55000" or "23514", bad.SqlState); // the trigger fires before the check constraint
 
         Assert.AreEqual(1, (await store.GetAsync(TenantA, rev, default))!.Version);
         Assert.AreEqual(1, await db.TenantPublicationTransitions.CountAsync());
