@@ -63,6 +63,7 @@ public sealed class PublicReaderGateTests
     public void Historical_WithTruthfulLabel_StaysVisible_WithoutLabelIsHidden()
     {
         Assert.IsTrue(PublicReaderGate.Evaluate(F(fresh: false, cur: EvidenceCurrency.NonCurrent, label: true)).Visible);
+        Assert.IsTrue(PublicReaderGate.Evaluate(F(fresh: false, cur: EvidenceCurrency.Unknown, label: true)).Visible);
         Hidden(F(fresh: false, cur: EvidenceCurrency.NonCurrent, label: false), PublicHiddenReasons.HistoricalLabelMissing);
         Hidden(F(fresh: false, cur: EvidenceCurrency.Unknown, label: false), PublicHiddenReasons.HistoricalLabelMissing);
     }
