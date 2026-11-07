@@ -1537,6 +1537,8 @@ public sealed class TenantPublicationRevisionConfiguration : IEntityTypeConfigur
                 "state NOT IN ('Approved','Published') OR (approved_digest IS NOT NULL AND approved_digest = content_digest)");
             table.HasCheckConstraint("ck_tenant_publication_revisions_published_permitted",
                 "state <> 'Published' OR policy_permits_public_display");
+            table.HasCheckConstraint("ck_tenant_publication_revisions_evidence_currency",
+                "evidence_currency IN ('Current','NonCurrent','Unknown')");
         });
 
         builder.HasKey(x => new { x.TenantId, x.Id }).HasName("pk_tenant_publication_revisions");
@@ -1550,6 +1552,13 @@ public sealed class TenantPublicationRevisionConfiguration : IEntityTypeConfigur
         builder.Property(x => x.Version).HasColumnName("version").IsRequired();
         builder.Property(x => x.LastOperationId).HasColumnName("last_operation_id").HasMaxLength(200);
         builder.Property(x => x.LastAction).HasColumnName("last_action").HasMaxLength(20);
+        builder.Property(x => x.Restricted).HasColumnName("restricted").HasDefaultValue(true).IsRequired();
+        builder.Property(x => x.Superseded).HasColumnName("superseded").HasDefaultValue(false).IsRequired();
+        builder.Property(x => x.ExpiresAtUtc).HasColumnName("expires_at_utc");
+        builder.Property(x => x.FreshnessRequired).HasColumnName("freshness_required").HasDefaultValue(true).IsRequired();
+        builder.Property(x => x.EvidenceCurrency).HasColumnName("evidence_currency").HasMaxLength(20).HasDefaultValue("Unknown").IsRequired();
+        builder.Property(x => x.HistoricalLabelPresent).HasColumnName("historical_label_present").HasDefaultValue(false).IsRequired();
+        builder.Property(x => x.PublicCitationsJson).HasColumnName("public_citations").HasColumnType("jsonb");
     }
 }
 

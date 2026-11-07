@@ -1212,6 +1212,46 @@ namespace VeritasAtlas.Infrastructure.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("version");
 
+                    b.Property<DateTime?>("ExpiresAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expires_at_utc");
+
+                    b.Property<string>("EvidenceCurrency")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasDefaultValue("Unknown")
+                        .HasColumnName("evidence_currency");
+
+                    b.Property<bool>("FreshnessRequired")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true)
+                        .HasColumnName("freshness_required");
+
+                    b.Property<bool>("HistoricalLabelPresent")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("historical_label_present");
+
+                    b.Property<string>("PublicCitationsJson")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("public_citations");
+
+                    b.Property<bool>("Restricted")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true)
+                        .HasColumnName("restricted");
+
+                    b.Property<bool>("Superseded")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("superseded");
+
                     b.HasKey("TenantId", "Id")
                         .HasName("pk_tenant_publication_revisions");
 
@@ -1220,6 +1260,8 @@ namespace VeritasAtlas.Infrastructure.Migrations
                             t.HasCheckConstraint("ck_tenant_publication_revisions_author_not_blank", "length(btrim(author_id)) > 0");
 
                             t.HasCheckConstraint("ck_tenant_publication_revisions_digest_not_blank", "length(btrim(content_digest)) > 0");
+
+                            t.HasCheckConstraint("ck_tenant_publication_revisions_evidence_currency", "evidence_currency IN ('Current','NonCurrent','Unknown')");
 
                             t.HasCheckConstraint("ck_tenant_publication_revisions_published_bound", "state NOT IN ('Approved','Published') OR (approved_digest IS NOT NULL AND approved_digest = content_digest)");
 
