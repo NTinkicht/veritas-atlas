@@ -56,4 +56,18 @@ public static class TenantInvestigationLimits
     public const int MaxCreationKeyLength = 200;
     public const int MaxTitleLength = 200;
     public const int MaxSubjectLength = 200;
+
+    // Stricter than ck_tenant_investigations_title_shape: refuses any Unicode
+    // leading/trailing whitespace, and char.IsControl covers C0, DEL and C1.
+    public static bool IsValidTitle(string? value) =>
+        !string.IsNullOrWhiteSpace(value)
+        && value.Length <= MaxTitleLength
+        && !char.IsWhiteSpace(value[0])
+        && !char.IsWhiteSpace(value[^1])
+        && !value.Any(char.IsControl);
+
+    public static bool IsValidCreationKey(string? value) =>
+        !string.IsNullOrWhiteSpace(value)
+        && value.Length <= MaxCreationKeyLength
+        && !value.Any(char.IsControl);
 }
