@@ -6,7 +6,8 @@ import type { PublicPublicationResult } from "../api/publicPublication";
 export const HIDDEN_MESSAGE = "This publication is not available.";
 export const ERROR_MESSAGE = "This publication could not be loaded. Please try again later.";
 
-const fmt = (iso: string | null) => (iso ? new Date(iso).toISOString().slice(0, 10) : "not stated");
+// Keep the source-local calendar date: take it from the ISO string, never via a UTC conversion.
+const fmt = (iso: string | null) => (iso && /^\d{4}-\d{2}-\d{2}/.test(iso) ? iso.slice(0, 10) : "not stated");
 
 export type PublicReaderState = PublicPublicationResult | { kind: "loading" };
 

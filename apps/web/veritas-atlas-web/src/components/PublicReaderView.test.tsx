@@ -24,6 +24,13 @@ describe("PublicReaderView", () => {
     expect(html).not.toContain("<img");
   });
 
+  it("keeps the source-local calendar date for non-UTC offsets", () => {
+    const c = { ...ok.publication.citations[0], asOf: "2026-11-01T00:00:00+03:00", effectiveDate: "2026-11-02T23:30:00-05:00" };
+    const html = renderToStaticMarkup(<PublicReaderView state={{ kind: "ok", publication: { ...ok.publication, citations: [c] } }} />);
+    expect(html).toContain("As of 2026-11-01");
+    expect(html).toContain("Effective 2026-11-02");
+  });
+
   it("shows identical text for every hidden cause and no staff controls", () => {
     const hidden = renderToStaticMarkup(<PublicReaderView state={{ kind: "hidden" }} />);
     expect(hidden).toContain(HIDDEN_MESSAGE);
