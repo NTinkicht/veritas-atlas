@@ -10,6 +10,7 @@ namespace VeritasAtlas.Infrastructure.Services;
 public sealed class EfPublicPublicationReader : IPublicPublicationReader
 {
     private const int MaxCitations = 50;
+    private static readonly JsonSerializerOptions CitationOptions = new(JsonSerializerDefaults.Web);
     private readonly VeritasAtlasDbContext _db;
     private readonly TimeProvider _time;
 
@@ -42,14 +43,14 @@ public sealed class EfPublicPublicationReader : IPublicPublicationReader
         {
             citations = string.IsNullOrEmpty(row.PublicCitationsJson)
                 ? []
-                : JsonSerializer.Deserialize<List<PublicCitationProjection>>(row.PublicCitationsJson) ?? [];
+                : JsonSerializer.Deserialize<List<PublicCitationProjection>>(row.PublicCitationsJson, CitationOptions) ?? [];
         }
         catch (JsonException)
         {
             return null;
         }
 
-        if (citations.Count > MaxCitations || citations.Any(c => c is null)) return null;
+        if (citations.Count > MaxCitations || citations.Any(c => c is null || c.CitationLabel is null || c.Title is null || c.Quote is null || c.SourceName is null || c.FreshnessLabel is null)) return null;
         var label = currency == EvidenceCurrency.Current ? "current" : "historical";
         return new PublicPublicationView(row.Id, label, citations);
     }

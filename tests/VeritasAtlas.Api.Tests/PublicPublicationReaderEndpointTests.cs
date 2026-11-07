@@ -64,6 +64,13 @@ public sealed class PublicPublicationReaderEndpointTests
         CollectionAssert.AreEquivalent(
             new[] { "citationLabel", "title", "quote", "sourceName", "asOf", "effectiveDate", "freshnessLabel" },
             citation.EnumerateObject().Select(p => p.Name).ToArray());
+        Assert.AreEqual("[1]", citation.GetProperty("citationLabel").GetString());
+        Assert.AreEqual("Synthetic ruling", citation.GetProperty("title").GetString());
+        Assert.AreEqual("Synthetic quote.", citation.GetProperty("quote").GetString());
+        Assert.AreEqual("Synthetic Gazette", citation.GetProperty("sourceName").GetString());
+        Assert.AreEqual("as of 2026-01-01", citation.GetProperty("freshnessLabel").GetString());
+        Assert.AreEqual(JsonValueKind.Null, citation.GetProperty("effectiveDate").ValueKind);
+        Assert.AreEqual(new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero), citation.GetProperty("asOf").GetDateTimeOffset());
         var raw = await response.Content.ReadAsStringAsync();
         foreach (var leak in new[] { "tenant", "a1111111", "storageKey", "s3://", "reviewer", "synthetic-author", Digest })
         {
