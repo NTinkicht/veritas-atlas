@@ -1075,6 +1075,56 @@ namespace VeritasAtlas.Infrastructure.Migrations
                         });
                 });
 
+            modelBuilder.Entity("VeritasAtlas.Infrastructure.Persistence.TenantInvestigationEvidenceItem", b =>
+                {
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("CollectedBySubject")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("collected_by_subject");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<Guid>("EvidenceVerificationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("evidence_verification_id");
+
+                    b.Property<Guid>("InvestigationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("investigation_id");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("note");
+
+                    b.HasKey("TenantId", "Id")
+                        .HasName("pk_tenant_investigation_evidence_items");
+
+                    b.HasIndex("TenantId", "InvestigationId", "EvidenceVerificationId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_tenant_investigation_evidence_items_collected");
+
+                    b.ToTable("tenant_investigation_evidence_items", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_tenant_investigation_evidence_items_collected_by_shape", "length(btrim(collected_by_subject)) > 0 AND collected_by_subject !~ '[\\x01-\\x1f\\x7f-\\x9f]'");
+
+                            t.HasCheckConstraint("ck_tenant_investigation_evidence_items_note_shape", "note IS NULL OR (length(note) > 0 AND note = btrim(note) AND note !~ '[\\x01-\\x1f\\x7f-\\x9f]')");
+
+                            t.HasCheckConstraint("ck_tenant_investigation_evidence_items_tenant_id_not_empty", "tenant_id <> '00000000-0000-0000-0000-000000000000'::uuid");
+                        });
+                });
+
             modelBuilder.Entity("VeritasAtlas.Infrastructure.Persistence.TenantParseRun", b =>
                 {
                     b.Property<Guid>("TenantId")
@@ -1188,34 +1238,6 @@ namespace VeritasAtlas.Infrastructure.Migrations
                         .HasColumnType("character varying(200)")
                         .HasColumnName("content_digest");
 
-                    b.Property<string>("LastAction")
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)")
-                        .HasColumnName("last_action");
-
-                    b.Property<string>("LastOperationId")
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)")
-                        .HasColumnName("last_operation_id");
-
-                    b.Property<bool>("PolicyPermitsPublicDisplay")
-                        .HasColumnType("boolean")
-                        .HasColumnName("policy_permits_public_display");
-
-                    b.Property<string>("State")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)")
-                        .HasColumnName("state");
-
-                    b.Property<long>("Version")
-                        .HasColumnType("bigint")
-                        .HasColumnName("version");
-
-                    b.Property<DateTime?>("ExpiresAtUtc")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("expires_at_utc");
-
                     b.Property<string>("EvidenceCurrency")
                         .IsRequired()
                         .ValueGeneratedOnAdd()
@@ -1223,6 +1245,10 @@ namespace VeritasAtlas.Infrastructure.Migrations
                         .HasColumnType("character varying(20)")
                         .HasDefaultValue("Unknown")
                         .HasColumnName("evidence_currency");
+
+                    b.Property<DateTime?>("ExpiresAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expires_at_utc");
 
                     b.Property<long>("FactsVersion")
                         .ValueGeneratedOnAdd()
@@ -1242,6 +1268,20 @@ namespace VeritasAtlas.Infrastructure.Migrations
                         .HasDefaultValue(false)
                         .HasColumnName("historical_label_present");
 
+                    b.Property<string>("LastAction")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("last_action");
+
+                    b.Property<string>("LastOperationId")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("last_operation_id");
+
+                    b.Property<bool>("PolicyPermitsPublicDisplay")
+                        .HasColumnType("boolean")
+                        .HasColumnName("policy_permits_public_display");
+
                     b.Property<string>("PublicCitationsJson")
                         .HasColumnType("jsonb")
                         .HasColumnName("public_citations");
@@ -1252,11 +1292,21 @@ namespace VeritasAtlas.Infrastructure.Migrations
                         .HasDefaultValue(true)
                         .HasColumnName("restricted");
 
+                    b.Property<string>("State")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("state");
+
                     b.Property<bool>("Superseded")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValue(false)
                         .HasColumnName("superseded");
+
+                    b.Property<long>("Version")
+                        .HasColumnType("bigint")
+                        .HasColumnName("version");
 
                     b.HasKey("TenantId", "Id")
                         .HasName("pk_tenant_publication_revisions");
@@ -1282,6 +1332,75 @@ namespace VeritasAtlas.Infrastructure.Migrations
                             t.HasCheckConstraint("ck_tenant_publication_revisions_tenant_id_not_empty", "tenant_id <> '00000000-0000-0000-0000-000000000000'::uuid");
 
                             t.HasCheckConstraint("ck_tenant_publication_revisions_version_nonnegative", "version >= 0");
+                        });
+                });
+
+            modelBuilder.Entity("VeritasAtlas.Infrastructure.Persistence.TenantPublicationTransition", b =>
+                {
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<Guid>("RevisionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("revision_id");
+
+                    b.Property<long>("Version")
+                        .HasColumnType("bigint")
+                        .HasColumnName("version");
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("action");
+
+                    b.Property<string>("ActorId")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("actor_id");
+
+                    b.Property<string>("ActorRole")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("actor_role");
+
+                    b.Property<string>("FromState")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("from_state");
+
+                    b.Property<DateTime>("OccurredAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("occurred_at_utc");
+
+                    b.Property<string>("OperationId")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("operation_id");
+
+                    b.Property<string>("ToState")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("to_state");
+
+                    b.HasKey("TenantId", "RevisionId", "Version")
+                        .HasName("pk_tenant_publication_transitions");
+
+                    b.HasIndex("TenantId", "RevisionId", "OperationId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_tenant_publication_transitions_operation");
+
+                    b.ToTable("tenant_publication_transitions", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_tenant_publication_transitions_text_not_blank", "length(btrim(operation_id)) > 0 AND length(btrim(actor_id)) > 0 AND length(btrim(actor_role)) > 0");
+
+                            t.HasCheckConstraint("ck_tenant_publication_transitions_version_positive", "version >= 1");
                         });
                 });
 
@@ -1353,75 +1472,6 @@ namespace VeritasAtlas.Infrastructure.Migrations
                             t.HasCheckConstraint("ck_tenant_publication_visibility_changes_text_not_blank", "length(btrim(operation_id)) > 0 AND length(btrim(actor_id)) > 0 AND length(btrim(actor_role)) > 0");
 
                             t.HasCheckConstraint("ck_tenant_publication_visibility_changes_versions", "facts_version >= 1 AND revision_version >= 0");
-                        });
-                });
-
-            modelBuilder.Entity("VeritasAtlas.Infrastructure.Persistence.TenantPublicationTransition", b =>
-                {
-                    b.Property<Guid>("TenantId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("tenant_id");
-
-                    b.Property<Guid>("RevisionId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("revision_id");
-
-                    b.Property<long>("Version")
-                        .HasColumnType("bigint")
-                        .HasColumnName("version");
-
-                    b.Property<string>("Action")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)")
-                        .HasColumnName("action");
-
-                    b.Property<string>("ActorId")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)")
-                        .HasColumnName("actor_id");
-
-                    b.Property<string>("ActorRole")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)")
-                        .HasColumnName("actor_role");
-
-                    b.Property<string>("FromState")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)")
-                        .HasColumnName("from_state");
-
-                    b.Property<DateTime>("OccurredAtUtc")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("occurred_at_utc");
-
-                    b.Property<string>("OperationId")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)")
-                        .HasColumnName("operation_id");
-
-                    b.Property<string>("ToState")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)")
-                        .HasColumnName("to_state");
-
-                    b.HasKey("TenantId", "RevisionId", "Version")
-                        .HasName("pk_tenant_publication_transitions");
-
-                    b.HasIndex("TenantId", "RevisionId", "OperationId")
-                        .IsUnique()
-                        .HasDatabaseName("ux_tenant_publication_transitions_operation");
-
-                    b.ToTable("tenant_publication_transitions", null, t =>
-                        {
-                            t.HasCheckConstraint("ck_tenant_publication_transitions_text_not_blank", "length(btrim(operation_id)) > 0 AND length(btrim(actor_id)) > 0 AND length(btrim(actor_role)) > 0");
-
-                            t.HasCheckConstraint("ck_tenant_publication_transitions_version_positive", "version >= 1");
                         });
                 });
 

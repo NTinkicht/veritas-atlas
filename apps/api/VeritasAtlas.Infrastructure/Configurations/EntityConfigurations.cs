@@ -1279,6 +1279,46 @@ public sealed class TenantRetrievalAttestationConfiguration : IEntityTypeConfigu
     }
 }
 
+public sealed class TenantInvestigationEvidenceItemConfiguration : IEntityTypeConfiguration<VeritasAtlas.Infrastructure.Persistence.TenantInvestigationEvidenceItem>
+{
+    public void Configure(EntityTypeBuilder<VeritasAtlas.Infrastructure.Persistence.TenantInvestigationEvidenceItem> builder)
+    {
+        builder.ToTable("tenant_investigation_evidence_items", table =>
+        {
+            table.HasCheckConstraint(
+                "ck_tenant_investigation_evidence_items_tenant_id_not_empty",
+                "tenant_id <> '00000000-0000-0000-0000-000000000000'::uuid");
+            // Stored exactly as given: not blank, no surrounding whitespace, no control characters.
+            table.HasCheckConstraint(
+                "ck_tenant_investigation_evidence_items_note_shape",
+                "note IS NULL OR (length(note) > 0 AND note = btrim(note) AND note !~ '[\\x01-\\x1f\\x7f-\\x9f]')");
+            table.HasCheckConstraint(
+                "ck_tenant_investigation_evidence_items_collected_by_shape",
+                "length(btrim(collected_by_subject)) > 0 AND collected_by_subject !~ '[\\x01-\\x1f\\x7f-\\x9f]'");
+        });
+
+        builder.HasKey(x => new { x.TenantId, x.Id }).HasName("pk_tenant_investigation_evidence_items");
+        builder.Property(x => x.TenantId).HasColumnName("tenant_id").IsRequired();
+        builder.Property(x => x.Id).HasColumnName("id").ValueGeneratedNever().IsRequired();
+        builder.Property(x => x.InvestigationId).HasColumnName("investigation_id").IsRequired();
+        builder.Property(x => x.EvidenceVerificationId).HasColumnName("evidence_verification_id").IsRequired();
+        builder.Property(x => x.Note)
+            .HasColumnName("note")
+            .HasMaxLength(VeritasAtlas.Application.Interfaces.TenantInvestigationEvidenceLimits.MaxNoteLength);
+        builder.Property(x => x.CollectedBySubject)
+            .HasColumnName("collected_by_subject")
+            .HasMaxLength(VeritasAtlas.Application.Interfaces.TenantInvestigationLimits.MaxSubjectLength)
+            .IsRequired();
+        builder.Property(x => x.CreatedAtUtc).HasColumnName("created_at_utc").IsRequired();
+
+        builder.HasIndex(x => new { x.TenantId, x.InvestigationId, x.EvidenceVerificationId })
+            .IsUnique()
+            .HasDatabaseName("ux_tenant_investigation_evidence_items_collected");
+        // No FKs: a FK would turn TRUNCATE of the append-only parents into a 0A000 error;
+        // the insert guard trigger checks both references instead.
+    }
+}
+
 public sealed class TenantInvestigationConfiguration : IEntityTypeConfiguration<VeritasAtlas.Infrastructure.Persistence.TenantInvestigation>
 {
     public void Configure(EntityTypeBuilder<VeritasAtlas.Infrastructure.Persistence.TenantInvestigation> builder)
