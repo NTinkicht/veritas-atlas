@@ -28,7 +28,7 @@ public sealed partial class TenantPublicationRevisionsController : ControllerBas
         _store = store;
     }
 
-    [GeneratedRegex("^[0-9a-f]{64}$")]
+    [GeneratedRegex(@"\A[0-9a-f]{64}\z")]
     private static partial Regex DigestPattern();
 
     [HttpPost]

@@ -97,6 +97,7 @@ public sealed class TenantPublicationRevisionEndpointTests
             new { policyPermitsPublicDisplay = true },
             new { contentDigest = "not-a-digest", policyPermitsPublicDisplay = true },
             new { contentDigest = new string('A', 64), policyPermitsPublicDisplay = true },
+            new { contentDigest = Digest + "\n", policyPermitsPublicDisplay = true },
         })
         {
             var response = await Send(client, HttpMethod.Post, Base, operatorBearer, bad);
