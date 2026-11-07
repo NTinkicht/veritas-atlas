@@ -49,13 +49,22 @@ describe("web surface audit", () => {
     expect(isMounted("/not-audited", false)).toBe(false);
   });
 
-  it("requires sign-in for every production route except /login", () => {
+  it("requires sign-in for every production route except /login and the anonymous public reader", () => {
     for (const route of buildRoutes(false)) {
-      if (route.path === "/login") continue;
+      if (route.path === "/login" || route.path === "/public/publications/:id") continue;
       const el = route.element as { type: unknown } | undefined;
       expect(el, route.path).toBeDefined();
       expect((el!.type as { name?: string }).name, route.path).toBe("RequireAuth");
     }
+  });
+
+  it("keeps the public reader route credential-free and free of staff wrappers", () => {
+    const src = readFileSync(resolve(__dirname, "api/publicPublication.ts"), "utf8");
+    expect(src).not.toMatch(/httpAuth|getAuthHeaders|localStorage|sessionStorage/);
+    expect(src).toContain('credentials: "omit"');
+    const route = buildRoutes(false).find((r) => r.path === "/public/publications/:id");
+    expect((route?.element as { type: unknown }).type).not.toBe(undefined);
+    expect(((route?.element as { type: { name?: string } }).type.name)).toBe("PublicPublicationPage");
   });
 
   it("does not fetch or render the seeded scenario snapshot outside Development", () => {

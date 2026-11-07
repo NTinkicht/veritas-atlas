@@ -8,6 +8,7 @@ const REAL: Record<string, string> = {
   "/": "none (navigation landing page, no data claims)",
   "/dashboard": "/api/v1/cases, /claims, /contradictions, /workflow-audit/entries (scenario snapshot only in Development)",
   "/login": "/api/v1/auth/login",
+  "/public/publications/:id": "/api/v1/public/publications/{id} (anonymous, credential-free, fail-closed)",
   "/evidence-search": "/api/v1/tenant-evidence/search",
   "/workflow-audit": "/api/v1/workflow-audit/entries|clear",
   "/case-flow-map": "/api/v1/cases/status-counts",
