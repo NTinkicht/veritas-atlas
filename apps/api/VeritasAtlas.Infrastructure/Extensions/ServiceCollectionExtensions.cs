@@ -72,6 +72,9 @@ public static class ServiceCollectionExtensions
         services.AddScoped<ITenantPublicationRevisionStore>(sp => new EfTenantPublicationRevisionStore(
             sp.GetRequiredService<VeritasAtlasDbContext>(),
             sp.GetService<TimeProvider>() ?? TimeProvider.System));
+        services.AddScoped<IPublicPublicationReader>(sp => new EfPublicPublicationReader(
+            sp.GetRequiredService<VeritasAtlasDbContext>(),
+            sp.GetService<TimeProvider>() ?? TimeProvider.System));
         services.AddScoped<ITenantInvestigationStore, EfTenantInvestigationStore>();
         services.AddSingleton<ISourceFreshnessPolicyResolver, FailClosedSourceFreshnessPolicyResolver>();
         services.AddSingleton<ISourceRevisionEvidenceProvider, FailClosedSourceRevisionEvidenceProvider>();

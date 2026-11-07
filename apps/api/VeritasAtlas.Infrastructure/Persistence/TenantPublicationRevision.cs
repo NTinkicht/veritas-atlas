@@ -26,6 +26,24 @@ public sealed class TenantPublicationRevision
     public string? LastOperationId { get; set; }
 
     public string? LastAction { get; set; }
+
+    // VER-P0-16 slice 6 (#200): server-side public-reader facts. Defaults are the restrictive values, so a revision is
+    // never publicly readable until a later, separately authorised write path sets them truthfully.
+    public bool Restricted { get; set; } = true;
+
+    public bool Superseded { get; set; }
+
+    public DateTime? ExpiresAtUtc { get; set; }
+
+    public bool FreshnessRequired { get; set; } = true;
+
+    /// <summary>Current, NonCurrent or Unknown (see <c>EvidenceCurrency</c>).</summary>
+    public string EvidenceCurrency { get; set; } = "Unknown";
+
+    public bool HistoricalLabelPresent { get; set; }
+
+    /// <summary>JSON array of allow-listed public citations; read only through the allow-listed projection record.</summary>
+    public string? PublicCitationsJson { get; set; }
 }
 
 /// <summary>Append-only audit ledger row: one per applied transition of a <see cref="TenantPublicationRevision"/>.</summary>
