@@ -114,6 +114,43 @@ public sealed class EfTenantInvestigationEvidenceStore : ITenantInvestigationEvi
         return rows.Select(ToModel).ToList();
     }
 
+    public async Task<TenantInvestigationEvidenceComparisonModel?> CompareAsync(
+        Guid tenantId, Guid investigationId, Guid leftItemId, Guid rightItemId, CancellationToken cancellationToken)
+    {
+        RequireTenant(tenantId);
+        if (leftItemId == rightItemId)
+        {
+            throw new ArgumentException("Two distinct items are required.", nameof(rightItemId));
+        }
+
+        var rows = await (
+            from item in _db.TenantInvestigationEvidenceItems.AsNoTracking()
+            join v in _db.TenantEvidenceVerifications.AsNoTracking()
+                on new { item.TenantId, Id = item.EvidenceVerificationId } equals new { v.TenantId, v.Id }
+            where item.TenantId == tenantId && item.InvestigationId == investigationId
+                && (item.Id == leftItemId || item.Id == rightItemId)
+            select new ComparedEvidenceModel(
+                item.Id, v.Id, item.Note, v.ParentEvidenceRef, v.RawRetrievalId, v.AttestationId,
+                v.ParseRunId, v.CreatedAtUtc))
+            .ToListAsync(cancellationToken);
+
+        var left = rows.SingleOrDefault(x => x.ItemId == leftItemId);
+        var right = rows.SingleOrDefault(x => x.ItemId == rightItemId);
+        if (left is null || right is null)
+        {
+            return null;
+        }
+
+        left = left with { VerifiedAtUtc = DateTime.SpecifyKind(left.VerifiedAtUtc, DateTimeKind.Utc) };
+        right = right with { VerifiedAtUtc = DateTime.SpecifyKind(right.VerifiedAtUtc, DateTimeKind.Utc) };
+        return new TenantInvestigationEvidenceComparisonModel(
+            left, right,
+            string.Equals(left.ParentEvidenceRef, right.ParentEvidenceRef, StringComparison.Ordinal),
+            left.RawRetrievalId == right.RawRetrievalId,
+            left.AttestationId == right.AttestationId,
+            left.ParseRunId == right.ParseRunId);
+    }
+
     private Task<TenantInvestigationEvidenceItem?> FindAsync(
         Guid tenantId, Guid investigationId, Guid verificationId, CancellationToken cancellationToken) =>
         _db.TenantInvestigationEvidenceItems.AsNoTracking().SingleOrDefaultAsync(

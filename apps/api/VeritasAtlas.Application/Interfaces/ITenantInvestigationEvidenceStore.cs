@@ -15,7 +15,32 @@ public interface ITenantInvestigationEvidenceStore
     /// <summary>Null when the investigation does not exist in the tenant.</summary>
     Task<IReadOnlyList<TenantInvestigationEvidenceItemModel>?> ListAsync(
         Guid tenantId, Guid investigationId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// VER-P0-10 slice 3: read-only side-by-side comparison of two collected items. Null when the
+    /// investigation or either item is not in the caller tenant's investigation.
+    /// </summary>
+    Task<TenantInvestigationEvidenceComparisonModel?> CompareAsync(
+        Guid tenantId, Guid investigationId, Guid leftItemId, Guid rightItemId, CancellationToken cancellationToken);
 }
+
+public sealed record ComparedEvidenceModel(
+    Guid ItemId,
+    Guid EvidenceVerificationId,
+    string? Note,
+    string ParentEvidenceRef,
+    Guid RawRetrievalId,
+    Guid AttestationId,
+    Guid ParseRunId,
+    DateTime VerifiedAtUtc);
+
+public sealed record TenantInvestigationEvidenceComparisonModel(
+    ComparedEvidenceModel Left,
+    ComparedEvidenceModel Right,
+    bool SameEvidenceRef,
+    bool SameRawRetrieval,
+    bool SameAttestation,
+    bool SameParseRun);
 
 public sealed record EvidenceItemInput(Guid EvidenceVerificationId, string? Note, string CollectedBySubject);
 
