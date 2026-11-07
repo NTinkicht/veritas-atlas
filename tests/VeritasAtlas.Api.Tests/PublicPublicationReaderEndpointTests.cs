@@ -43,6 +43,14 @@ public sealed class PublicPublicationReaderEndpointTests
         bool Restricted = false, bool Superseded = false, string? Expires = null, bool FreshnessRequired = true,
         string Currency = "Current", bool HistoricalLabel = false, string? CitationsJson = Citations);
 
+    private static void AssertHardenedHeaders(HttpResponseMessage response, string label)
+    {
+        Assert.AreEqual("no-store", response.Headers.CacheControl?.ToString(), label);
+        Assert.AreEqual("nosniff", string.Join(",", response.Headers.GetValues("X-Content-Type-Options")), label);
+        Assert.AreEqual("no-referrer", string.Join(",", response.Headers.GetValues("Referrer-Policy")), label);
+        Assert.AreEqual("default-src 'none'; frame-ancestors 'none'", string.Join(",", response.Headers.GetValues("Content-Security-Policy")), label);
+    }
+
     [TestMethod]
     public async Task OnlyAPublishedPermittedUnrestrictedCurrentRevisionIsReadableWithTheExactAllowList()
     {
@@ -56,6 +64,7 @@ public sealed class PublicPublicationReaderEndpointTests
         using var response = await client.GetAsync($"{Public}/{id}");
         Assert.AreEqual(HttpStatusCode.OK, response.StatusCode);
         Assert.AreEqual("no-store", response.Headers.CacheControl?.ToString());
+        AssertHardenedHeaders(response, "visible");
         var json = await response.Content.ReadFromJsonAsync<JsonElement>();
         CollectionAssert.AreEquivalent(new[] { "id", "freshnessLabel", "citations" },
             json.EnumerateObject().Select(p => p.Name).ToArray());
@@ -90,6 +99,7 @@ public sealed class PublicPublicationReaderEndpointTests
         using var unknown = await client.GetAsync($"{Public}/{Guid.NewGuid()}");
         Assert.AreEqual(HttpStatusCode.NotFound, unknown.StatusCode);
         var unknownBody = await unknown.Content.ReadAsStringAsync();
+        AssertHardenedHeaders(unknown, "unknown id");
 
         var cases = new (string Label, string State, Facts Facts)[]
         {
@@ -113,6 +123,7 @@ public sealed class PublicPublicationReaderEndpointTests
             using var response = await client.GetAsync($"{Public}/{id}");
             Assert.AreEqual(HttpStatusCode.NotFound, response.StatusCode, label);
             Assert.AreEqual(unknownBody, await response.Content.ReadAsStringAsync(), label);
+            AssertHardenedHeaders(response, label);
         }
 
         // A freshly created, never-touched revision keeps the restrictive defaults and is hidden even if published.
