@@ -25,13 +25,18 @@ public sealed class PublicPublicationsController : ControllerBase
     [HttpGet("{id:guid}")]
     public async Task<IActionResult> Get(Guid id, CancellationToken cancellationToken)
     {
+        // Identical on every outcome (visible or hidden) so headers never reveal why a revision is hidden,
+        // and no intermediary may retain a response past publish/withdraw.
+        Response.Headers.CacheControl = "no-store";
+        Response.Headers["X-Content-Type-Options"] = "nosniff";
+        Response.Headers["Referrer-Policy"] = "no-referrer";
+        Response.Headers["Content-Security-Policy"] = "default-src 'none'; frame-ancestors 'none'";
         var view = await _reader.GetAsync(id, cancellationToken);
         if (view is null)
         {
             return NotFound(new PublicNotFound(PublicReaderDecision.AnonymousHiddenOutcome));
         }
 
-        Response.Headers.CacheControl = "no-store";
         return Ok(new PublicPublicationResponse(view.Id, view.FreshnessLabel, view.Citations));
     }
 
