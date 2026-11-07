@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using VeritasAtlas.Domain.Entities;
 using VeritasAtlas.Infrastructure.Configurations;
 
@@ -49,6 +49,8 @@ public sealed class VeritasAtlasDbContext : DbContext
 
     public DbSet<TenantPublicationTransition> TenantPublicationTransitions => Set<TenantPublicationTransition>();
 
+    public DbSet<TenantPublicationVisibilityChange> TenantPublicationVisibilityChanges => Set<TenantPublicationVisibilityChange>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfiguration(new PersonConfiguration());
@@ -78,6 +80,7 @@ public sealed class VeritasAtlasDbContext : DbContext
         modelBuilder.ApplyConfiguration(new TenantAuditEventConfiguration());
         modelBuilder.ApplyConfiguration(new TenantPublicationRevisionConfiguration());
         modelBuilder.ApplyConfiguration(new TenantPublicationTransitionConfiguration());
+        modelBuilder.ApplyConfiguration(new TenantPublicationVisibilityChangeConfiguration());
 
         base.OnModelCreating(modelBuilder);
     }

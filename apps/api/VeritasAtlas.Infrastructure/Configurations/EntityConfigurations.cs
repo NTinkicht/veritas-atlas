@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using VeritasAtlas.Domain.Entities;
@@ -1539,6 +1539,10 @@ public sealed class TenantPublicationRevisionConfiguration : IEntityTypeConfigur
                 "state <> 'Published' OR policy_permits_public_display");
             table.HasCheckConstraint("ck_tenant_publication_revisions_evidence_currency",
                 "evidence_currency IN ('Current','NonCurrent','Unknown')");
+            table.HasCheckConstraint("ck_tenant_publication_revisions_facts_version_nonnegative", "facts_version >= 0");
+            // Outside the Approved/Published line the public-reader facts are always the restrictive defaults.
+            table.HasCheckConstraint("ck_tenant_publication_revisions_facts_restrictive",
+                "state IN ('Approved','Published') OR (restricted AND NOT superseded AND expires_at_utc IS NULL AND freshness_required AND evidence_currency = 'Unknown' AND NOT historical_label_present AND public_citations IS NULL)");
         });
 
         builder.HasKey(x => new { x.TenantId, x.Id }).HasName("pk_tenant_publication_revisions");
@@ -1559,6 +1563,7 @@ public sealed class TenantPublicationRevisionConfiguration : IEntityTypeConfigur
         builder.Property(x => x.EvidenceCurrency).HasColumnName("evidence_currency").HasMaxLength(20).HasDefaultValue("Unknown").IsRequired();
         builder.Property(x => x.HistoricalLabelPresent).HasColumnName("historical_label_present").HasDefaultValue(false).IsRequired();
         builder.Property(x => x.PublicCitationsJson).HasColumnName("public_citations").HasColumnType("jsonb");
+        builder.Property(x => x.FactsVersion).HasColumnName("facts_version").HasDefaultValue(0L).IsRequired();
     }
 }
 
@@ -1591,6 +1596,41 @@ public sealed class TenantPublicationTransitionConfiguration : IEntityTypeConfig
             .WithMany()
             .HasForeignKey(x => new { x.TenantId, x.RevisionId })
             .HasConstraintName("fk_tenant_publication_transitions_tenant_revision")
+            .OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
+public sealed class TenantPublicationVisibilityChangeConfiguration : IEntityTypeConfiguration<VeritasAtlas.Infrastructure.Persistence.TenantPublicationVisibilityChange>
+{
+    public void Configure(EntityTypeBuilder<VeritasAtlas.Infrastructure.Persistence.TenantPublicationVisibilityChange> builder)
+    {
+        builder.ToTable("tenant_publication_visibility_changes", table =>
+        {
+            table.HasCheckConstraint("ck_tenant_publication_visibility_changes_versions", "facts_version >= 1 AND revision_version >= 0");
+            table.HasCheckConstraint("ck_tenant_publication_visibility_changes_kind", "kind IN ('Set','Reset')");
+            table.HasCheckConstraint("ck_tenant_publication_visibility_changes_text_not_blank",
+                "length(btrim(operation_id)) > 0 AND length(btrim(actor_id)) > 0 AND length(btrim(actor_role)) > 0");
+            table.HasCheckConstraint("ck_tenant_publication_visibility_changes_digest", "request_digest ~ '^[0-9a-f]{64}$'");
+        });
+
+        builder.HasKey(x => new { x.TenantId, x.RevisionId, x.FactsVersion }).HasName("pk_tenant_publication_visibility_changes");
+        builder.HasIndex(x => new { x.TenantId, x.RevisionId, x.OperationId }).IsUnique()
+            .HasDatabaseName("ux_tenant_publication_visibility_changes_operation");
+        builder.Property(x => x.TenantId).HasColumnName("tenant_id").IsRequired();
+        builder.Property(x => x.RevisionId).HasColumnName("revision_id").IsRequired();
+        builder.Property(x => x.FactsVersion).HasColumnName("facts_version").IsRequired();
+        builder.Property(x => x.RevisionVersion).HasColumnName("revision_version").IsRequired();
+        builder.Property(x => x.OperationId).HasColumnName("operation_id").HasMaxLength(220).IsRequired();
+        builder.Property(x => x.Kind).HasColumnName("kind").HasMaxLength(10).IsRequired();
+        builder.Property(x => x.RequestDigest).HasColumnName("request_digest").HasMaxLength(64).IsRequired();
+        builder.Property(x => x.ActorId).HasColumnName("actor_id").HasMaxLength(200).IsRequired();
+        builder.Property(x => x.ActorRole).HasColumnName("actor_role").HasMaxLength(20).IsRequired();
+        builder.Property(x => x.OccurredAtUtc).HasColumnName("occurred_at_utc").IsRequired();
+
+        builder.HasOne<VeritasAtlas.Infrastructure.Persistence.TenantPublicationRevision>()
+            .WithMany()
+            .HasForeignKey(x => new { x.TenantId, x.RevisionId })
+            .HasConstraintName("fk_tenant_publication_visibility_changes_tenant_revision")
             .OnDelete(DeleteBehavior.Restrict);
     }
 }

@@ -58,6 +58,7 @@ public sealed class TenantPublicationRevisionEndpointTests
             {
                 (HttpMethod.Post, Base, new { contentDigest = Digest, policyPermitsPublicDisplay = true }),
                 (HttpMethod.Get, $"{Base}/{id}", null),
+                (HttpMethod.Put, $"{Base}/{id}/visibility", new { expectedFactsVersion = 0, operationId = "op-v" }),
                 (HttpMethod.Post, $"{Base}/{id}/transitions",
                     new { action = "Submit", expectedVersion = 0, operationId = "op-1" }),
             })
@@ -267,7 +268,7 @@ public sealed class TenantPublicationRevisionEndpointTests
     {
         using var request = new HttpRequestMessage(method, path);
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", bearer);
-        if (method == HttpMethod.Post)
+        if (method == HttpMethod.Post || method == HttpMethod.Put)
         {
             request.Content = body is null
                 ? new StringContent(string.Empty, Encoding.UTF8, "application/json")
@@ -344,6 +345,14 @@ public sealed class TenantPublicationRevisionEndpointTests
         {
             Interlocked.Increment(ref _calls);
             return Task.FromResult(new PublicationTransitionResult(PublicationTransitionOutcome.NotFound, null, null));
+        }
+
+        public Task<VisibilityChangeResult> SetVisibilityAsync(
+            Guid tenantId, Guid revisionId, string actorId, LifecycleRole actorRole, PublicVisibilityFactsInput facts,
+            long expectedFactsVersion, string operationId, CancellationToken cancellationToken)
+        {
+            Interlocked.Increment(ref _calls);
+            return Task.FromResult(new VisibilityChangeResult(VisibilityOutcome.NotFound, null, null));
         }
     }
 

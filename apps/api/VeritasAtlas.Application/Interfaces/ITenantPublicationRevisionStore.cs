@@ -19,13 +19,26 @@ public interface ITenantPublicationRevisionStore
     Task<PublicationTransitionResult> TransitionAsync(
         Guid tenantId, Guid revisionId, string actorId, LifecycleRole actorRole, LifecycleAction action,
         long expectedVersion, string operationId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// VER-P0-16 slice 7 (#202): publisher-only, version-checked, audited write of the public-reader facts. Only legal while the
+    /// revision is Approved or Published; a lifecycle transition that leaves that line resets the facts to the restrictive defaults.
+    /// </summary>
+    Task<VisibilityChangeResult> SetVisibilityAsync(
+        Guid tenantId, Guid revisionId, string actorId, LifecycleRole actorRole, PublicVisibilityFactsInput facts,
+        long expectedFactsVersion, string operationId, CancellationToken cancellationToken);
 }
 
 public sealed record TenantPublicationRevisionModel(
     Guid Id, string AuthorId, string ContentDigest, string? ApprovedDigest, bool PolicyPermitsPublicDisplay,
-    LifecycleState State, long Version);
+    LifecycleState State, long Version, long FactsVersion = 0);
 
 public enum PublicationTransitionOutcome { Applied, Replayed, Denied, NotFound, ConcurrentUpdate }
 
 public sealed record PublicationTransitionResult(
     PublicationTransitionOutcome Outcome, string? DenialCode, TenantPublicationRevisionModel? Revision);
+
+public enum VisibilityOutcome { Applied, Replayed, Denied, NotFound, ConcurrentUpdate }
+
+public sealed record VisibilityChangeResult(
+    VisibilityOutcome Outcome, string? DenialCode, TenantPublicationRevisionModel? Revision);
