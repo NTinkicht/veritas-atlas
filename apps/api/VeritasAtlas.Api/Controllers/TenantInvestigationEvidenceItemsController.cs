@@ -94,6 +94,35 @@ public sealed class TenantInvestigationEvidenceItemsController : ControllerBase
             : Ok(new TenantInvestigationEvidenceItemListResponse(items.Select(ToResponse).ToList()));
     }
 
+    /// <summary>
+    /// VER-P0-10 slice 3: read-only comparison of two collected items. Only ids of items in the
+    /// caller tenant's investigation are accepted; anything else answers like an unknown id.
+    /// </summary>
+    [HttpGet("comparison")]
+    public async Task<IActionResult> Compare(
+        Guid investigationId, [FromQuery] Guid? left, [FromQuery] Guid? right, CancellationToken cancellationToken)
+    {
+        if (TenantClaim.GetTenantId(User) is not { } tenantId) return TenantRequired();
+        if (!HasExactlyOneRoleIn(User, ReaderRoles))
+        {
+            return Error(StatusCodes.Status403Forbidden, "role_not_permitted",
+                "The caller's role may not read collected evidence.");
+        }
+
+        if (left is not { } leftId || right is not { } rightId
+            || leftId == Guid.Empty || rightId == Guid.Empty || leftId == rightId)
+        {
+            return Error(StatusCodes.Status400BadRequest, "invalid_comparison",
+                "left and right must be two different collected evidence item ids.");
+        }
+
+        var comparison = await _store.CompareAsync(tenantId, investigationId, leftId, rightId, cancellationToken);
+        return comparison is null
+            ? Error(StatusCodes.Status404NotFound, "tenant_investigation_or_evidence_not_found",
+                "The investigation or evidence was not found.")
+            : Ok(comparison);
+    }
+
     /// <summary>Fail closed: the distinct role claims name exactly one role, and it is allowed.</summary>
     private static bool HasExactlyOneRoleIn(ClaimsPrincipal user, string[] allowed)
     {
