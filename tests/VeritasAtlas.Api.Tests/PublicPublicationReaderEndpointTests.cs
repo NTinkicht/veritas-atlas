@@ -194,9 +194,12 @@ public sealed class PublicPublicationReaderEndpointTests
         await using var conn = new NpgsqlConnection(connection);
         await conn.OpenAsync();
         await using var cmd = conn.CreateCommand();
-        // The guard trigger only allows lifecycle steps; the facts have no write path yet (follow-up slice).
+        // Simulates corrupt or legacy rows the write path could never produce (slice 7 keeps non-restrictive facts on the
+        // Approved/Published line only): the guard trigger and the restrictive-facts CHECK are bypassed so the reader's
+        // fail-closed behaviour is still proven against them. The database is reset per test.
         cmd.CommandText =
             "SET session_replication_role = replica; " +
+            "ALTER TABLE tenant_publication_revisions DROP CONSTRAINT IF EXISTS ck_tenant_publication_revisions_facts_restrictive; " +
             "UPDATE tenant_publication_revisions SET restricted = @r, superseded = @s, " +
             $"expires_at_utc = {(f.Expires ?? "NULL")}, freshness_required = @f, evidence_currency = @c, " +
             "historical_label_present = @h, public_citations = CAST(@p AS jsonb) WHERE id = @id";

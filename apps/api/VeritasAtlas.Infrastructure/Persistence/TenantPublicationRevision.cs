@@ -44,6 +44,9 @@ public sealed class TenantPublicationRevision
 
     /// <summary>JSON array of allow-listed public citations; read only through the allow-listed projection record.</summary>
     public string? PublicCitationsJson { get; set; }
+
+    /// <summary>Counts audited changes of the public-reader facts above (slice 7, #202); independent of the lifecycle <see cref="Version"/>.</summary>
+    public long FactsVersion { get; set; }
 }
 
 /// <summary>Append-only audit ledger row: one per applied transition of a <see cref="TenantPublicationRevision"/>.</summary>
@@ -63,6 +66,36 @@ public sealed class TenantPublicationTransition
     public string FromState { get; set; } = string.Empty;
 
     public string ToState { get; set; } = string.Empty;
+
+    public string ActorId { get; set; } = string.Empty;
+
+    public string ActorRole { get; set; } = string.Empty;
+
+    public DateTime OccurredAtUtc { get; set; }
+}
+
+/// <summary>
+/// Append-only audit ledger row: one per audited change of the public-reader facts (slice 7, #202). Kind is Set (publisher write)
+/// or Reset (facts returned to the restrictive defaults by a lifecycle transition that left the Approved/Published line).
+/// </summary>
+public sealed class TenantPublicationVisibilityChange
+{
+    public Guid TenantId { get; set; }
+
+    public Guid RevisionId { get; set; }
+
+    /// <summary>The revision <see cref="TenantPublicationRevision.FactsVersion"/> this change produced.</summary>
+    public long FactsVersion { get; set; }
+
+    /// <summary>The lifecycle version the revision had when the facts changed.</summary>
+    public long RevisionVersion { get; set; }
+
+    public string OperationId { get; set; } = string.Empty;
+
+    public string Kind { get; set; } = string.Empty;
+
+    /// <summary>SHA-256 (lowercase hex) of the canonical facts that were set; binds an operation id to its exact request.</summary>
+    public string RequestDigest { get; set; } = string.Empty;
 
     public string ActorId { get; set; } = string.Empty;
 
