@@ -13,6 +13,7 @@ The table mirrors `src/routeAudit.ts`. `src/routes.test.ts` fails when a route h
 | `/` | HomePage | REAL | none (navigation landing page, no data claims) |
 | `/dashboard` | DashboardPage | REAL | /api/v1/cases, /claims, /contradictions, /workflow-audit/entries (scenario snapshot only in Development) |
 | `/login` | LoginPage | REAL | /api/v1/auth/login |
+| `/public/publications/:id` | PublicPublicationPage | REAL | /api/v1/public/publications/{id} (anonymous, credential-free, fail-closed) |
 | `/evidence-search` | EvidenceSearchPage | REAL | /api/v1/tenant-evidence/search |
 | `/workflow-audit` | WorkflowAuditPage | REAL | /api/v1/workflow-audit/entries/clear |
 | `/persistence` | PersistenceConsolePage | SEEDED-OR-DEMO | /api/v1/persistence/snapshot/reset: scenario snapshot of the seeded workflow scenario |
