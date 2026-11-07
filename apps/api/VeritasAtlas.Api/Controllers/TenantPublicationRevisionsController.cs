@@ -129,6 +129,7 @@ public sealed partial class TenantPublicationRevisionsController : ControllerBas
             || expected < 0
             || string.IsNullOrWhiteSpace(operationId) || operationId.Length > MaxOperationIdLength
             || operationId.Any(char.IsControl)
+            || operationId.StartsWith(PublicVisibilityRules.ResetOperationPrefix, StringComparison.Ordinal)
             || citations.Count > PublicVisibilityRules.MaxCitations
             || citations.Any(c => c is not { CitationLabel: not null, Title: not null, Quote: not null, SourceName: not null, FreshnessLabel: not null }))
         {

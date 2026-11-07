@@ -21,6 +21,9 @@ public static class VisibilityDenials
 public static class PublicVisibilityRules
 {
     public const int MaxCitations = 50;
+
+    /// <summary>Ledger namespace reserved for audited Resets; publisher-supplied operation ids may not start with it.</summary>
+    public const string ResetOperationPrefix = "transition:";
     private const int MaxLabel = 100;
     private const int MaxTitle = 300;
     private const int MaxQuote = 2000;

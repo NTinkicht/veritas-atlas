@@ -73,6 +73,7 @@ public sealed class PublicVisibilityWritePathTests
             Facts(0, " "),
             Facts(0, new string('x', 201)),
             Facts(0, "bad\u0007id"),
+            Facts(0, "transition:withdraw-1"),
             Facts(0, "op", currency: "current"),
             Facts(0, "op", currency: "Bogus"),
             Facts(0, "op", citations: new object[] { new { citationLabel = "[1]" } }),
@@ -209,6 +210,15 @@ public sealed class PublicVisibilityWritePathTests
         Assert.AreEqual("transition:t4", audit[3].OperationId);
         Assert.IsTrue(audit.Take(3).All(a => a.ActorId == "synthetic-publisher" && a.ActorRole == "Publisher"));
         Assert.AreEqual(HttpStatusCode.Forbidden, (await Put(client, publisher, id, Facts(4, "v-after"))).StatusCode);
+
+        // The reset namespace is reserved: a publisher cannot pre-claim a transition's reset id and block its withdrawal.
+        var reserved = await CreateAsync(client, author, permits: true);
+        await Step(client, author, reserved, "Submit", 0, "r1");
+        await Step(client, reviewer, reserved, "Approve", 1, "r2");
+        Assert.AreEqual(HttpStatusCode.BadRequest,
+            (await Put(client, publisher, reserved, Facts(0, "transition:w-1"))).StatusCode);
+        Assert.AreEqual(HttpStatusCode.OK, (await Put(client, publisher, reserved, Facts(0, "w-1"))).StatusCode);
+        await Step(client, publisher, reserved, "Withdraw", 2, "w-1");
     }
 
     [TestMethod]

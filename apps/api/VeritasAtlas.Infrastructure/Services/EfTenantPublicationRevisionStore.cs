@@ -18,7 +18,7 @@ public sealed class EfTenantPublicationRevisionStore : ITenantPublicationRevisio
 {
     private const string UniqueViolation = "23505";
     private const int MaxText = 200;
-    private const string ResetOperationPrefix = "transition:";
+    private const string ResetOperationPrefix = PublicVisibilityRules.ResetOperationPrefix;
     private static readonly JsonSerializerOptions FactsJson = new(JsonSerializerDefaults.Web);
     private readonly VeritasAtlasDbContext _db;
     private readonly TimeProvider _time;
@@ -193,6 +193,12 @@ public sealed class EfTenantPublicationRevisionStore : ITenantPublicationRevisio
         if (actorRole != LifecycleRole.Publisher)
         {
             return VisibilityDenied(LifecycleDenials.RoleNotPermitted, row);
+        }
+
+        if (operationId.StartsWith(ResetOperationPrefix, StringComparison.Ordinal))
+        {
+            // Reset rows share the ledger's unique operation key; keeping the namespace reserved means a Set can never block a transition.
+            return VisibilityDenied(VisibilityDenials.InvalidFacts, row);
         }
 
         var digest = Sha256Hex(JsonSerializer.Serialize(new
