@@ -149,14 +149,7 @@ public sealed class EfTenantInvestigationStore : ITenantInvestigationStore
         }
     }
 
-    // Stricter than ck_tenant_investigations_title_shape: refuses any Unicode
-    // leading/trailing whitespace, and char.IsControl covers C0, DEL and C1.
-    private static bool IsTitle(string? value) =>
-        !string.IsNullOrWhiteSpace(value)
-        && value.Length <= TenantInvestigationLimits.MaxTitleLength
-        && !char.IsWhiteSpace(value[0])
-        && !char.IsWhiteSpace(value[^1])
-        && !value.Any(char.IsControl);
+    private static bool IsTitle(string? value) => TenantInvestigationLimits.IsValidTitle(value);
 
     // PostgreSQL stores microseconds: round-trip-stable values keep a created
     // result identical to a later read or replay of the same row.
