@@ -41,12 +41,14 @@ Source of truth is the test; this table is generated from it.
 | Endpoint (under `api/v1/`) | Roles answered with 403 |
 |---|---|
 | `DELETE tenant-investigations/{investigationId:guid}/evidence-items/{itemId:guid}/bookmark` | reviewer, publisher, admin, intruder |
+| `DELETE tenant-investigations/{investigationId:guid}/shares/{grantee}` | reviewer, publisher, admin, intruder |
 | `GET tenant-investigations` | intruder |
 | `GET tenant-investigations/{id:guid}` | intruder |
 | `GET tenant-investigations/{investigationId:guid}/bookmarks` | intruder |
 | `GET tenant-investigations/{investigationId:guid}/evidence-items` | intruder |
 | `GET tenant-investigations/{investigationId:guid}/evidence-items/comparison` | intruder |
 | `GET tenant-investigations/{investigationId:guid}/evidence-items/{itemId:guid}/annotations` | intruder |
+| `GET tenant-investigations/{investigationId:guid}/shares` | reviewer, publisher, admin, intruder |
 | `GET tenant-publication-revisions/{id:guid}` | admin, intruder |
 | `POST actions/seed/lifecycle` | analyst, intruder |
 | `POST persistence/reset` | operator, analyst, reviewer, publisher, intruder |
@@ -62,6 +64,7 @@ Source of truth is the test; this table is generated from it.
 | `POST tenant-sources` | operator, analyst, reviewer, publisher, intruder |
 | `POST workflow-audit/clear` | operator, analyst, reviewer, publisher, intruder |
 | `PUT tenant-investigations/{investigationId:guid}/evidence-items/{itemId:guid}/bookmark` | reviewer, publisher, admin, intruder |
+| `PUT tenant-investigations/{investigationId:guid}/shares/{grantee}` | reviewer, publisher, admin, intruder |
 | `PUT tenant-publication-revisions/{id:guid}/visibility` | operator, analyst, reviewer, admin, intruder |
 | `PUT tenant-sources/{id:guid}/fetch-policy` | operator, analyst, reviewer, publisher, intruder |
 

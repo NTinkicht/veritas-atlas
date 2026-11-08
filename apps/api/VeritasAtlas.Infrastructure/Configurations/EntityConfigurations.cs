@@ -1399,6 +1399,49 @@ public sealed class TenantInvestigationBookmarkConfiguration : IEntityTypeConfig
     }
 }
 
+public sealed class TenantInvestigationShareConfiguration : IEntityTypeConfiguration<VeritasAtlas.Infrastructure.Persistence.TenantInvestigationShare>
+{
+    public void Configure(EntityTypeBuilder<VeritasAtlas.Infrastructure.Persistence.TenantInvestigationShare> builder)
+    {
+        builder.ToTable("tenant_investigation_shares", table =>
+        {
+            table.HasCheckConstraint(
+                "ck_tenant_investigation_shares_tenant_id_not_empty",
+                "tenant_id <> '00000000-0000-0000-0000-000000000000'::uuid");
+            table.HasCheckConstraint(
+                "ck_tenant_investigation_shares_subject_shape",
+                "length(btrim(grantee_subject)) > 0 AND grantee_subject !~ '[\\x01-\\x1f\\x7f-\\x9f]' AND length(btrim(granted_by_subject)) > 0 AND granted_by_subject !~ '[\\x01-\\x1f\\x7f-\\x9f]'");
+            table.HasCheckConstraint(
+                "ck_tenant_investigation_shares_not_self",
+                "grantee_subject <> granted_by_subject");
+            table.HasCheckConstraint(
+                "ck_tenant_investigation_shares_revocation_shape",
+                "(revoked_at_utc IS NULL) = (revoked_by_subject IS NULL) AND (revoked_by_subject IS NULL OR (length(btrim(revoked_by_subject)) > 0 AND revoked_by_subject !~ '[\\x01-\\x1f\\x7f-\\x9f]'))");
+        });
+
+        builder.HasKey(x => new { x.TenantId, x.InvestigationId, x.GranteeSubject }).HasName("pk_tenant_investigation_shares");
+        builder.Property(x => x.TenantId).HasColumnName("tenant_id").IsRequired();
+        builder.Property(x => x.InvestigationId).HasColumnName("investigation_id").IsRequired();
+        builder.Property(x => x.GranteeSubject)
+            .HasColumnName("grantee_subject")
+            .HasMaxLength(VeritasAtlas.Application.Interfaces.TenantInvestigationLimits.MaxSubjectLength)
+            .IsRequired();
+        builder.Property(x => x.GrantedBySubject)
+            .HasColumnName("granted_by_subject")
+            .HasMaxLength(VeritasAtlas.Application.Interfaces.TenantInvestigationLimits.MaxSubjectLength)
+            .IsRequired();
+        builder.Property(x => x.GrantedAtUtc).HasColumnName("granted_at_utc").IsRequired();
+        builder.Property(x => x.RevokedAtUtc).HasColumnName("revoked_at_utc");
+        builder.Property(x => x.RevokedBySubject)
+            .HasColumnName("revoked_by_subject")
+            .HasMaxLength(VeritasAtlas.Application.Interfaces.TenantInvestigationLimits.MaxSubjectLength);
+
+        builder.HasIndex(x => new { x.TenantId, x.GranteeSubject, x.InvestigationId })
+            .HasDatabaseName("ix_tenant_investigation_shares_grantee");
+        // No FKs (append-only parents): the insert guard trigger checks the investigation and its creator.
+    }
+}
+
 public sealed class TenantInvestigationConfiguration : IEntityTypeConfiguration<VeritasAtlas.Infrastructure.Persistence.TenantInvestigation>
 {
     public void Configure(EntityTypeBuilder<VeritasAtlas.Infrastructure.Persistence.TenantInvestigation> builder)
