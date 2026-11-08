@@ -1175,6 +1175,58 @@ namespace VeritasAtlas.Infrastructure.Migrations
                         });
                 });
 
+            modelBuilder.Entity("VeritasAtlas.Infrastructure.Persistence.TenantInvestigationShare", b =>
+                {
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<Guid>("InvestigationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("investigation_id");
+
+                    b.Property<string>("GranteeSubject")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("grantee_subject");
+
+                    b.Property<string>("GrantedBySubject")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("granted_by_subject");
+
+                    b.Property<DateTime>("GrantedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("granted_at_utc");
+
+                    b.Property<DateTime?>("RevokedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("revoked_at_utc");
+
+                    b.Property<string>("RevokedBySubject")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("revoked_by_subject");
+
+                    b.HasKey("TenantId", "InvestigationId", "GranteeSubject")
+                        .HasName("pk_tenant_investigation_shares");
+
+                    b.HasIndex("TenantId", "GranteeSubject", "InvestigationId")
+                        .HasDatabaseName("ix_tenant_investigation_shares_grantee");
+
+                    b.ToTable("tenant_investigation_shares", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_tenant_investigation_shares_not_self", "grantee_subject <> granted_by_subject");
+
+                            t.HasCheckConstraint("ck_tenant_investigation_shares_revocation_shape", "(revoked_at_utc IS NULL) = (revoked_by_subject IS NULL) AND (revoked_by_subject IS NULL OR (length(btrim(revoked_by_subject)) > 0 AND revoked_by_subject !~ '[\\x01-\\x1f\\x7f-\\x9f]'))");
+
+                            t.HasCheckConstraint("ck_tenant_investigation_shares_subject_shape", "length(btrim(grantee_subject)) > 0 AND grantee_subject !~ '[\\x01-\\x1f\\x7f-\\x9f]' AND length(btrim(granted_by_subject)) > 0 AND granted_by_subject !~ '[\\x01-\\x1f\\x7f-\\x9f]'");
+
+                            t.HasCheckConstraint("ck_tenant_investigation_shares_tenant_id_not_empty", "tenant_id <> '00000000-0000-0000-0000-000000000000'::uuid");
+                        });
+                });
+
             modelBuilder.Entity("VeritasAtlas.Infrastructure.Persistence.TenantInvestigationEvidenceItem", b =>
                 {
                     b.Property<Guid>("TenantId")

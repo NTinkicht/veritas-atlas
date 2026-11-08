@@ -216,6 +216,7 @@ public sealed class AuthorizationMatrixTests
     private static readonly string[] PinnedMatrix =
     [
         "DELETE api/v1/tenant-investigations/{investigationId:guid}/evidence-items/{itemId:guid}/bookmark | denied: reviewer,publisher,admin,intruder",
+        "DELETE api/v1/tenant-investigations/{investigationId:guid}/shares/{grantee} | denied: reviewer,publisher,admin,intruder",
         "GET api/v1/agent-runs | denied: ",
         "GET api/v1/auth-diagnostics/protected | denied: ",
         "GET api/v1/auth/me | denied: ",
@@ -246,6 +247,7 @@ public sealed class AuthorizationMatrixTests
         "GET api/v1/tenant-investigations/{investigationId:guid}/evidence-items | denied: intruder",
         "GET api/v1/tenant-investigations/{investigationId:guid}/evidence-items/comparison | denied: intruder",
         "GET api/v1/tenant-investigations/{investigationId:guid}/evidence-items/{itemId:guid}/annotations | denied: intruder",
+        "GET api/v1/tenant-investigations/{investigationId:guid}/shares | denied: reviewer,publisher,admin,intruder",
         "GET api/v1/tenant-publication-revisions/{id:guid} | denied: admin,intruder",
         "GET api/v1/tenant-sources | denied: ",
         "GET api/v1/tenant-sources/{id:guid} | denied: ",
@@ -306,6 +308,7 @@ public sealed class AuthorizationMatrixTests
         "POST api/v1/tenant-sources | denied: operator,analyst,reviewer,publisher,intruder",
         "POST api/v1/workflow-audit/clear | denied: operator,analyst,reviewer,publisher,intruder",
         "PUT api/v1/tenant-investigations/{investigationId:guid}/evidence-items/{itemId:guid}/bookmark | denied: reviewer,publisher,admin,intruder",
+        "PUT api/v1/tenant-investigations/{investigationId:guid}/shares/{grantee} | denied: reviewer,publisher,admin,intruder",
         "PUT api/v1/tenant-publication-revisions/{id:guid}/visibility | denied: operator,analyst,reviewer,admin,intruder",
         "PUT api/v1/tenant-sources/{id:guid}/fetch-policy | denied: operator,analyst,reviewer,publisher,intruder"
     ];
