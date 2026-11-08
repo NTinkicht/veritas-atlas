@@ -57,6 +57,7 @@ public sealed class EfTenantInvestigationAnnotationStore : ITenantInvestigationA
             InvestigationId = investigationId,
             EvidenceItemId = evidenceItemId,
             Text = input.Text,
+            TextSha256 = Sha256Hex(input.Text),
             AuthorSubject = input.AuthorSubject,
             CreatedAtUtc = ToPostgresPrecision(_timeProvider.GetUtcNow().UtcDateTime)
         };
@@ -112,12 +113,20 @@ public sealed class EfTenantInvestigationAnnotationStore : ITenantInvestigationA
             x => x.TenantId == tenantId && x.InvestigationId == investigationId && x.Id == evidenceItemId,
             cancellationToken);
 
-    private Task<TenantInvestigationAnnotation?> FindAsync(
-        Guid tenantId, Guid evidenceItemId, AnnotationInput input, CancellationToken cancellationToken) =>
-        _db.TenantInvestigationAnnotations.AsNoTracking().SingleOrDefaultAsync(
+    // Replay key: the bounded digest narrows to at most one row; exact text equality then decides.
+    private async Task<TenantInvestigationAnnotation?> FindAsync(
+        Guid tenantId, Guid evidenceItemId, AnnotationInput input, CancellationToken cancellationToken)
+    {
+        var hash = Sha256Hex(input.Text);
+        var row = await _db.TenantInvestigationAnnotations.AsNoTracking().SingleOrDefaultAsync(
             x => x.TenantId == tenantId && x.EvidenceItemId == evidenceItemId
-                && x.AuthorSubject == input.AuthorSubject && x.Text == input.Text,
+                && x.AuthorSubject == input.AuthorSubject && x.TextSha256 == hash,
             cancellationToken);
+        return row is not null && string.Equals(row.Text, input.Text, StringComparison.Ordinal) ? row : null;
+    }
+
+    private static string Sha256Hex(string text) =>
+        Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(text)));
 
     private static void RequireTenant(Guid tenantId)
     {

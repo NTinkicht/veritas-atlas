@@ -1333,6 +1333,9 @@ public sealed class TenantInvestigationAnnotationConfiguration : IEntityTypeConf
                 "ck_tenant_investigation_annotations_text_shape",
                 "length(text) > 0 AND text = btrim(text) AND text !~ '[\\x01-\\x09\\x0b-\\x1f\\x7f-\\x9f]'");
             table.HasCheckConstraint(
+                "ck_tenant_investigation_annotations_text_sha256_shape",
+                "text_sha256 ~ '^[0-9a-f]{64}$'");
+            table.HasCheckConstraint(
                 "ck_tenant_investigation_annotations_author_shape",
                 "length(btrim(author_subject)) > 0 AND author_subject !~ '[\\x01-\\x1f\\x7f-\\x9f]'");
         });
@@ -1346,13 +1349,18 @@ public sealed class TenantInvestigationAnnotationConfiguration : IEntityTypeConf
             .HasColumnName("text")
             .HasMaxLength(VeritasAtlas.Application.Interfaces.TenantInvestigationAnnotationLimits.MaxTextLength)
             .IsRequired();
+        builder.Property(x => x.TextSha256)
+            .HasColumnName("text_sha256")
+            .HasMaxLength(64)
+            .IsFixedLength()
+            .IsRequired();
         builder.Property(x => x.AuthorSubject)
             .HasColumnName("author_subject")
             .HasMaxLength(VeritasAtlas.Application.Interfaces.TenantInvestigationLimits.MaxSubjectLength)
             .IsRequired();
         builder.Property(x => x.CreatedAtUtc).HasColumnName("created_at_utc").IsRequired();
 
-        builder.HasIndex(x => new { x.TenantId, x.EvidenceItemId, x.AuthorSubject, x.Text })
+        builder.HasIndex(x => new { x.TenantId, x.EvidenceItemId, x.AuthorSubject, x.TextSha256 })
             .IsUnique()
             .HasDatabaseName("ux_tenant_investigation_annotations_replay");
         builder.HasIndex(x => new { x.TenantId, x.EvidenceItemId, x.CreatedAtUtc })

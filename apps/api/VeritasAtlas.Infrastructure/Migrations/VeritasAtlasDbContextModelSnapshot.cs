@@ -1103,6 +1103,13 @@ namespace VeritasAtlas.Infrastructure.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("investigation_id");
 
+                    b.Property<string>("TextSha256")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character(64)")
+                        .IsFixedLength()
+                        .HasColumnName("text_sha256");
+
                     b.Property<string>("Text")
                         .IsRequired()
                         .HasMaxLength(1000)
@@ -1112,7 +1119,7 @@ namespace VeritasAtlas.Infrastructure.Migrations
                     b.HasKey("TenantId", "Id")
                         .HasName("pk_tenant_investigation_annotations");
 
-                    b.HasIndex("TenantId", "EvidenceItemId", "AuthorSubject", "Text")
+                    b.HasIndex("TenantId", "EvidenceItemId", "AuthorSubject", "TextSha256")
                         .IsUnique()
                         .HasDatabaseName("ux_tenant_investigation_annotations_replay");
 
@@ -1124,6 +1131,8 @@ namespace VeritasAtlas.Infrastructure.Migrations
                             t.HasCheckConstraint("ck_tenant_investigation_annotations_author_shape", "length(btrim(author_subject)) > 0 AND author_subject !~ '[\\x01-\\x1f\\x7f-\\x9f]'");
 
                             t.HasCheckConstraint("ck_tenant_investigation_annotations_tenant_id_not_empty", "tenant_id <> '00000000-0000-0000-0000-000000000000'::uuid");
+
+                            t.HasCheckConstraint("ck_tenant_investigation_annotations_text_sha256_shape", "text_sha256 ~ '^[0-9a-f]{64}$'");
 
                             t.HasCheckConstraint("ck_tenant_investigation_annotations_text_shape", "length(text) > 0 AND text = btrim(text) AND text !~ '[\\x01-\\x09\\x0b-\\x1f\\x7f-\\x9f]'");
                         });

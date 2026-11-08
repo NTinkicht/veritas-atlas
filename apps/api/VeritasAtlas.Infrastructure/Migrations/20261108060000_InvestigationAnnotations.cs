@@ -24,6 +24,7 @@ namespace VeritasAtlas.Infrastructure.Migrations
                     investigation_id = table.Column<Guid>(type: "uuid", nullable: false),
                     evidence_item_id = table.Column<Guid>(type: "uuid", nullable: false),
                     text = table.Column<string>(type: "character varying(1000)", maxLength: 1000, nullable: false),
+                    text_sha256 = table.Column<string>(type: "character(64)", fixedLength: true, maxLength: 64, nullable: false),
                     author_subject = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
                     created_at_utc = table.Column<DateTime>(type: "timestamp with time zone", nullable: false)
                 },
@@ -31,6 +32,7 @@ namespace VeritasAtlas.Infrastructure.Migrations
                 {
                     table.PrimaryKey("pk_tenant_investigation_annotations", x => new { x.tenant_id, x.id });
                     table.CheckConstraint("ck_tenant_investigation_annotations_author_shape", "length(btrim(author_subject)) > 0 AND author_subject !~ '[\\x01-\\x1f\\x7f-\\x9f]'");
+                    table.CheckConstraint("ck_tenant_investigation_annotations_text_sha256_shape", "text_sha256 ~ '^[0-9a-f]{64}$'");
                     table.CheckConstraint("ck_tenant_investigation_annotations_tenant_id_not_empty", "tenant_id <> '00000000-0000-0000-0000-000000000000'::uuid");
                     table.CheckConstraint("ck_tenant_investigation_annotations_text_shape", "length(text) > 0 AND text = btrim(text) AND text !~ '[\\x01-\\x09\\x0b-\\x1f\\x7f-\\x9f]'");
                 });
@@ -43,7 +45,7 @@ namespace VeritasAtlas.Infrastructure.Migrations
             migrationBuilder.CreateIndex(
                 name: "ux_tenant_investigation_annotations_replay",
                 table: "tenant_investigation_annotations",
-                columns: new[] { "tenant_id", "evidence_item_id", "author_subject", "text" },
+                columns: new[] { "tenant_id", "evidence_item_id", "author_subject", "text_sha256" },
                 unique: true);
             // Append-only, and a row may only reference an evidence item of the same tenant and
             // investigation (VER-P0-10 slice 4).

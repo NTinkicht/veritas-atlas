@@ -196,6 +196,35 @@ public sealed class TenantInvestigationAnnotationTests
     }
 
     [TestMethod]
+    public async Task MaxLengthIncompressibleMultibyteTextIsStoredAndReplayedOverRealPostgres()
+    {
+        if (Database() is not { } cs) return;
+        await TenantInvestigationEvidenceItemTests.ResetAsync(cs);
+        await using var db = new VeritasAtlasDbContext(TenantInvestigationEvidenceItemTests.Options(cs));
+        var verification = await TenantInvestigationEvidenceItemTests.SeedVerifiedAsync(db, TenantA, "a");
+        var inv = (await new EfTenantInvestigationStore(db, TimeProvider.System).CreateAsync(
+            TenantA, new InvestigationInput("k", "T", "synthetic"), CancellationToken.None)).Investigation!.Id;
+        var item = (await new EfTenantInvestigationEvidenceStore(db, TimeProvider.System).CollectAsync(
+            TenantA, inv, new EvidenceItemInput(verification, null, "synthetic"), CancellationToken.None)).Item!.Id;
+        var store = new EfTenantInvestigationAnnotationStore(db, TimeProvider.System);
+
+        // 1000 distinct CJK characters: about 3000 UTF-8 bytes and not compressible, which a
+        // full-text B-tree key would reject (index entry limit about 2704 bytes).
+        var text = new string(Enumerable.Range(0, TenantInvestigationAnnotationLimits.MaxTextLength)
+            .Select(i => (char)(0x4E00 + i * 7)).ToArray());
+        Assert.IsTrue(System.Text.Encoding.UTF8.GetByteCount(text) > 2800);
+        var added = await store.AddAsync(TenantA, inv, item, new AnnotationInput(text, "synthetic"), CancellationToken.None);
+        var replay = await store.AddAsync(TenantA, inv, item, new AnnotationInput(text, "synthetic"), CancellationToken.None);
+        var near = await store.AddAsync(TenantA, inv, item, new AnnotationInput(text[..^1] + "x", "synthetic"), CancellationToken.None);
+        Assert.AreEqual(AnnotationAddOutcome.Added, added.Outcome);
+        Assert.AreEqual(AnnotationAddOutcome.Replayed, replay.Outcome);
+        Assert.AreEqual(added.Annotation!.Id, replay.Annotation!.Id);
+        Assert.AreEqual(text, replay.Annotation.Text);
+        Assert.AreEqual(AnnotationAddOutcome.Added, near.Outcome);
+        Assert.AreEqual(2, await db.TenantInvestigationAnnotations.AsNoTracking().CountAsync());
+    }
+
+    [TestMethod]
     public async Task SchemaIsAppendOnlyAndGuardsReferencesOverRealPostgres()
     {
         if (Database() is not { } cs) return;

@@ -17,6 +17,9 @@ public sealed class TenantInvestigationAnnotation
 
     public string Text { get; set; } = string.Empty;
 
+    /// <summary>Lowercase hex SHA-256 of the UTF-8 text: a bounded replay key (a full-text B-tree key can exceed the index entry limit).</summary>
+    public string TextSha256 { get; set; } = string.Empty;
+
     public string AuthorSubject { get; set; } = string.Empty;
 
     public DateTime CreatedAtUtc { get; set; }
