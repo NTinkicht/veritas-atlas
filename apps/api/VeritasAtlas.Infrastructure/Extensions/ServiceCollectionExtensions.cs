@@ -78,6 +78,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<ITenantInvestigationStore, EfTenantInvestigationStore>();
         services.AddScoped<ITenantInvestigationEvidenceStore, EfTenantInvestigationEvidenceStore>();
         services.AddScoped<ITenantInvestigationAnnotationStore, EfTenantInvestigationAnnotationStore>();
+        services.AddScoped<ITenantInvestigationBookmarkStore, EfTenantInvestigationBookmarkStore>();
         services.AddSingleton<ISourceFreshnessPolicyResolver, FailClosedSourceFreshnessPolicyResolver>();
         services.AddSingleton<ISourceRevisionEvidenceProvider, FailClosedSourceRevisionEvidenceProvider>();
         services.AddScoped<IEvidenceFreshnessService>(sp => new EfEvidenceFreshnessService(
