@@ -74,6 +74,15 @@ public sealed class StatementClassifierV1Tests
     }
 
     [TestMethod]
+    public void Transposed_decimal_figure_is_unsupported_not_an_inference()
+    {
+        var chunk = Chunk("The operator shall keep inspection records for 1.5 years.");
+        var r = Run("The operator shall keep inspection records for 5.1 years.", chunk);
+        Assert.AreEqual(StatementClass.Unsupported, r.Class);
+        Assert.IsFalse(r.CanBecomeClaimCandidate);
+    }
+
+    [TestMethod]
     public void No_evidence_means_unsupported()
     {
         Assert.AreEqual(StatementClass.Unsupported, Run("The operator shall keep inspection records.").Class);

@@ -140,13 +140,19 @@ public static class StatementClassifierV1
     }
 
     // Letters and digits only, so an invented figure ("9") is a content word that must be present.
+    // A '.' or ',' between two digits stays inside the token so "1.5" and "5.1" stay distinct figures.
     private static List<string> Words(string text)
     {
         var words = new List<string>();
         var sb = new StringBuilder();
-        foreach (var ch in text)
+        for (var i = 0; i < text.Length; i++)
         {
+            var ch = text[i];
+            var numericSeparator = (ch == '.' || ch == ',')
+                && i > 0 && i + 1 < text.Length
+                && char.IsDigit(text[i - 1]) && char.IsDigit(text[i + 1]);
             if (char.IsLetterOrDigit(ch)) sb.Append(char.ToLowerInvariant(ch));
+            else if (numericSeparator) sb.Append(ch);
             else if (sb.Length > 0) { words.Add(sb.ToString()); sb.Clear(); }
         }
         if (sb.Length > 0) words.Add(sb.ToString());
