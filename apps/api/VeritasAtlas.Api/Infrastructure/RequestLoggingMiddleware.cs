@@ -21,15 +21,13 @@ public sealed class RequestLoggingMiddleware
 
         var method = context.Request.Method;
         var path = context.Request.Path.ToString();
-        var query = context.Request.QueryString.ToString();
 
         var startedAtUtc = DateTime.UtcNow;
 
         _logger.LogInformation(
-            "Request started {Method} {Path}{Query} CorrelationId={CorrelationId}",
+            "Request started {Method} {Path} CorrelationId={CorrelationId}",
             method,
             path,
-            query,
             correlationId);
 
         try
@@ -39,11 +37,10 @@ public sealed class RequestLoggingMiddleware
             var elapsedMs = (DateTime.UtcNow - startedAtUtc).TotalMilliseconds;
 
             _logger.LogInformation(
-                "Request completed {Method} {Path}{Query} StatusCode={StatusCode} ElapsedMs={ElapsedMs} CorrelationId={CorrelationId}",
+                "Request completed {Method} {Path} StatusCode={StatusCode} ElapsedMs={ElapsedMs} CorrelationId={CorrelationId}",
                 method,
                 path,
-                query,
-                context.Response.StatusCode,
+                    context.Response.StatusCode,
                 Math.Round(elapsedMs, 2),
                 correlationId);
         }
@@ -53,11 +50,10 @@ public sealed class RequestLoggingMiddleware
 
             _logger.LogError(
                 ex,
-                "Request failed {Method} {Path}{Query} ElapsedMs={ElapsedMs} CorrelationId={CorrelationId}",
+                "Request failed {Method} {Path} ElapsedMs={ElapsedMs} CorrelationId={CorrelationId}",
                 method,
                 path,
-                query,
-                Math.Round(elapsedMs, 2),
+                    Math.Round(elapsedMs, 2),
                 correlationId);
 
             throw;

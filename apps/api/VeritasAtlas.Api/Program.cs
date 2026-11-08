@@ -1,6 +1,7 @@
-using Microsoft.AspNetCore.Authentication.JwtBearer;
+﻿using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using VeritasAtlas.Api.Infrastructure;
 using VeritasAtlas.Api.Infrastructure.Health;
 using Microsoft.AspNetCore.RateLimiting;
 using VeritasAtlas.Api.Infrastructure.Auth;
@@ -89,6 +90,9 @@ builder.Services.AddAuthorization(options =>
 
 var app = builder.Build();
 
+app.UseMiddleware<CorrelationIdMiddleware>();
+app.UseMiddleware<ExceptionHandlingMiddleware>();
+app.UseMiddleware<RequestLoggingMiddleware>();
 app.UseRouting();
 app.UseRateLimiter();
 app.UseCors("Frontend");
