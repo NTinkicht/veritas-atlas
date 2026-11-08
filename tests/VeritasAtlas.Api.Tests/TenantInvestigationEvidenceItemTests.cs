@@ -288,7 +288,7 @@ public sealed class TenantInvestigationEvidenceItemTests
 
     private sealed record Created(Guid Id);
 
-    private static async Task<Guid> CreateInvestigationAsync(HttpClient client, string bearer, string key = "k1")
+    internal static async Task<Guid> CreateInvestigationAsync(HttpClient client, string bearer, string key = "k1")
     {
         using var response = await Send(client, HttpMethod.Post, "/api/v1/tenant-investigations", bearer, new { creationKey = key, title = "Case" });
         Assert.AreEqual(HttpStatusCode.Created, response.StatusCode);
@@ -302,7 +302,7 @@ public sealed class TenantInvestigationEvidenceItemTests
                 c.PublisherIdentity, c.BindingMechanism, c.BindingReference, c.FinalUri, c.ContentSha256, true));
     }
 
-    private static async Task<Guid> SeedVerifiedAsync(VeritasAtlasDbContext db, Guid tenant, string key)
+    internal static async Task<Guid> SeedVerifiedAsync(VeritasAtlasDbContext db, Guid tenant, string key)
     {
         var at = new DateTime(2026, 11, 2, 9, 0, 0, DateTimeKind.Utc);
         var source = await new EfTenantSourceRegistry(db, TimeProvider.System)
@@ -328,7 +328,7 @@ public sealed class TenantInvestigationEvidenceItemTests
         return verify.Verification!.Id;
     }
 
-    private static async Task<HttpResponseMessage> Send(
+    internal static async Task<HttpResponseMessage> Send(
         HttpClient client, HttpMethod method, string path, string bearer, object? body = null)
     {
         using var request = new HttpRequestMessage(method, path);
@@ -351,17 +351,17 @@ public sealed class TenantInvestigationEvidenceItemTests
         return builder.ConnectionString;
     }
 
-    private static DbContextOptions<VeritasAtlasDbContext> Options(string connectionString) =>
+    internal static DbContextOptions<VeritasAtlasDbContext> Options(string connectionString) =>
         new DbContextOptionsBuilder<VeritasAtlasDbContext>().UseNpgsql(connectionString).Options;
 
-    private static async Task ResetAsync(string connectionString)
+    internal static async Task ResetAsync(string connectionString)
     {
         await using var db = new VeritasAtlasDbContext(Options(connectionString));
         await db.Database.EnsureDeletedAsync();
         await db.Database.MigrateAsync();
     }
 
-    private static string Sign(string? name, string[] roles, string[] tenants)
+    internal static string Sign(string? name, string[] roles, string[] tenants)
     {
         var claims = new List<Claim> { new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString("N")) };
         if (name is not null) claims.Add(new Claim(ClaimTypes.Name, name));
