@@ -149,6 +149,17 @@ public sealed class EfTenantInvestigationShareStore : ITenantInvestigationShareS
                  && x.GranteeSubject == subject && x.RevokedAtUtc == null, cancellationToken);
     }
 
+    public async Task<IReadOnlySet<Guid>> ListActiveGrantedInvestigationIdsAsync(
+        Guid tenantId, string subject, CancellationToken cancellationToken)
+    {
+        Require(tenantId, subject);
+        var ids = await _db.TenantInvestigationShares.AsNoTracking()
+            .Where(x => x.TenantId == tenantId && x.GranteeSubject == subject && x.RevokedAtUtc == null)
+            .Select(x => x.InvestigationId)
+            .ToListAsync(cancellationToken);
+        return ids.ToHashSet();
+    }
+
     private async Task<ShareGrantResult> ReactivateAsync(
         Guid tenantId, Guid investigationId, string owner, string grantee, DateTime now, CancellationToken cancellationToken)
     {
