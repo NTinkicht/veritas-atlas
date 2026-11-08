@@ -137,6 +137,15 @@ public sealed class StatementClassifierV1Tests
     }
 
     [TestMethod]
+    public void Null_chunk_list_fails_closed_instead_of_throwing()
+    {
+        var r = StatementClassifierV1.Classify(Tenant, "The operator", null!);
+        Assert.AreEqual(StatementClassificationFailure.InvalidChunk, r.Failure);
+        Assert.AreEqual("null_chunks", r.Reason);
+        Assert.IsFalse(r.CanBecomeClaimCandidate);
+    }
+
+    [TestMethod]
     public void Content_word_threshold_is_inclusive_at_the_minimum()
     {
         var chunk = Chunk(Text);

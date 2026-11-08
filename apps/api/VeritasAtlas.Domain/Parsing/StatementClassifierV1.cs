@@ -85,7 +85,8 @@ public static class StatementClassifierV1
     public static StatementClassification Classify(
         Guid tenantId, string statement, IReadOnlyList<EvidenceChunk> chunks)
     {
-        ArgumentNullException.ThrowIfNull(chunks);
+        if (chunks is null)
+            return StatementClassification.Fail(StatementClassificationFailure.InvalidChunk, "null_chunks");
         if (tenantId == Guid.Empty)
             return StatementClassification.Fail(StatementClassificationFailure.MissingTenant, "missing_tenant");
         if (string.IsNullOrWhiteSpace(statement) || statement.Length > MaxStatementLength
