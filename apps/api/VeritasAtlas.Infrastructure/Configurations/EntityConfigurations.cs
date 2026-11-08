@@ -1369,6 +1369,36 @@ public sealed class TenantInvestigationAnnotationConfiguration : IEntityTypeConf
     }
 }
 
+public sealed class TenantInvestigationBookmarkConfiguration : IEntityTypeConfiguration<VeritasAtlas.Infrastructure.Persistence.TenantInvestigationBookmark>
+{
+    public void Configure(EntityTypeBuilder<VeritasAtlas.Infrastructure.Persistence.TenantInvestigationBookmark> builder)
+    {
+        builder.ToTable("tenant_investigation_bookmarks", table =>
+        {
+            table.HasCheckConstraint(
+                "ck_tenant_investigation_bookmarks_tenant_id_not_empty",
+                "tenant_id <> '00000000-0000-0000-0000-000000000000'::uuid");
+            table.HasCheckConstraint(
+                "ck_tenant_investigation_bookmarks_subject_shape",
+                "length(btrim(subject)) > 0 AND subject !~ '[\\x01-\\x1f\\x7f-\\x9f]'");
+        });
+
+        builder.HasKey(x => new { x.TenantId, x.EvidenceItemId, x.Subject }).HasName("pk_tenant_investigation_bookmarks");
+        builder.Property(x => x.TenantId).HasColumnName("tenant_id").IsRequired();
+        builder.Property(x => x.EvidenceItemId).HasColumnName("evidence_item_id").IsRequired();
+        builder.Property(x => x.Subject)
+            .HasColumnName("subject")
+            .HasMaxLength(VeritasAtlas.Application.Interfaces.TenantInvestigationLimits.MaxSubjectLength)
+            .IsRequired();
+        builder.Property(x => x.InvestigationId).HasColumnName("investigation_id").IsRequired();
+        builder.Property(x => x.CreatedAtUtc).HasColumnName("created_at_utc").IsRequired();
+
+        builder.HasIndex(x => new { x.TenantId, x.InvestigationId, x.Subject, x.CreatedAtUtc })
+            .HasDatabaseName("ix_tenant_investigation_bookmarks_subject");
+        // No FKs (append-only parents): the insert guard trigger checks the item reference.
+    }
+}
+
 public sealed class TenantInvestigationConfiguration : IEntityTypeConfiguration<VeritasAtlas.Infrastructure.Persistence.TenantInvestigation>
 {
     public void Configure(EntityTypeBuilder<VeritasAtlas.Infrastructure.Persistence.TenantInvestigation> builder)

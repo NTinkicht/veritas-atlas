@@ -1138,6 +1138,43 @@ namespace VeritasAtlas.Infrastructure.Migrations
                         });
                 });
 
+            modelBuilder.Entity("VeritasAtlas.Infrastructure.Persistence.TenantInvestigationBookmark", b =>
+                {
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<Guid>("EvidenceItemId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("evidence_item_id");
+
+                    b.Property<string>("Subject")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("subject");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<Guid>("InvestigationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("investigation_id");
+
+                    b.HasKey("TenantId", "EvidenceItemId", "Subject")
+                        .HasName("pk_tenant_investigation_bookmarks");
+
+                    b.HasIndex("TenantId", "InvestigationId", "Subject", "CreatedAtUtc")
+                        .HasDatabaseName("ix_tenant_investigation_bookmarks_subject");
+
+                    b.ToTable("tenant_investigation_bookmarks", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_tenant_investigation_bookmarks_subject_shape", "length(btrim(subject)) > 0 AND subject !~ '[\\x01-\\x1f\\x7f-\\x9f]'");
+
+                            t.HasCheckConstraint("ck_tenant_investigation_bookmarks_tenant_id_not_empty", "tenant_id <> '00000000-0000-0000-0000-000000000000'::uuid");
+                        });
+                });
+
             modelBuilder.Entity("VeritasAtlas.Infrastructure.Persistence.TenantInvestigationEvidenceItem", b =>
                 {
                     b.Property<Guid>("TenantId")
