@@ -31,6 +31,7 @@ query -> evidence -> claims -> review -> publication:
   `admin`; visibility changes are denied to everyone except `publisher`; anonymous readers see only explicitly PUBLISHED,
   public-scope revisions.
 - Tenant source registry writes (create, fetch policy): denied to every role except `admin`.
+- Legacy destructive `POST persistence/reset` and `POST workflow-audit/clear`: denied to every role except `admin`.
 
 ## Pinned matrix (endpoints where at least one role is denied with 403)
 
@@ -48,6 +49,7 @@ Source of truth is the test; this table is generated from it.
 | `GET tenant-investigations/{investigationId:guid}/evidence-items/{itemId:guid}/annotations` | intruder |
 | `GET tenant-publication-revisions/{id:guid}` | admin, intruder |
 | `POST actions/seed/lifecycle` | analyst, intruder |
+| `POST persistence/reset` | operator, analyst, reviewer, publisher, intruder |
 | `POST tenant-answers/compose` | intruder |
 | `POST tenant-answers/serve-check` | intruder |
 | `POST tenant-claims/confidence` | intruder |
@@ -58,6 +60,7 @@ Source of truth is the test; this table is generated from it.
 | `POST tenant-publication-revisions` | reviewer, publisher, admin, intruder |
 | `POST tenant-publication-revisions/{id:guid}/transitions` | admin, intruder |
 | `POST tenant-sources` | operator, analyst, reviewer, publisher, intruder |
+| `POST workflow-audit/clear` | operator, analyst, reviewer, publisher, intruder |
 | `PUT tenant-investigations/{investigationId:guid}/evidence-items/{itemId:guid}/bookmark` | reviewer, publisher, admin, intruder |
 | `PUT tenant-publication-revisions/{id:guid}/visibility` | operator, analyst, reviewer, admin, intruder |
 | `PUT tenant-sources/{id:guid}/fetch-policy` | operator, analyst, reviewer, publisher, intruder |
@@ -66,8 +69,8 @@ Source of truth is the test; this table is generated from it.
 
 1. **Unknown roles pass on legacy endpoints.** An authenticated token with an
    unrecognized role is not denied by any of the legacy non-tenant endpoints
-   (about 70 routes), including the destructive `POST persistence/reset` and
-   `POST workflow-audit/clear`, which any authenticated role may call. See #237.
+   (about 70 routes). The destructive `POST persistence/reset` and
+   `POST workflow-audit/clear` are now admin-only (#237).
 2. **Probe limitation.** The probe sends an empty JSON body. Endpoints that
    answer 400 from model binding do so before in-action role checks, so their
    role gating is not asserted by this matrix (rows with no denied role may

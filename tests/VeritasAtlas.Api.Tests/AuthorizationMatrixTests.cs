@@ -123,7 +123,7 @@ public sealed class AuthorizationMatrixTests
         "POST api/v1/contradictions | denied: ",
         "POST api/v1/documents | denied: ",
         "POST api/v1/evidence | denied: ",
-        "POST api/v1/persistence/reset | denied: ",
+        "POST api/v1/persistence/reset | denied: operator,analyst,reviewer,publisher,intruder",
         "POST api/v1/persons | denied: ",
         "POST api/v1/persons/{id:guid}/aliases | denied: ",
         "POST api/v1/publication-workflow/cases/{caseId}/hold | denied: ",
@@ -148,7 +148,7 @@ public sealed class AuthorizationMatrixTests
         "POST api/v1/tenant-publication-revisions | denied: reviewer,publisher,admin,intruder",
         "POST api/v1/tenant-publication-revisions/{id:guid}/transitions | denied: admin,intruder",
         "POST api/v1/tenant-sources | denied: operator,analyst,reviewer,publisher,intruder",
-        "POST api/v1/workflow-audit/clear | denied: ",
+        "POST api/v1/workflow-audit/clear | denied: operator,analyst,reviewer,publisher,intruder",
         "PUT api/v1/tenant-investigations/{investigationId:guid}/evidence-items/{itemId:guid}/bookmark | denied: reviewer,publisher,admin,intruder",
         "PUT api/v1/tenant-publication-revisions/{id:guid}/visibility | denied: operator,analyst,reviewer,admin,intruder",
         "PUT api/v1/tenant-sources/{id:guid}/fetch-policy | denied: operator,analyst,reviewer,publisher,intruder"

@@ -10,6 +10,8 @@ namespace VeritasAtlas.Api.Controllers;
 [Route("api/v1/workflow-audit")]
 public class WorkflowAuditController : ControllerBase
 {
+    private static readonly string[] AdminRoles = ["admin"];
+
     private readonly WorkflowAuditStore _workflowAuditStore;
     private readonly WorkflowIntegrityService _workflowIntegrityService;
 
@@ -44,6 +46,12 @@ public class WorkflowAuditController : ControllerBase
     [HttpPost("clear")]
     public async Task<IActionResult> Clear(CancellationToken cancellationToken)
     {
+        // Destructive: admin only, fail closed for every other or unknown role (#237).
+        if (!TenantAnswerServeCheckController.HasExactlyOneRoleIn(User, AdminRoles))
+        {
+            return StatusCode(StatusCodes.Status403Forbidden);
+        }
+
         await _workflowAuditStore.ClearAsync(cancellationToken);
         return Ok(new { Cleared = true, TimestampUtc = DateTime.UtcNow });
     }
