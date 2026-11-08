@@ -22,6 +22,13 @@ public interface ITenantInvestigationShareStore
     /// <summary>True only for the creator or a subject holding an active grant in the same tenant.</summary>
     Task<bool> IsAuthorizedAsync(
         Guid tenantId, Guid investigationId, string subject, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Ids of this tenant's investigations the subject holds an active grant on (the subject's
+    /// own investigations are not included: the caller already knows those from the creator).
+    /// </summary>
+    Task<IReadOnlySet<Guid>> ListActiveGrantedInvestigationIdsAsync(
+        Guid tenantId, string subject, CancellationToken cancellationToken);
 }
 
 public sealed record TenantInvestigationShareModel(

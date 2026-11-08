@@ -57,7 +57,6 @@ public sealed class TenantInvestigationEndpointTests
         {
             using var create = await Send(client, HttpMethod.Post, Path, bearer, new { creationKey = "k1", title = "T" });
             Assert.AreEqual(HttpStatusCode.Forbidden, create.StatusCode, label);
-            if (label is not ("no name" or "control name"))
             {
                 using var get = await Send(client, HttpMethod.Get, $"{Path}/{id}", bearer);
                 using var list = await Send(client, HttpMethod.Get, Path, bearer);
@@ -140,10 +139,34 @@ public sealed class TenantInvestigationEndpointTests
         var bInv = (await b.Content.ReadFromJsonAsync<Investigation>())!;
         Assert.AreNotEqual(first.Id, bInv.Id);
 
-        // A reviewer in the same tenant may read.
+        // VER-P0-10 slice 7: a reviewer in the same tenant sees nothing until the creator shares it.
+        using var unshared = await Send(client, HttpMethod.Get, $"{Path}/{first.Id}", reviewerA);
+        using var unsharedList = await Send(client, HttpMethod.Get, Path, reviewerA);
+        using var unknownForReviewer = await Send(client, HttpMethod.Get, $"{Path}/{Guid.NewGuid()}", reviewerA);
+        Assert.AreEqual(HttpStatusCode.NotFound, unshared.StatusCode);
+        Assert.AreEqual(await unknownForReviewer.Content.ReadAsStringAsync(), await unshared.Content.ReadAsStringAsync());
+        Assert.AreEqual(0, (await unsharedList.Content.ReadFromJsonAsync<InvestigationList>())!.Items.Count);
+
+        using var grant = await Send(client, HttpMethod.Put, $"{Path}/{first.Id}/shares/synthetic-reviewer-a", analystA);
+        Assert.IsTrue(grant.IsSuccessStatusCode, await grant.Content.ReadAsStringAsync());
         using var read = await Send(client, HttpMethod.Get, $"{Path}/{first.Id}", reviewerA);
         Assert.AreEqual(HttpStatusCode.OK, read.StatusCode);
         Assert.AreEqual(first, await read.Content.ReadFromJsonAsync<Investigation>());
+        using var sharedList = await Send(client, HttpMethod.Get, Path, reviewerA);
+        CollectionAssert.AreEqual(new[] { first.Id },
+            (await sharedList.Content.ReadFromJsonAsync<InvestigationList>())!.Items.Select(x => x.Id).ToArray());
+
+        // Another tenant's analyst with the same name is not a grantee of this tenant's investigation.
+        var namesake = Sign("synthetic-reviewer-a", ["analyst"], [TenantB.ToString("D")]);
+        using var namesakeRead = await Send(client, HttpMethod.Get, $"{Path}/{first.Id}", namesake);
+        Assert.AreEqual(HttpStatusCode.NotFound, namesakeRead.StatusCode);
+
+        using var revoke = await Send(client, HttpMethod.Delete, $"{Path}/{first.Id}/shares/synthetic-reviewer-a", analystA);
+        Assert.IsTrue(revoke.IsSuccessStatusCode, await revoke.Content.ReadAsStringAsync());
+        using var afterRevoke = await Send(client, HttpMethod.Get, $"{Path}/{first.Id}", reviewerA);
+        using var afterRevokeList = await Send(client, HttpMethod.Get, Path, reviewerA);
+        Assert.AreEqual(HttpStatusCode.NotFound, afterRevoke.StatusCode);
+        Assert.AreEqual(0, (await afterRevokeList.Content.ReadFromJsonAsync<InvestigationList>())!.Items.Count);
 
         using var cross = await Send(client, HttpMethod.Get, $"{Path}/{bInv.Id}", analystA);
         using var unknown = await Send(client, HttpMethod.Get, $"{Path}/{Guid.NewGuid()}", analystA);
@@ -158,7 +181,10 @@ public sealed class TenantInvestigationEndpointTests
 
         // Exactly one audit event per created investigation, in its own tenant.
         await using var db = new VeritasAtlasDbContext(Options(connectionString));
-        var audits = await db.TenantAuditEvents.AsNoTracking().ToListAsync();
+        var all = await db.TenantAuditEvents.AsNoTracking().ToListAsync();
+        Assert.AreEqual(2, all.Count(e => e.Action == "investigation.share_granted"
+            || e.Action == "investigation.share_revoked"), "one grant and one revoke event");
+        var audits = all.Where(e => e.Action == "investigation.created").ToList();
         Assert.AreEqual(2, audits.Count, "replay and conflict write no event");
         Assert.AreEqual("synthetic-analyst-a", audits.Single(e => e.TenantId == TenantA).ActorSubject);
         Assert.AreEqual(first.Id.ToString("D"), audits.Single(e => e.TenantId == TenantA).EntityId);

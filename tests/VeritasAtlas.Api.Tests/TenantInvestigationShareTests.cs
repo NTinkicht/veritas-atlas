@@ -361,6 +361,13 @@ public sealed class TenantInvestigationShareTests
             Interlocked.Increment(ref _calls);
             return Task.FromResult(false);
         }
+
+        public Task<IReadOnlySet<Guid>> ListActiveGrantedInvestigationIdsAsync(
+            Guid tenantId, string subject, CancellationToken cancellationToken)
+        {
+            Interlocked.Increment(ref _calls);
+            return Task.FromResult<IReadOnlySet<Guid>>(new HashSet<Guid>());
+        }
     }
 
     private sealed class ApiFactory(string? connectionString = null, ITenantInvestigationShareStore? store = null)

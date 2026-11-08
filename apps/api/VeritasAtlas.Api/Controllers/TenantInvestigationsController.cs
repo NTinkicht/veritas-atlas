@@ -21,10 +21,12 @@ public sealed class TenantInvestigationsController : ControllerBase
     private static readonly string[] ReaderRoles = ["operator", "analyst", "reviewer", "publisher", "admin"];
 
     private readonly ITenantInvestigationStore _store;
+    private readonly ITenantInvestigationShareStore _shares;
 
-    public TenantInvestigationsController(ITenantInvestigationStore store)
+    public TenantInvestigationsController(ITenantInvestigationStore store, ITenantInvestigationShareStore shares)
     {
         _store = store;
+        _shares = shares;
     }
 
     [HttpPost]
@@ -34,15 +36,7 @@ public sealed class TenantInvestigationsController : ControllerBase
     {
         if (TenantClaim.GetTenantId(User) is not { } tenantId) return TenantRequired();
 
-        var actor = User.FindFirstValue(ClaimTypes.Name);
-        if (string.IsNullOrWhiteSpace(actor)
-            || actor.Length > TenantInvestigationLimits.MaxSubjectLength
-            || actor.Length > TenantAuditEventLimits.MaxSubjectLength
-            || actor.Any(char.IsControl))
-        {
-            return Error(StatusCodes.Status403Forbidden, "actor_required",
-                "The access token carries no usable subject name.");
-        }
+        if (ActorOrRefusal() is not { } actor) return ActorRequired();
 
         if (!HasExactlyOneRoleIn(User, AuthorRoles))
         {
@@ -82,9 +76,13 @@ public sealed class TenantInvestigationsController : ControllerBase
     {
         if (Refuse() is { } refusal) return refusal;
         var tenantId = TenantClaim.GetTenantId(User)!.Value;
+        var actor = ActorOrRefusal()!;
 
-        var entry = await _store.GetAsync(tenantId, id, cancellationToken);
-        // Anti-oracle: another tenant's id is answered exactly like an unknown id.
+        // Only the creator or an active grantee may open it (VER-P0-10 slice 7). Anti-oracle:
+        // another tenant's id, an unshared id and an unknown id are answered identically.
+        var entry = await _shares.IsAuthorizedAsync(tenantId, id, actor, cancellationToken)
+            ? await _store.GetAsync(tenantId, id, cancellationToken)
+            : null;
         return entry is null
             ? Error(StatusCodes.Status404NotFound, "tenant_investigation_not_found",
                 "The investigation was not found.")
@@ -97,18 +95,41 @@ public sealed class TenantInvestigationsController : ControllerBase
         if (Refuse() is { } refusal) return refusal;
         var tenantId = TenantClaim.GetTenantId(User)!.Value;
 
+        var actor = ActorOrRefusal()!;
+
         var entries = await _store.ListAsync(tenantId, cancellationToken);
-        return Ok(new TenantInvestigationListResponse(entries.Select(ToResponse).ToList()));
+        var granted = await _shares.ListActiveGrantedInvestigationIdsAsync(tenantId, actor, cancellationToken);
+        var visible = entries.Where(e =>
+            string.Equals(e.CreatedBySubject, actor, StringComparison.Ordinal) || granted.Contains(e.Id));
+        return Ok(new TenantInvestigationListResponse(visible.Select(ToResponse).ToList()));
     }
 
     private ObjectResult? Refuse()
     {
         if (TenantClaim.GetTenantId(User) is null) return TenantRequired();
-        return HasExactlyOneRoleIn(User, ReaderRoles)
-            ? null
-            : Error(StatusCodes.Status403Forbidden, "role_not_permitted",
+        if (!HasExactlyOneRoleIn(User, ReaderRoles))
+        {
+            return Error(StatusCodes.Status403Forbidden, "role_not_permitted",
                 "The caller's role may not read investigations.");
+        }
+
+        return ActorOrRefusal() is null ? ActorRequired() : null;
     }
+
+    private string? ActorOrRefusal()
+    {
+        var actor = User.FindFirstValue(ClaimTypes.Name);
+        return string.IsNullOrWhiteSpace(actor)
+            || actor.Length > TenantInvestigationLimits.MaxSubjectLength
+            || actor.Length > TenantAuditEventLimits.MaxSubjectLength
+            || actor.Any(char.IsControl)
+            ? null
+            : actor;
+    }
+
+    private ObjectResult ActorRequired() =>
+        Error(StatusCodes.Status403Forbidden, "actor_required",
+            "The access token carries no usable subject name.");
 
     /// <summary>Fail closed: the distinct role claims name exactly one role, and it is allowed.</summary>
     private static bool HasExactlyOneRoleIn(ClaimsPrincipal user, string[] allowed)
