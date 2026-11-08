@@ -47,6 +47,14 @@ public static class AnswerReportComposer
                 continue;
             }
 
+            // The gate only demands an as-of date when a citation is non-current. A historical claim must always
+            // disclose its as-of date, even if every citation happens to be Current, so it cannot read as current-state.
+            if (!c.CurrentState && c.HistoricalAsOf is null)
+            {
+                blockers.Add(new(ServeBlockers.HistoricalAsOfMissing, c.ClaimId, null));
+                continue;
+            }
+
             var citations = c.Citations!
                 .OrderBy(x => x.EvidenceRef, StringComparer.Ordinal)
                 .Select(x => new ReportCitation(x.EvidenceRef, (x.ServeTimeFreshness ?? FreshnessState.Unknown).ToString().ToLowerInvariant()))

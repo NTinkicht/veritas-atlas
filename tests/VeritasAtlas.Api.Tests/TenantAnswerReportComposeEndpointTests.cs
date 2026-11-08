@@ -105,11 +105,13 @@ public sealed class TenantAnswerReportComposeEndpointTests
             new { claims = new[] { Claim("c1", [RefCurrent], text: "bad\u0000text") }, humanVerification = "verified" },
             new { claims = new[] { Claim("c1", [RefCurrent], text: new string('x', 2001)) }, humanVerification = "verified" },
             new { claims = new[] { Claim("c1", [RefCurrent]) }, humanVerification = "approved" },
+            new { claims = new[] { Claim("c1", [RefCurrent]), Claim("c1", [RefCurrent], text: "dup") }, humanVerification = "verified" },
         };
         foreach (var body in cases)
         {
             using var response = await Post(client, good, body);
             Assert.AreEqual(HttpStatusCode.BadRequest, response.StatusCode, JsonSerializer.Serialize(body));
+            StringAssert.Contains(await response.Content.ReadAsStringAsync(), "invalid_compose_request");
         }
 
         Assert.AreEqual(0, stub.Calls.Count);
@@ -152,6 +154,19 @@ public sealed class TenantAnswerReportComposeEndpointTests
         Assert.IsTrue(stub.Calls.All(c => c.Tenant == TenantA), "the tenant is the signed claim, never the body");
         Assert.IsFalse(served.GetRawText().Contains(TenantB.ToString("D"), StringComparison.OrdinalIgnoreCase));
         Assert.IsFalse(served.GetRawText().Contains(TenantA.ToString("D"), StringComparison.OrdinalIgnoreCase));
+    }
+
+    [TestMethod]
+    public async Task HistoricalClaimWithoutAsOfIsBlockedEvenWithCurrentEvidence()
+    {
+        var stub = new StubValidator();
+        using var factory = new ApiFactory(stub);
+        using var client = factory.CreateClient();
+        var r = await Ok(client, Sign("x", ["analyst"], [TenantA.ToString("D")]),
+            new { claims = new[] { Claim("h1", [RefCurrent], current: false) }, humanVerification = "verified" });
+        Assert.AreEqual("block", r.GetProperty("decision").GetString());
+        CollectionAssert.AreEqual(new[] { ServeBlockers.HistoricalAsOfMissing }, Codes(r));
+        Assert.AreEqual(JsonValueKind.Null, r.GetProperty("report").ValueKind);
     }
 
     [TestMethod]

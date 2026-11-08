@@ -82,4 +82,13 @@ public sealed class AnswerReportComposerTests
         Assert.IsNull(r.Report);
         Assert.IsTrue(r.Verdict.Blockers.Any(b => b.Code == ServeBlockers.ContradictionNotDisclosed));
     }
+
+    [TestMethod]
+    public void HistoricalClaimWithoutAsOf_BlocksEvenWithOnlyCurrentCitations()
+    {
+        var r = Run([new("a", false, null, [Cit("ev1:a")])]);
+        Assert.AreEqual(ServeDecision.Block, r.Verdict.Decision);
+        Assert.IsNull(r.Report);
+        CollectionAssert.AreEqual(new[] { ServeBlockers.HistoricalAsOfMissing }, r.Verdict.Blockers.Select(b => b.Code).ToArray());
+    }
 }
