@@ -121,13 +121,6 @@ public sealed class AuthorizationMatrixTests
                     StringAssert.DoesNotMatch(body, new Regex("is not allowed to execute"), label);
                     StringAssert.DoesNotMatch(body, new Regex("was not found"), label + " (record must exist)");
                 }
-                else if (route.StartsWith("actions/cases/", StringComparison.Ordinal) && route.Contains("/{id}/", StringComparison.Ordinal))
-                {
-                    // Known gap (#241): WorkflowActionsController does not map UnauthorizedAccessException, so the
-                    // role denial surfaces as a generic 500. Still fail-closed: the record must not change.
-                    Assert.AreEqual(HttpStatusCode.InternalServerError, response.StatusCode, $"{label}: {body}");
-                    Assert.AreEqual(before, await StatusAsync(connection, kind, ids[kind]), label + " must not change the record");
-                }
                 else
                 {
                     Assert.AreEqual(HttpStatusCode.Forbidden, response.StatusCode, $"{label}: {body}");
