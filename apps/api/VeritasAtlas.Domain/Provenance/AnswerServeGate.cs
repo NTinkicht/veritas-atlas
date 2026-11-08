@@ -17,6 +17,7 @@ public static class ServeBlockers
     public const string HistoricalAsOfMissing = "historical_as_of_missing";
     public const string ContradictionNotDisclosed = "contradiction_not_disclosed";
     public const string HumanVerificationMissing = "human_verification_missing";
+    public const string ClaimTextMissing = "claim_text_missing";
 }
 
 /// <summary>One citation behind a claim. <see cref="ServeTimeFreshness"/> must be re-evaluated immediately before serving; null means "not evaluated" and is treated as Unknown.</summary>

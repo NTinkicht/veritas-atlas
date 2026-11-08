@@ -9,7 +9,8 @@ namespace VeritasAtlas.Api.Controllers;
 public sealed record AnswerServeCitationBody(string? EvidenceRef, string? ParserName, string? ParserVersion, Guid? ScopeSourceEntryId);
 
 public sealed record AnswerServeClaimBody(
-    string? ClaimId, bool CurrentState, DateOnly? HistoricalAsOf, IReadOnlyList<AnswerServeCitationBody?>? Citations);
+    string? ClaimId, bool CurrentState, DateOnly? HistoricalAsOf, IReadOnlyList<AnswerServeCitationBody?>? Citations,
+    string? Text = null);
 
 public sealed record AnswerServeContradictionBody(string? ContradictionId, IReadOnlyList<string?>? ClaimIds);
 
@@ -42,7 +43,7 @@ public sealed class TenantAnswerServeCheckController : ControllerBase
     public const int MaxTotalCitations = 200;
     public const int MaxContradictions = 200;
     public const int MaxIdLength = 500;
-    private static readonly string[] ReaderRoles = ["operator", "analyst", "reviewer", "publisher", "admin"];
+    internal static readonly string[] ReaderRoles = ["operator", "analyst", "reviewer", "publisher", "admin"];
 
     private readonly IClaimEvidenceValidationService _validator;
 
@@ -63,6 +64,27 @@ public sealed class TenantAnswerServeCheckController : ControllerBase
             return Error(StatusCodes.Status400BadRequest, "invalid_serve_check_request", "The request is invalid.");
 
         var tenantKey = tenantId.ToString("D");
+        var claims = await ResolveClaimsAsync(_validator, tenantId, body!, cancellationToken);
+        if (claims is null)
+            return Error(StatusCodes.Status400BadRequest, "invalid_serve_check_request", "The request is invalid.");
+
+        var contradictions = (body!.Contradictions ?? [])
+            .Select(c => new KnownContradiction(c!.ContradictionId!, c.ClaimIds!.Select(x => x!).ToList()))
+            .ToList();
+        var disclosed = (body.DisclosedContradictionIds ?? []).Select(x => x!).ToHashSet(StringComparer.Ordinal);
+
+        var verdict = AnswerServeGate.Evaluate(tenantKey, claims, contradictions, disclosed, verification);
+        return Ok(new AnswerServeCheckResponse(
+            verdict.Decision.ToString().ToLowerInvariant(),
+            "caller_asserted",
+            verdict.Blockers.Select(b => new AnswerServeBlockerView(b.Code, b.ClaimId, b.Detail)).ToList()));
+    }
+
+    /// <summary>Resolves every citation tenant-scoped at the server clock; null when the validator reports an invalid request.</summary>
+    internal static async Task<List<ServeClaim>?> ResolveClaimsAsync(
+        IClaimEvidenceValidationService validator, Guid tenantId, AnswerServeCheckBody body, CancellationToken cancellationToken)
+    {
+        var tenantKey = tenantId.ToString("D");
         var claims = new List<ServeClaim>(body!.Claims!.Count);
         foreach (var claim in body.Claims!)
         {
@@ -72,14 +94,14 @@ public sealed class TenantAnswerServeCheckController : ControllerBase
                 : new SourceFreshnessClaimPolicy(true, claim.HistoricalAsOf is not null);
             foreach (var citation in claim.Citations ?? [])
             {
-                var result = await _validator.ValidateAsync(
+                var result = await validator.ValidateAsync(
                     tenantId,
                     new ClaimEvidenceValidationRequest(
                         true, policy,
                         [new ClaimEvidenceCitation(citation!.EvidenceRef, citation.ParserName, citation.ParserVersion, citation.ScopeSourceEntryId)]),
                     cancellationToken);
                 if (result.Outcome == ClaimEvidenceValidationOutcome.InvalidRequest)
-                    return Error(StatusCodes.Status400BadRequest, "invalid_serve_check_request", "The request is invalid.");
+                    return null;
 
                 var item = result.Items.FirstOrDefault();
                 // For a current-state claim a stale or unknown-freshness result still proves the evidence exists
@@ -98,19 +120,10 @@ public sealed class TenantAnswerServeCheckController : ControllerBase
             claims.Add(new ServeClaim(claim.ClaimId!, claim.CurrentState, claim.HistoricalAsOf, citations));
         }
 
-        var contradictions = (body.Contradictions ?? [])
-            .Select(c => new KnownContradiction(c!.ContradictionId!, c.ClaimIds!.Select(x => x!).ToList()))
-            .ToList();
-        var disclosed = (body.DisclosedContradictionIds ?? []).Select(x => x!).ToHashSet(StringComparer.Ordinal);
-
-        var verdict = AnswerServeGate.Evaluate(tenantKey, claims, contradictions, disclosed, verification);
-        return Ok(new AnswerServeCheckResponse(
-            verdict.Decision.ToString().ToLowerInvariant(),
-            "caller_asserted",
-            verdict.Blockers.Select(b => new AnswerServeBlockerView(b.Code, b.ClaimId, b.Detail)).ToList()));
+        return claims;
     }
 
-    private static bool TryParse(AnswerServeCheckBody? body, out HumanVerificationState verification)
+    internal static bool TryParse(AnswerServeCheckBody? body, out HumanVerificationState verification)
     {
         verification = HumanVerificationState.Unreviewed;
         if (body is null
@@ -140,10 +153,10 @@ public sealed class TenantAnswerServeCheckController : ControllerBase
         return disclosed.Count <= MaxContradictions && disclosed.All(ValidId);
     }
 
-    private static bool ValidId(string? id) =>
+    internal static bool ValidId(string? id) =>
         !string.IsNullOrWhiteSpace(id) && id.Length <= MaxIdLength && !id.Any(char.IsControl);
 
-    private static bool HasExactlyOneRoleIn(ClaimsPrincipal user, string[] allowed)
+    internal static bool HasExactlyOneRoleIn(ClaimsPrincipal user, string[] allowed)
     {
         var roles = user.FindAll(ClaimTypes.Role).Concat(user.FindAll("role"))
             .Select(c => c.Value)
