@@ -5,6 +5,8 @@ namespace VeritasAtlas.Api.Infrastructure;
 
 public sealed class ExceptionHandlingMiddleware
 {
+    public const string GenericServerErrorDetail = "An unexpected error occurred.";
+
     private readonly RequestDelegate _next;
 
     public ExceptionHandlingMiddleware(RequestDelegate next)
@@ -30,9 +32,18 @@ public sealed class ExceptionHandlingMiddleware
         {
             await WriteProblemDetailsAsync(context, StatusCodes.Status400BadRequest, ex.Message);
         }
-        catch (Exception ex)
+        catch (OperationCanceledException) when (context.RequestAborted.IsCancellationRequested)
         {
-            await WriteProblemDetailsAsync(context, StatusCodes.Status500InternalServerError, ex.Message);
+            // Client went away; nothing to write.
+        }
+        catch (Exception) when (!context.Response.HasStarted)
+        {
+            // Never echo exception text (may contain connection strings, SQL, paths). Details go to the log only.
+            var correlationId = context.Items.TryGetValue(CorrelationIdMiddleware.ItemKey, out var value) ? value?.ToString() : null;
+            var detail = correlationId is null
+                ? GenericServerErrorDetail
+                : $"{GenericServerErrorDetail} Correlation id: {correlationId}";
+            await WriteProblemDetailsAsync(context, StatusCodes.Status500InternalServerError, detail);
         }
     }
 
