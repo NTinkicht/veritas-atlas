@@ -97,11 +97,9 @@ Source of truth is the test; this table is generated from it.
    | `POST review-workflow/reviews/{id}/reopen` | ReopenReview | reviewer, publisher, admin |
 
    `analyst` and unknown roles are denied everywhere; `operator` may only
-   submit. Denied calls answer 403 with the role-policy message, except the six
-   `actions/cases/{id:guid}/...` routes served by `WorkflowActionsController`,
-   which does not map `UnauthorizedAccessException` and so answers a generic
-   500 (still fail-closed, record unchanged; tracked in #241 and pinned as 500
-   until fixed).
+   submit. Denied calls answer 403 with the role-policy message on every route, including
+   the six `actions/cases/{id:guid}/...` routes (fixed in #241; an invalid
+   transition answers 400). The record is unchanged on denial.
 4. VER-P0-01 remains PLANNED: this slice adds the authorization matrix and
    negative vectors only. Requirement traceability for the remaining
    decisions is still open.
