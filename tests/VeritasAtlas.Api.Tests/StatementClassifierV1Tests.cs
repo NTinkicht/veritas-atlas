@@ -126,6 +126,28 @@ public sealed class StatementClassifierV1Tests
     }
 
     [TestMethod]
+    public void Null_chunk_and_null_chunk_fields_fail_closed()
+    {
+        Assert.AreEqual(StatementClassificationFailure.InvalidChunk,
+            Run("The operator", new EvidenceChunk[] { null! }).Failure);
+        Assert.AreEqual(StatementClassificationFailure.InvalidChunk,
+            Run("The operator", new EvidenceChunk(null!, 0, "s", "t", "h")).Failure);
+        Assert.AreEqual(StatementClassificationFailure.InvalidChunk,
+            Run("The operator", new EvidenceChunk("ev1:aa", 0, null!, "t", "h")).Failure);
+    }
+
+    [TestMethod]
+    public void Content_word_threshold_is_inclusive_at_the_minimum()
+    {
+        var chunk = Chunk(Text);
+        Assert.AreEqual(4, StatementClassifierV1.MinContentWords);
+        var atMin = Run("Records inspection keep operator", chunk);
+        Assert.AreEqual(StatementClass.Inference, atMin.Class);
+        Assert.IsFalse(atMin.CanBecomeClaimCandidate);
+        Assert.AreEqual(StatementClass.Unsupported, Run("Records inspection keep", chunk).Class);
+    }
+
+    [TestMethod]
     public void Is_deterministic()
     {
         var chunk = Chunk(Text);
