@@ -82,10 +82,13 @@ public sealed class TenantAnswerServeCheckController : ControllerBase
                     return Error(StatusCodes.Status400BadRequest, "invalid_serve_check_request", "The request is invalid.");
 
                 var item = result.Items.FirstOrDefault();
-                // A stale or unknown-freshness result still proves the evidence exists and is authentic in this
-                // tenant, so the gate attributes it to freshness rather than to verification. Every other failure
-                // (unknown, tampered, wrong scope or parser, unauthenticated) leaves the citation unverified.
-                var freshnessOnly = item is not null
+                // For a current-state claim a stale or unknown-freshness result still proves the evidence exists
+                // and is authentic in this tenant, so the gate attributes it to freshness (the gate itself blocks
+                // non-current evidence there). For a historical claim the gate accepts any freshness once an as-of
+                // date is present, so a rejected freshness validation must stay unverified (fail closed); valid
+                // historical evidence already returns Valid. Every other failure leaves the citation unverified.
+                var freshnessOnly = claim.CurrentState
+                    && item is not null
                     && (item.Code is ClaimEvidenceCodes.Stale or ClaimEvidenceCodes.FreshnessUnknown);
                 var verified = result.Valid || freshnessOnly;
                 citations.Add(new ServeCitation(

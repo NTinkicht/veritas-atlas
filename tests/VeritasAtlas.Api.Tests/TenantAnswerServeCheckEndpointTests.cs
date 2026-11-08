@@ -212,6 +212,22 @@ public sealed class TenantAnswerServeCheckEndpointTests
     }
 
     [TestMethod]
+    public async Task HistoricalClaimWithAsOfDateStillBlocksWhenFreshnessValidationIsRejected()
+    {
+        var stub = new StubValidator();
+        using var factory = new ApiFactory(stub);
+        using var client = factory.CreateClient();
+        var bearer = Sign("x", ["analyst"], [TenantA.ToString("D")]);
+
+        var unknown = await Ok(client, bearer, new
+        {
+            claims = new[] { Claim("h1", [RefUnknownFresh], current: false, asOf: "2020-01-01") }, humanVerification = "verified",
+        });
+        Assert.AreEqual("block", unknown.GetProperty("decision").GetString());
+        Assert.IsTrue(Codes(unknown).Contains(ServeBlockers.CitationNotVerified));
+    }
+
+    [TestMethod]
     public async Task BlocksUndisclosedContradictionsAndAcceptsDisclosedOnes()
     {
         var stub = new StubValidator();
