@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using VeritasAtlas.Application.Interfaces;
+using VeritasAtlas.Domain.Parsing;
 using VeritasAtlas.Infrastructure.Persistence;
 using VeritasAtlas.Infrastructure.Services;
 
@@ -87,6 +88,8 @@ public static class ServiceCollectionExtensions
             sp.GetRequiredService<ISourceRevisionEvidenceProvider>(),
             sp.GetService<TimeProvider>() ?? TimeProvider.System));
         services.AddScoped<IEvidenceSearchService, EfEvidenceSearchService>();
+        services.AddSingleton<IClaimExtractor, ClaimExtractionV1>();
+        services.AddScoped<IClaimCandidateService, EfClaimCandidateService>();
         services.AddScoped<IClaimEvidenceValidationService, EfClaimEvidenceValidationService>();
         services.AddScoped<ITenantAuditEventStore, EfTenantAuditEventStore>();
 
