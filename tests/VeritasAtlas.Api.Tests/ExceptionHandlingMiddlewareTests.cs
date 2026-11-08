@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http.Features;
 using Microsoft.Extensions.Logging;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using VeritasAtlas.Api.Infrastructure;
@@ -54,6 +55,24 @@ public sealed class ExceptionHandlingMiddlewareTests
             c => c.RequestAborted = cts.Token);
         Assert.AreEqual(200, status);
         Assert.AreEqual(string.Empty, body);
+    }
+
+    private sealed class StartedResponseFeature : HttpResponseFeature
+    {
+        public override bool HasStarted => true;
+    }
+
+    [TestMethod]
+    public async Task ExceptionAfterResponseStartedPropagatesAndWritesNoBody()
+    {
+        var context = new DefaultHttpContext();
+        context.Response.Body = new MemoryStream();
+        context.Features.Set<IHttpResponseFeature>(new StartedResponseFeature { Body = context.Response.Body });
+        var middleware = new ExceptionHandlingMiddleware(_ => throw new InvalidOperationException("Password=hunter2"));
+
+        await Assert.ThrowsExactlyAsync<InvalidOperationException>(() => middleware.Invoke(context));
+
+        Assert.AreEqual(0, context.Response.Body.Length);
     }
 
     [TestMethod]
