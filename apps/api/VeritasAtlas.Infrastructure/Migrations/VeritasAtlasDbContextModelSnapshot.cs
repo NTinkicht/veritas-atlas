@@ -1075,6 +1075,60 @@ namespace VeritasAtlas.Infrastructure.Migrations
                         });
                 });
 
+            modelBuilder.Entity("VeritasAtlas.Infrastructure.Persistence.TenantInvestigationAnnotation", b =>
+                {
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("AuthorSubject")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("author_subject");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<Guid>("EvidenceItemId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("evidence_item_id");
+
+                    b.Property<Guid>("InvestigationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("investigation_id");
+
+                    b.Property<string>("Text")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("text");
+
+                    b.HasKey("TenantId", "Id")
+                        .HasName("pk_tenant_investigation_annotations");
+
+                    b.HasIndex("TenantId", "EvidenceItemId", "AuthorSubject", "Text")
+                        .IsUnique()
+                        .HasDatabaseName("ux_tenant_investigation_annotations_replay");
+
+                    b.HasIndex("TenantId", "EvidenceItemId", "CreatedAtUtc")
+                        .HasDatabaseName("ix_tenant_investigation_annotations_item");
+
+                    b.ToTable("tenant_investigation_annotations", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_tenant_investigation_annotations_author_shape", "length(btrim(author_subject)) > 0 AND author_subject !~ '[\\x01-\\x1f\\x7f-\\x9f]'");
+
+                            t.HasCheckConstraint("ck_tenant_investigation_annotations_tenant_id_not_empty", "tenant_id <> '00000000-0000-0000-0000-000000000000'::uuid");
+
+                            t.HasCheckConstraint("ck_tenant_investigation_annotations_text_shape", "length(text) > 0 AND text = btrim(text) AND text !~ '[\\x01-\\x09\\x0b-\\x1f\\x7f-\\x9f]'");
+                        });
+                });
+
             modelBuilder.Entity("VeritasAtlas.Infrastructure.Persistence.TenantInvestigationEvidenceItem", b =>
                 {
                     b.Property<Guid>("TenantId")

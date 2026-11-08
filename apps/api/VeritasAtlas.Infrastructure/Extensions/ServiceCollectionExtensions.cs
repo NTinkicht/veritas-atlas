@@ -77,6 +77,7 @@ public static class ServiceCollectionExtensions
             sp.GetService<TimeProvider>() ?? TimeProvider.System));
         services.AddScoped<ITenantInvestigationStore, EfTenantInvestigationStore>();
         services.AddScoped<ITenantInvestigationEvidenceStore, EfTenantInvestigationEvidenceStore>();
+        services.AddScoped<ITenantInvestigationAnnotationStore, EfTenantInvestigationAnnotationStore>();
         services.AddSingleton<ISourceFreshnessPolicyResolver, FailClosedSourceFreshnessPolicyResolver>();
         services.AddSingleton<ISourceRevisionEvidenceProvider, FailClosedSourceRevisionEvidenceProvider>();
         services.AddScoped<IEvidenceFreshnessService>(sp => new EfEvidenceFreshnessService(

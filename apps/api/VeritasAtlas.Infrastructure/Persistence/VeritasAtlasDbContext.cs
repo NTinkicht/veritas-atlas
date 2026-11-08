@@ -45,6 +45,8 @@ public sealed class VeritasAtlasDbContext : DbContext
 
     public DbSet<TenantInvestigationEvidenceItem> TenantInvestigationEvidenceItems => Set<TenantInvestigationEvidenceItem>();
 
+    public DbSet<TenantInvestigationAnnotation> TenantInvestigationAnnotations => Set<TenantInvestigationAnnotation>();
+
     public DbSet<TenantAuditEvent> TenantAuditEvents => Set<TenantAuditEvent>();
 
     public DbSet<TenantPublicationRevision> TenantPublicationRevisions => Set<TenantPublicationRevision>();
@@ -80,6 +82,7 @@ public sealed class VeritasAtlasDbContext : DbContext
         modelBuilder.ApplyConfiguration(new TenantSourceFetchPolicyConfiguration());
         modelBuilder.ApplyConfiguration(new TenantInvestigationConfiguration());
         modelBuilder.ApplyConfiguration(new TenantInvestigationEvidenceItemConfiguration());
+        modelBuilder.ApplyConfiguration(new TenantInvestigationAnnotationConfiguration());
         modelBuilder.ApplyConfiguration(new TenantAuditEventConfiguration());
         modelBuilder.ApplyConfiguration(new TenantPublicationRevisionConfiguration());
         modelBuilder.ApplyConfiguration(new TenantPublicationTransitionConfiguration());
