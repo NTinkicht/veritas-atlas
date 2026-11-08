@@ -97,7 +97,7 @@ public static class StatementClassifierV1
         foreach (var chunk in chunks)
         {
             if (chunk is null || string.IsNullOrWhiteSpace(chunk.ParentEvidenceRef)
-                || string.IsNullOrWhiteSpace(chunk.ElementId) || string.IsNullOrEmpty(chunk.Text))
+                || string.IsNullOrWhiteSpace(chunk.ElementId) || string.IsNullOrWhiteSpace(chunk.Text))
                 return StatementClassification.Fail(StatementClassificationFailure.InvalidChunk, "incomplete_chunk");
             var digest = Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(chunk.Text)));
             if (!string.Equals(digest, chunk.TextSha256, StringComparison.Ordinal))

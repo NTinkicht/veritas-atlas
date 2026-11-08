@@ -146,6 +146,13 @@ public sealed class StatementClassifierV1Tests
     }
 
     [TestMethod]
+    public void Whitespace_only_chunk_text_fails_closed()
+    {
+        Assert.AreEqual(StatementClassificationFailure.InvalidChunk,
+            Run("The operator", Chunk("   \t ")).Failure);
+    }
+
+    [TestMethod]
     public void Content_word_threshold_is_inclusive_at_the_minimum()
     {
         var chunk = Chunk(Text);
