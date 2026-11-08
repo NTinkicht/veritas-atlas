@@ -10,6 +10,8 @@ namespace VeritasAtlas.Api.Controllers;
 [Route("api/v1/persistence")]
 public class PersistenceController : ControllerBase
 {
+    private static readonly string[] AdminRoles = ["admin"];
+
     private readonly ScenarioPersistenceService _scenarioPersistenceService;
     private readonly WorkflowAuditStore _workflowAuditStore;
 
@@ -47,6 +49,12 @@ public class PersistenceController : ControllerBase
     [HttpPost("reset")]
     public async Task<ActionResult<ResetResponse>> Reset(CancellationToken cancellationToken)
     {
+        // Destructive: admin only, fail closed for every other or unknown role (#237).
+        if (!TenantAnswerServeCheckController.HasExactlyOneRoleIn(User, AdminRoles))
+        {
+            return StatusCode(StatusCodes.Status403Forbidden);
+        }
+
         await _scenarioPersistenceService.ClearSnapshotAsync();
         await _workflowAuditStore.ClearAsync(cancellationToken);
 
