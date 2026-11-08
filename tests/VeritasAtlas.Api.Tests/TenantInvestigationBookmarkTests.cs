@@ -228,6 +228,103 @@ public sealed class TenantInvestigationBookmarkTests
         await Assert.ThrowsExactlyAsync<ArgumentException>(() => store.PutAsync(Guid.Empty, invA, item, "synthetic", CancellationToken.None));
     }
 
+    [TestMethod]
+    public async Task RacesWithGuardRefusalAndRemovedWinnerAreHandledOverRealPostgres()
+    {
+        if (Database() is not { } cs) return;
+        await TenantInvestigationEvidenceItemTests.ResetAsync(cs);
+        await using var seed = new VeritasAtlasDbContext(TenantInvestigationEvidenceItemTests.Options(cs));
+        var verification = await TenantInvestigationEvidenceItemTests.SeedVerifiedAsync(seed, TenantA, "a");
+        var inv = (await new EfTenantInvestigationStore(seed, TimeProvider.System).CreateAsync(
+            TenantA, new InvestigationInput("k", "T", "synthetic"), CancellationToken.None)).Investigation!.Id;
+        var item = (await new EfTenantInvestigationEvidenceStore(seed, TimeProvider.System).CollectAsync(
+            TenantA, inv, new EvidenceItemInput(verification, null, "synthetic"), CancellationToken.None)).Item!.Id;
+
+        // Guard trigger refuses at insert time (item vanished after the check): 404 outcome, not an exception.
+        var guardRace = new RaceInterceptor(cs, repoint: true);
+        await using (var db = new VeritasAtlasDbContext(
+                         new DbContextOptionsBuilder<VeritasAtlasDbContext>().UseNpgsql(cs).AddInterceptors(guardRace).Options))
+        {
+            var result = await new EfTenantInvestigationBookmarkStore(db, TimeProvider.System)
+                .PutAsync(TenantA, inv, item, "synthetic", CancellationToken.None);
+            Assert.AreEqual(BookmarkPutOutcome.NotFound, result.Outcome);
+        }
+        Assert.AreEqual(0, await seed.TenantInvestigationBookmarks.AsNoTracking().CountAsync());
+        Assert.AreEqual(0, await seed.TenantAuditEvents.AsNoTracking().CountAsync(e => e.Action == "investigation.bookmark_added"));
+
+        // A concurrent winner is inserted and removed again before it can be read: the insert is retried.
+        var winnerRace = new RaceInterceptor(cs, repoint: false);
+        await using (var db = new VeritasAtlasDbContext(
+                         new DbContextOptionsBuilder<VeritasAtlasDbContext>().UseNpgsql(cs).AddInterceptors(winnerRace).Options))
+        {
+            var result = await new EfTenantInvestigationBookmarkStore(db, TimeProvider.System)
+                .PutAsync(TenantA, inv, item, "synthetic", CancellationToken.None);
+            Assert.AreEqual(BookmarkPutOutcome.Added, result.Outcome);
+        }
+        Assert.AreEqual(1, await seed.TenantInvestigationBookmarks.AsNoTracking().CountAsync());
+        Assert.AreEqual(1, await seed.TenantAuditEvents.AsNoTracking().CountAsync(e => e.Action == "investigation.bookmark_added"));
+
+        // Subjects longer than the audit limit are rejected before any write.
+        await using var plain = new VeritasAtlasDbContext(TenantInvestigationEvidenceItemTests.Options(cs));
+        await Assert.ThrowsExactlyAsync<ArgumentException>(() =>
+            new EfTenantInvestigationBookmarkStore(plain, TimeProvider.System).PutAsync(
+                TenantA, inv, item, new string('s', TenantAuditEventLimits.MaxSubjectLength + 1), CancellationToken.None));
+    }
+
+    /// <summary>On the first save, either re-points the pending bookmark (guard refusal) or inserts a conflicting winner that is removed once our insert fails.</summary>
+    private sealed class RaceInterceptor(string connectionString, bool repoint)
+        : Microsoft.EntityFrameworkCore.Diagnostics.SaveChangesInterceptor
+    {
+        private bool _fired;
+        private (Guid, Guid, string)? _winner;
+
+        public override async ValueTask<Microsoft.EntityFrameworkCore.Diagnostics.InterceptionResult<int>> SavingChangesAsync(
+            Microsoft.EntityFrameworkCore.Diagnostics.DbContextEventData eventData,
+            Microsoft.EntityFrameworkCore.Diagnostics.InterceptionResult<int> result,
+            CancellationToken cancellationToken = default)
+        {
+            if (_fired) return result;
+            _fired = true;
+            var row = eventData.Context!.ChangeTracker.Entries<TenantInvestigationBookmark>().Single().Entity;
+            if (repoint)
+            {
+                row.InvestigationId = Guid.NewGuid();
+                return result;
+            }
+
+            await using var connection = new NpgsqlConnection(connectionString);
+            await connection.OpenAsync(cancellationToken);
+            await using var command = new NpgsqlCommand(
+                "INSERT INTO tenant_investigation_bookmarks (tenant_id, evidence_item_id, subject, investigation_id, created_at_utc) VALUES (@t, @e, @s, @i, now())",
+                connection);
+            command.Parameters.AddWithValue("t", row.TenantId);
+            command.Parameters.AddWithValue("e", row.EvidenceItemId);
+            command.Parameters.AddWithValue("s", row.Subject);
+            command.Parameters.AddWithValue("i", row.InvestigationId);
+            await command.ExecuteNonQueryAsync(cancellationToken);
+            _winner = (row.TenantId, row.EvidenceItemId, row.Subject);
+            return result;
+        }
+
+        // The conflicting winner is removed right after our insert fails, before the store re-reads it.
+        public override async Task SaveChangesFailedAsync(
+            Microsoft.EntityFrameworkCore.Diagnostics.DbContextErrorEventData eventData,
+            CancellationToken cancellationToken = default)
+        {
+            if (_winner is not { } w) return;
+            _winner = null;
+            await using var connection = new NpgsqlConnection(connectionString);
+            await connection.OpenAsync(cancellationToken);
+            await using var command = new NpgsqlCommand(
+                "DELETE FROM tenant_investigation_bookmarks WHERE tenant_id = @t AND evidence_item_id = @e AND subject = @s",
+                connection);
+            command.Parameters.AddWithValue("t", w.Item1);
+            command.Parameters.AddWithValue("e", w.Item2);
+            command.Parameters.AddWithValue("s", w.Item3);
+            await command.ExecuteNonQueryAsync(cancellationToken);
+        }
+    }
+
     private sealed record Bookmark(Guid InvestigationId, Guid EvidenceItemId, DateTime CreatedAtUtc);
 
     private sealed record BookmarkList(List<Bookmark> Items);

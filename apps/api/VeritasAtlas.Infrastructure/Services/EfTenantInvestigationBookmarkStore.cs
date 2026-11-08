@@ -14,6 +14,8 @@ namespace VeritasAtlas.Infrastructure.Services;
 public sealed class EfTenantInvestigationBookmarkStore : ITenantInvestigationBookmarkStore
 {
     private const string UniqueViolation = "23505";
+    private const string GuardViolation = "23514";
+    private const int MaxPutAttempts = 3;
     public const string AddedAction = "investigation.bookmark_added";
     public const string RemovedAction = "investigation.bookmark_removed";
     public const string AuditEntityType = "investigation_bookmark";
@@ -30,42 +32,59 @@ public sealed class EfTenantInvestigationBookmarkStore : ITenantInvestigationBoo
         Guid tenantId, Guid investigationId, Guid evidenceItemId, string subject, CancellationToken cancellationToken)
     {
         Require(tenantId, subject);
-        if (!await ItemExistsAsync(tenantId, investigationId, evidenceItemId, cancellationToken))
+
+        // A unique-violation winner may be removed again before we can read it: retry a bounded
+        // number of times, re-checking the item each time.
+        for (var attempt = 0; attempt < MaxPutAttempts; attempt++)
         {
-            return new BookmarkPutResult(BookmarkPutOutcome.NotFound, null);
+            if (!await ItemExistsAsync(tenantId, investigationId, evidenceItemId, cancellationToken))
+            {
+                return new BookmarkPutResult(BookmarkPutOutcome.NotFound, null);
+            }
+
+            var existing = await FindAsync(tenantId, evidenceItemId, subject, cancellationToken);
+            if (existing is not null)
+            {
+                return new BookmarkPutResult(BookmarkPutOutcome.Replayed, ToModel(existing));
+            }
+
+            var row = new TenantInvestigationBookmark
+            {
+                TenantId = tenantId,
+                InvestigationId = investigationId,
+                EvidenceItemId = evidenceItemId,
+                Subject = subject,
+                CreatedAtUtc = ToPostgresPrecision(_timeProvider.GetUtcNow().UtcDateTime)
+            };
+            var audit = NewAudit(AddedAction, row, row.CreatedAtUtc);
+            _db.TenantInvestigationBookmarks.Add(row);
+            _db.TenantAuditEvents.Add(audit);
+            try
+            {
+                await _db.SaveChangesAsync(cancellationToken);
+                return new BookmarkPutResult(BookmarkPutOutcome.Added, ToModel(row));
+            }
+            catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: GuardViolation })
+            {
+                // The guard trigger refused: the item vanished after the existence check.
+                _db.Entry(row).State = EntityState.Detached;
+                _db.Entry(audit).State = EntityState.Detached;
+                return new BookmarkPutResult(BookmarkPutOutcome.NotFound, null);
+            }
+            catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: UniqueViolation })
+            {
+                _db.Entry(row).State = EntityState.Detached;
+                _db.Entry(audit).State = EntityState.Detached;
+                var winner = await FindAsync(tenantId, evidenceItemId, subject, cancellationToken);
+                if (winner is not null)
+                {
+                    return new BookmarkPutResult(BookmarkPutOutcome.Replayed, ToModel(winner));
+                }
+                // Winner already removed: loop and insert again (bookmark and audit stay atomic).
+            }
         }
 
-        var existing = await FindAsync(tenantId, evidenceItemId, subject, cancellationToken);
-        if (existing is not null)
-        {
-            return new BookmarkPutResult(BookmarkPutOutcome.Replayed, ToModel(existing));
-        }
-
-        var row = new TenantInvestigationBookmark
-        {
-            TenantId = tenantId,
-            InvestigationId = investigationId,
-            EvidenceItemId = evidenceItemId,
-            Subject = subject,
-            CreatedAtUtc = ToPostgresPrecision(_timeProvider.GetUtcNow().UtcDateTime)
-        };
-        var audit = NewAudit(AddedAction, row, row.CreatedAtUtc);
-        _db.TenantInvestigationBookmarks.Add(row);
-        _db.TenantAuditEvents.Add(audit);
-        try
-        {
-            await _db.SaveChangesAsync(cancellationToken);
-        }
-        catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: UniqueViolation })
-        {
-            _db.Entry(row).State = EntityState.Detached;
-            _db.Entry(audit).State = EntityState.Detached;
-            var winner = await FindAsync(tenantId, evidenceItemId, subject, cancellationToken)
-                ?? throw new InvalidOperationException("Bookmark winner is not visible.", ex);
-            return new BookmarkPutResult(BookmarkPutOutcome.Replayed, ToModel(winner));
-        }
-
-        return new BookmarkPutResult(BookmarkPutOutcome.Added, ToModel(row));
+        throw new InvalidOperationException("Bookmark could not be stored after repeated concurrent removals.");
     }
 
     public async Task<BookmarkRemoveOutcome> RemoveAsync(
@@ -155,6 +174,7 @@ public sealed class EfTenantInvestigationBookmarkStore : ITenantInvestigationBoo
 
         if (string.IsNullOrWhiteSpace(subject)
             || subject.Length > TenantInvestigationLimits.MaxSubjectLength
+            || subject.Length > TenantAuditEventLimits.MaxSubjectLength
             || subject.Any(char.IsControl))
         {
             throw new ArgumentException("A valid subject is required.", nameof(subject));
