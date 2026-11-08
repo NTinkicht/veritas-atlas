@@ -225,7 +225,9 @@ public sealed class EfTenantInvestigationShareStore : ITenantInvestigationShareS
     private static void RequireGrantee(string grantee)
     {
         RequireSubject(grantee, nameof(grantee));
-        if (grantee.Length > TenantInvestigationShareLimits.MaxGranteeLength)
+        // Fail closed with the same rule as the controller: no surrounding whitespace, so
+        // " bob" can never become a distinct grantee from "bob".
+        if (!TenantInvestigationShareLimits.IsValidGrantee(grantee))
         {
             throw new ArgumentException("A valid grantee is required.", nameof(grantee));
         }

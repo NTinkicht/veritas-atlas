@@ -290,6 +290,20 @@ public sealed class TenantInvestigationShareTests
         await Assert.ThrowsExactlyAsync<ArgumentException>(() => store.GrantAsync(Guid.Empty, invA, "synthetic-owner", "synthetic-bob", CancellationToken.None));
         await Assert.ThrowsExactlyAsync<ArgumentException>(() => store.GrantAsync(
             TenantA, invA, "synthetic-owner", new string('g', TenantInvestigationShareLimits.MaxGranteeLength + 1), CancellationToken.None));
+
+        // Store-level fail-closed parity with the controller: surrounding whitespace is refused, so
+        // " synthetic-bob" can never become a grantee distinct from "synthetic-bob".
+        foreach (var padded in new[] { " synthetic-bob", "synthetic-bob ", "\u00A0synthetic-bob" })
+        {
+            await Assert.ThrowsExactlyAsync<ArgumentException>(() => store.GrantAsync(TenantA, invA, "synthetic-owner", padded, CancellationToken.None));
+            await Assert.ThrowsExactlyAsync<ArgumentException>(() => store.RevokeAsync(TenantA, invA, "synthetic-owner", padded, CancellationToken.None));
+        }
+
+        Assert.AreEqual(1, await db.TenantInvestigationShares.AsNoTracking().CountAsync());
+        // Positive control: the trimmed form is accepted and resolves to the existing active grant.
+        var ok = await store.GrantAsync(TenantA, invA, "synthetic-owner", "synthetic-bob", CancellationToken.None);
+        Assert.AreEqual(ShareGrantOutcome.Replayed, ok.Outcome);
+        Assert.AreEqual(1, await db.TenantInvestigationShares.AsNoTracking().CountAsync());
     }
 
     private sealed record ShareDto(Guid InvestigationId, string GranteeSubject, string GrantedBySubject, DateTime GrantedAtUtc);
