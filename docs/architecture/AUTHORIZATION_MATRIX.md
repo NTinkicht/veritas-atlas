@@ -72,6 +72,11 @@ Source of truth is the test; this table is generated from it.
    answer 400 from model binding do so before in-action role checks, so their
    role gating is not asserted by this matrix (rows with no denied role may
    still gate roles for valid bodies). A later slice should send valid bodies.
-3. VER-P0-01 remains PLANNED: this slice adds the authorization matrix and
+3. **Database-backed role checks are not reached.** The probe runs without a
+   reachable database, so workflow endpoints that load a record before their
+   role check (for example `RunCaseActionAsync`) fail for every role before
+   `EnsureRoleAllowed` runs. Rows for those endpoints showing no denied role do
+   not mean the role policies are absent. Tracked in #239.
+4. VER-P0-01 remains PLANNED: this slice adds the authorization matrix and
    negative vectors only. Requirement traceability for the remaining
    decisions is still open.
