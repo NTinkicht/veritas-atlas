@@ -75,11 +75,33 @@ Source of truth is the test; this table is generated from it.
    answer 400 from model binding do so before in-action role checks, so their
    role gating is not asserted by this matrix (rows with no denied role may
    still gate roles for valid bodies). A later slice should send valid bodies.
-3. **Database-backed role checks are not reached.** The probe runs without a
-   reachable database, so workflow endpoints that load a record before their
-   role check (for example `RunCaseActionAsync`) fail for every role before
-   `EnsureRoleAllowed` runs. Rows for those endpoints showing no denied role do
-   not mean the role policies are absent. Tracked in #239.
+3. **Database-backed role checks** are now reached by a second test
+   (`DatabaseBackedWorkflowRoleChecksArePinnedPerEndpoint`, #239) that seeds a
+   case, claim, contradiction and review in a real PostgreSQL database
+   (`VERITAS_TEST_POSTGRES`) and calls the 15 workflow action routes below as
+   every role, from a valid starting status. Denied roles must not change the
+   record; permitted roles must reach 200. Rows for these routes in the
+   pinned table above show no denied role only because that probe uses an
+   unreachable database; the real gating is:
+
+   | Route (under `api/v1/`) | Policy action | Roles allowed (others denied) |
+   |---|---|---|
+   | `POST actions/cases/{id}/submit` | SubmitCase | operator, reviewer, publisher, admin |
+   | `POST actions/cases/{id}/approve`, `reject` | ApproveCase, RejectCase | reviewer, publisher, admin |
+   | `POST actions/cases/{id}/prepare`, `publish`, `hold` | PreparePublication, PublishCase, HoldCase | reviewer, publisher, admin |
+   | `POST actions/contradictions/{id}/resolve` | ResolveContradiction | reviewer, publisher, admin |
+   | `POST actions/reviews/{id}/complete` | CompleteReview | reviewer, publisher, admin |
+   | `POST publication-workflow/cases/{id}/prepare`, `publish`, `hold` | PreparePublication, PublishCase, HoldCase | reviewer, publisher, admin |
+   | `POST review-workflow/claims/{id}/send-to-review`, `return-for-edit` | SendClaimToReview, ReturnClaimForEdit | reviewer, publisher, admin |
+   | `POST review-workflow/contradictions/{id}/escalate` | EscalateContradiction | reviewer, publisher, admin |
+   | `POST review-workflow/reviews/{id}/reopen` | ReopenReview | reviewer, publisher, admin |
+
+   `analyst` and unknown roles are denied everywhere; `operator` may only
+   submit. Denied calls answer 403 with the role-policy message, except the six
+   `actions/cases/{id:guid}/...` routes served by `WorkflowActionsController`,
+   which does not map `UnauthorizedAccessException` and so answers a generic
+   500 (still fail-closed, record unchanged; tracked in #241 and pinned as 500
+   until fixed).
 4. VER-P0-01 remains PLANNED: this slice adds the authorization matrix and
    negative vectors only. Requirement traceability for the remaining
    decisions is still open.
