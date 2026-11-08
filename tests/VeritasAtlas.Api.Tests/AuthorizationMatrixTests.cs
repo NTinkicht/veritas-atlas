@@ -8,10 +8,16 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.AspNetCore.TestHost;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Npgsql;
 using VeritasAtlas.Api.Infrastructure.Auth;
 using VeritasAtlas.Application.Interfaces;
+using VeritasAtlas.Domain.Entities;
+using VeritasAtlas.Domain.Enums;
+using VeritasAtlas.Domain.ValueObjects;
+using VeritasAtlas.Infrastructure.Persistence;
 
 namespace VeritasAtlas.Api.Tests;
 
@@ -48,6 +54,163 @@ public sealed class AuthorizationMatrixTests
         CollectionAssert.AreEqual(pinned, actual,
             "authorization matrix drifted; update the pinned matrix and docs/architecture/AUTHORIZATION_MATRIX.md together:\n"
             + string.Join("\n", actual));
+    }
+
+    private static readonly string[] SubmitRoles = ["operator", "reviewer", "publisher", "admin"];
+    private static readonly string[] ReviewerAndAbove = ["reviewer", "publisher", "admin"];
+
+    /// <summary>
+    /// (route, role-policy action, record kind, valid starting status, roles that must pass the role gate). Independent of
+    /// <c>WorkflowIntegrityService.RolePolicies</c> on purpose so widening or removing a policy entry fails here.
+    /// </summary>
+    private static readonly (string Route, string Action, string Kind, string Start, string[] Allowed)[] DatabaseBackedWorkflowRoutes =
+    [
+        ("actions/cases/{id}/submit", "SubmitCase", "case", "Open", SubmitRoles),
+        ("actions/cases/{id}/approve", "ApproveCase", "case", "InReview", ReviewerAndAbove),
+        ("actions/cases/{id}/reject", "RejectCase", "case", "InReview", ReviewerAndAbove),
+        ("actions/cases/{id}/prepare", "PreparePublication", "case", "Approved", ReviewerAndAbove),
+        ("actions/cases/{id}/publish", "PublishCase", "case", "Approved", ReviewerAndAbove),
+        ("actions/cases/{id}/hold", "HoldCase", "case", "InReview", ReviewerAndAbove),
+        ("actions/contradictions/{id}/resolve", "ResolveContradiction", "contradiction", "Draft", ReviewerAndAbove),
+        ("actions/reviews/{id}/complete", "CompleteReview", "review", "Completed", ReviewerAndAbove),
+        ("publication-workflow/cases/{id}/prepare", "PreparePublication", "case", "Approved", ReviewerAndAbove),
+        ("publication-workflow/cases/{id}/publish", "PublishCase", "case", "Approved", ReviewerAndAbove),
+        ("publication-workflow/cases/{id}/hold", "HoldCase", "case", "InReview", ReviewerAndAbove),
+        ("review-workflow/claims/{id}/send-to-review", "SendClaimToReview", "claim", "Draft", ReviewerAndAbove),
+        ("review-workflow/claims/{id}/return-for-edit", "ReturnClaimForEdit", "claim", "Draft", ReviewerAndAbove),
+        ("review-workflow/contradictions/{id}/escalate", "EscalateContradiction", "contradiction", "Draft", ReviewerAndAbove),
+        ("review-workflow/reviews/{id}/reopen", "ReopenReview", "review", "Completed", ReviewerAndAbove),
+    ];
+
+    /// <summary>
+    /// #239: with real records seeded, the workflow endpoints that load a record before
+    /// <c>EnsureRoleAllowed</c> reach the role check. Denied roles must answer 403 with the role-policy message
+    /// (not a missing-record 400), leave the record unchanged, and permitted roles must pass the gate.
+    /// </summary>
+    [TestMethod]
+    [DoNotParallelize]
+    public async Task DatabaseBackedWorkflowRoleChecksArePinnedPerEndpoint()
+    {
+        var connection = Database();
+        if (connection is null) return;
+        var ids = await ResetAndSeedAsync(connection);
+
+        using var factory = new ApiFactory(connection);
+        using var client = factory.CreateClient();
+        var jwt = factory.Services.GetRequiredService<JwtTokenService>();
+        var tenant = Guid.Parse("11111111-1111-1111-1111-111111111111");
+
+        foreach (var (route, action, kind, start, allowed) in DatabaseBackedWorkflowRoutes)
+        {
+            var path = "/api/v1/" + route.Replace("{id}", ids[kind].ToString("D"));
+            foreach (var role in AllRoles)
+            {
+                await SetStatusAsync(connection, kind, ids[kind], start);
+                var before = await StatusAsync(connection, kind, ids[kind]);
+                using var request = new HttpRequestMessage(HttpMethod.Post, path);
+                request.Headers.Authorization = new AuthenticationHeaderValue(
+                    "Bearer", jwt.CreateToken("synthetic-" + role, role, tenant).Token);
+                using var response = await client.SendAsync(request);
+                var body = await response.Content.ReadAsStringAsync();
+                var label = $"POST {route} as {role}";
+
+                if (allowed.Contains(role))
+                {
+                    Assert.IsTrue(response.StatusCode == HttpStatusCode.OK,
+                        $"{label} must pass the role gate (200 from a valid starting status), got {(int)response.StatusCode}: {body}");
+                    StringAssert.DoesNotMatch(body, new Regex("is not allowed to execute"), label);
+                    StringAssert.DoesNotMatch(body, new Regex("was not found"), label + " (record must exist)");
+                }
+                else if (route.StartsWith("actions/cases/", StringComparison.Ordinal) && route.Contains("/{id}/", StringComparison.Ordinal))
+                {
+                    // Known gap (#241): WorkflowActionsController does not map UnauthorizedAccessException, so the
+                    // role denial surfaces as a generic 500. Still fail-closed: the record must not change.
+                    Assert.AreEqual(HttpStatusCode.InternalServerError, response.StatusCode, $"{label}: {body}");
+                    Assert.AreEqual(before, await StatusAsync(connection, kind, ids[kind]), label + " must not change the record");
+                }
+                else
+                {
+                    Assert.AreEqual(HttpStatusCode.Forbidden, response.StatusCode, $"{label}: {body}");
+                    StringAssert.Contains(body, $"is not allowed to execute '{action}'", label);
+                    Assert.AreEqual(before, await StatusAsync(connection, kind, ids[kind]), label + " must not change the record");
+                }
+            }
+        }
+    }
+
+    private static string? Database()
+    {
+        var connectionString = Environment.GetEnvironmentVariable("VERITAS_TEST_POSTGRES");
+        if (string.IsNullOrWhiteSpace(connectionString))
+        {
+            Assert.Inconclusive("VERITAS_TEST_POSTGRES is not set.");
+            return null;
+        }
+
+        var builder = new NpgsqlConnectionStringBuilder(connectionString);
+        builder.Database += "_authzwf";
+        return builder.ConnectionString;
+    }
+
+    private static VeritasAtlasDbContext NewContext(string connectionString) =>
+        new(new DbContextOptionsBuilder<VeritasAtlasDbContext>().UseNpgsql(connectionString).Options);
+
+    private static async Task<Dictionary<string, Guid>> ResetAndSeedAsync(string connectionString)
+    {
+        await using var db = NewContext(connectionString);
+        await db.Database.EnsureDeletedAsync();
+        await db.Database.MigrateAsync();
+
+        var source = new Source { Name = "authz-matrix-source" };
+        var evidence = new Evidence { SourceId = source.Id, Content = "authz matrix evidence" };
+        var statement = new Statement { EvidenceId = evidence.Id, Text = new StatementText("raw", "raw") };
+        var claimA = new Claim { StatementId = statement.Id, Topic = "authz", NormalizedText = "claim a" };
+        var claimB = new Claim { StatementId = statement.Id, Topic = "authz", NormalizedText = "claim b" };
+        var theCase = new Case { Title = "authz matrix case" };
+        var contradiction = new Contradiction
+        {
+            CaseId = theCase.Id, LeftClaimId = claimA.Id, RightClaimId = claimB.Id, Summary = "authz matrix contradiction",
+        };
+        var review = new Review { CaseId = theCase.Id, Reviewer = "synthetic" };
+
+        db.AddRange(source, evidence, statement, claimA, claimB, theCase, contradiction, review);
+        await db.SaveChangesAsync();
+        return new Dictionary<string, Guid>
+        {
+            ["case"] = theCase.Id, ["claim"] = claimA.Id, ["contradiction"] = contradiction.Id, ["review"] = review.Id,
+        };
+    }
+
+    private static async Task SetStatusAsync(string connectionString, string kind, Guid id, string status)
+    {
+        await using var db = NewContext(connectionString);
+        switch (kind)
+        {
+            case "case":
+                await db.Cases.Where(x => x.Id == id).ExecuteUpdateAsync(u => u.SetProperty(x => x.Status, Enum.Parse<CaseStatus>(status)));
+                break;
+            case "claim":
+                await db.Claims.Where(x => x.Id == id).ExecuteUpdateAsync(u => u.SetProperty(x => x.Status, Enum.Parse<ClaimStatus>(status)));
+                break;
+            case "contradiction":
+                await db.Contradictions.Where(x => x.Id == id).ExecuteUpdateAsync(u => u.SetProperty(x => x.Status, Enum.Parse<ContradictionStatus>(status)));
+                break;
+            default:
+                await db.Reviews.Where(x => x.Id == id).ExecuteUpdateAsync(u => u.SetProperty(x => x.Status, Enum.Parse<ReviewStatus>(status)));
+                break;
+        }
+    }
+
+    private static async Task<string> StatusAsync(string connectionString, string kind, Guid id)
+    {
+        await using var db = NewContext(connectionString);
+        return kind switch
+        {
+            "case" => (await db.Cases.AsNoTracking().SingleAsync(x => x.Id == id)).Status.ToString(),
+            "claim" => (await db.Claims.AsNoTracking().SingleAsync(x => x.Id == id)).Status.ToString(),
+            "contradiction" => (await db.Contradictions.AsNoTracking().SingleAsync(x => x.Id == id)).Status.ToString(),
+            _ => (await db.Reviews.AsNoTracking().SingleAsync(x => x.Id == id)).Status.ToString(),
+        };
     }
 
     /// <summary>
@@ -215,7 +378,7 @@ public sealed class AuthorizationMatrixTests
         }
     }
 
-    private sealed class ApiFactory : WebApplicationFactory<Program>
+    private sealed class ApiFactory(string? connectionString = null) : WebApplicationFactory<Program>
     {
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {
@@ -225,7 +388,7 @@ public sealed class AuthorizationMatrixTests
             builder.UseSetting("Auth:Bootstrap:Password", "synthetic-bootstrap-password-not-real-0002");
             builder.UseSetting(
                 "ConnectionStrings:DefaultConnection",
-                "Host=127.0.0.1;Port=1;Database=unused;Username=unused;Password=unused");
+                connectionString ?? "Host=127.0.0.1;Port=1;Database=unused;Username=unused;Password=unused");
             builder.ConfigureTestServices(services =>
                 services.AddSingleton<IAccessTokenRevocationStore, InMemoryAccessTokenRevocationStore>());
         }
