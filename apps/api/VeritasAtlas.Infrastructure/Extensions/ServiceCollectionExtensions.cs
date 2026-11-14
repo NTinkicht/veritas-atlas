@@ -68,6 +68,9 @@ public static class ServiceCollectionExtensions
             sp.GetRequiredService<ITenantRawRetrievalLedger>(),
             sp.GetService<TimeProvider>() ?? TimeProvider.System));
         services.AddScoped<ITenantParseRunLedger, EfTenantParseRunLedger>();
+        services.AddScoped<IEvidenceParseService>(sp => new EfEvidenceParseService(
+            sp.GetRequiredService<VeritasAtlasDbContext>(),
+            sp.GetService<TimeProvider>() ?? TimeProvider.System));
         services.AddScoped<ITenantRetrievalAttestationLedger, EfTenantRetrievalAttestationLedger>();
         services.AddScoped<ITenantRetrievalCheckpointStore, EfTenantRetrievalCheckpointStore>();
         services.AddScoped<ITenantPublicationRevisionStore>(sp => new EfTenantPublicationRevisionStore(
