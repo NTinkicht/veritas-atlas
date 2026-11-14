@@ -16,6 +16,7 @@ The table mirrors `src/routeAudit.ts`. `src/routes.test.ts` fails when a route h
 | `/public/publications/:id` | PublicPublicationPage | REAL | /api/v1/public/publications/{id} (anonymous, credential-free, fail-closed) |
 | `/evidence-search` | EvidenceSearchPage | REAL | /api/v1/tenant-evidence/search |
 | `/investigations` | InvestigationBoardPage | REAL | /api/v1/tenant-investigations, /tenant-investigations/{id}/evidence-items |
+| `/publication-revisions` | PublicationRevisionDeskPage | REAL | /api/v1/tenant-publication-revisions/{id}, /transitions |
 | `/workflow-audit` | WorkflowAuditPage | REAL | /api/v1/workflow-audit/entries/clear |
 | `/persistence` | PersistenceConsolePage | SEEDED-OR-DEMO | /api/v1/persistence/snapshot/reset: scenario snapshot of the seeded workflow scenario |
 | `/persistence-console` | PersistenceConsolePage | SEEDED-OR-DEMO | /api/v1/persistence/snapshot/reset: scenario snapshot of the seeded workflow scenario |
@@ -129,5 +130,6 @@ The table mirrors `src/routeAudit.ts`. `src/routes.test.ts` fails when a route h
 - Removed the unused Vite starter `src/App.tsx`, `src/App.css`, and `src/assets/{hero.png,react.svg,vite.svg}`; a repo-wide search found no reference outside `App.tsx`. The legacy root `frontend/` is untouched.
 - DEAD and SEEDED-OR-DEMO pages stay in source (behind the Development-only mount) so the follow-up UI slice (#161) can replace or delete them one at a time with an audit row each; navigation shows only mounted routes.
 - `/investigations` is the read-only investigation board (VER-P0-17); it reads only the tenant investigation list and collected-evidence endpoints, rejects malformed responses whole, and has no seeded fallback.
+- `/publication-revisions` opens one tenant publication revision by id and posts lifecycle transitions with the expected version and a fresh operation id (VER-P0-17); authorization, self-approval denial and version races are decided only by the server, refusals (401/403/404/409) are shown and change nothing, malformed responses are rejected whole, and there is no seeded fallback.
 - `/evidence-search` (#161) is the analyst search and citation inspector; it reads only `/api/v1/tenant-evidence/search` and has no seeded fallback. The search hit carries no parser name/version, so the inspector says so rather than inventing one.
 - `/case-explorer`, `/case-scoreboard`: listed REAL because they call `/api/v1/cases`; neither reads seed modules (checked by search).
