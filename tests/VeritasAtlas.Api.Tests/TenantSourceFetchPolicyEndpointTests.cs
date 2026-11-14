@@ -57,6 +57,20 @@ public sealed class TenantSourceFetchPolicyEndpointTests
             wideningApproved
         };
 
+    // Roles outside the known five (#264) are refused earlier, at the authorization gate, so the controller's
+    // admin_required body must be absent for them and present for every known-role refusal.
+    private static void AssertRefusalReason(string body, string label)
+    {
+        if (label is "no role" or "administrator" or "anonymous")
+        {
+            StringAssert.DoesNotMatch(body, new System.Text.RegularExpressions.Regex("admin_required"), label + " must be refused by the gate");
+        }
+        else
+        {
+            StringAssert.Contains(body, "admin_required", label);
+        }
+    }
+
     [TestMethod]
     public async Task EveryNonAdminWriterIsRefusedBeforeTheRegistry()
     {
@@ -81,7 +95,7 @@ public sealed class TenantSourceFetchPolicyEndpointTests
             using var put = await Send(client, HttpMethod.Put, PolicyPath(source), bearer,
                 Body(wideningApproved: true));
             Assert.AreEqual(HttpStatusCode.Forbidden, put.StatusCode, label);
-            StringAssert.Contains(await put.Content.ReadAsStringAsync(), "admin_required", label);
+            AssertRefusalReason(await put.Content.ReadAsStringAsync(), label);
         }
 
         Assert.AreEqual(0, registry.Calls, "no registry access for a non-admin writer");

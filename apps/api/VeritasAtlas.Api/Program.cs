@@ -83,9 +83,10 @@ builder.Services
 // AllowAnonymous() (login, public auth diagnostics, health probes).
 builder.Services.AddAuthorization(options =>
 {
-    options.FallbackPolicy = new AuthorizationPolicyBuilder()
-        .RequireAuthenticatedUser()
-        .Build();
+    // VER-P0-01 (#264): an authenticated principal must also carry only known roles. The default policy covers
+    // bare [Authorize]; the fallback covers everything else.
+    options.DefaultPolicy = KnownRoles.BuildPolicy();
+    options.FallbackPolicy = KnownRoles.BuildPolicy();
 });
 
 var app = builder.Build();

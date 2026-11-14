@@ -34,6 +34,20 @@ public sealed class TenantSourceRegistryTests
     private static readonly Guid TenantA = Guid.Parse("a1111111-1111-4111-8111-111111111111");
     private static readonly Guid TenantB = Guid.Parse("b2222222-2222-4222-8222-222222222222");
 
+    // Roles outside the known five (#264) are refused earlier, at the authorization gate, so the controller's
+    // admin_required body must be absent for them and present for every known-role refusal.
+    private static void AssertRefusalReason(string body, string label)
+    {
+        if (label is "no role" or "administrator" or "anonymous")
+        {
+            StringAssert.DoesNotMatch(body, new System.Text.RegularExpressions.Regex("admin_required"), label + " must be refused by the gate");
+        }
+        else
+        {
+            StringAssert.Contains(body, "admin_required", label);
+        }
+    }
+
     [TestMethod]
     public void IssuedTokenCarriesExactlyTheConfiguredTenantAndNeverADefault()
     {
@@ -271,12 +285,14 @@ public sealed class TenantSourceRegistryTests
             using var blank = await Send(client, HttpMethod.Post, Path, bearer, new { canonicalKey = "   " });
             Assert.AreEqual(HttpStatusCode.Forbidden, create.StatusCode, label);
             Assert.AreEqual(HttpStatusCode.Forbidden, blank.StatusCode, label);
-            StringAssert.Contains(await create.Content.ReadAsStringAsync(), "admin_required", label);
-            StringAssert.Contains(await blank.Content.ReadAsStringAsync(), "admin_required", label);
+            AssertRefusalReason(await create.Content.ReadAsStringAsync(), label);
+            AssertRefusalReason(await blank.Content.ReadAsStringAsync(), label);
 
-            // Reads remain open to every authenticated member of the tenant.
+            // Reads remain open to every authenticated member of the tenant with a known role (#264).
             using var list = await Send(client, HttpMethod.Get, Path, bearer);
-            Assert.AreEqual(HttpStatusCode.OK, list.StatusCode, label);
+            Assert.AreEqual(
+                label is "no role" or "administrator" or "anonymous" ? HttpStatusCode.Forbidden : HttpStatusCode.OK,
+                list.StatusCode, label);
         }
         Assert.AreEqual(0, registry.Created.Count, "no registration without a single admin role");
 
