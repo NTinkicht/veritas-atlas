@@ -143,7 +143,9 @@ public sealed class EfEvidenceSearchService : IEvidenceSearchService
         && (request.Jurisdiction is null || string.Equals(row.Jurisdiction, request.Jurisdiction, StringComparison.OrdinalIgnoreCase))
         && (request.SourceType is null || string.Equals(row.SourceType, request.SourceType, StringComparison.OrdinalIgnoreCase))
         && (request.RetrievedFromUtc is null || row.RetrievedAtUtc >= request.RetrievedFromUtc)
-        && (request.RetrievedToUtc is null || row.RetrievedAtUtc <= request.RetrievedToUtc);
+        && (request.RetrievedToUtc is null || row.RetrievedAtUtc <= request.RetrievedToUtc)
+        && (request.ParserName is null || string.Equals(row.ParserName, request.ParserName, StringComparison.Ordinal))
+        && (request.ParserVersion is null || string.Equals(row.ParserVersion, request.ParserVersion, StringComparison.Ordinal));
 
     private static bool IsValid(EvidenceSearchRequest r) =>
         !string.IsNullOrWhiteSpace(r.Query)
@@ -151,6 +153,7 @@ public sealed class EfEvidenceSearchService : IEvidenceSearchService
         && !r.Query.Any(char.IsControl)
         && r.PageSize is >= 1 and <= EvidenceSearchLimits.MaxPageSize
         && ValidFilter(r.Jurisdiction) && ValidFilter(r.SourceType)
+        && ValidFilter(r.ParserName) && ValidFilter(r.ParserVersion)
         && (r.RetrievedFromUtc is null || r.RetrievedToUtc is null || r.RetrievedFromUtc <= r.RetrievedToUtc)
         && (r.Freshness is null || Enum.IsDefined(r.Freshness.Value))
         && (r.Cursor is null || (r.Cursor.Length <= EvidenceSearchLimits.MaxCursorLength && r.Cursor.Length > 0));
@@ -165,7 +168,8 @@ public sealed class EfEvidenceSearchService : IEvidenceSearchService
             tenantId.ToString("D"), r.Query.Trim(), r.SourceEntryId?.ToString("D") ?? "",
             r.Jurisdiction?.ToLowerInvariant() ?? "", r.SourceType?.ToLowerInvariant() ?? "",
             r.RetrievedFromUtc?.ToString("O") ?? "", r.RetrievedToUtc?.ToString("O") ?? "",
-            r.Freshness?.ToString() ?? "", r.PageSize);
+            r.Freshness?.ToString() ?? "", r.PageSize,
+            r.ParserName ?? "\u0000", r.ParserVersion ?? "\u0000");
         return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(text)));
     }
 
