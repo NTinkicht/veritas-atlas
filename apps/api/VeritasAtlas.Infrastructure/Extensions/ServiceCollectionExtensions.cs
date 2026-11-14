@@ -72,6 +72,11 @@ public static class ServiceCollectionExtensions
             sp.GetRequiredService<VeritasAtlasDbContext>(),
             sp.GetService<TimeProvider>() ?? TimeProvider.System));
         services.AddScoped<ITenantRetrievalAttestationLedger, EfTenantRetrievalAttestationLedger>();
+        services.AddSingleton<IPublisherBindingVerifier, FailClosedPublisherBindingVerifier>();
+        services.AddScoped<IEvidenceVerificationService>(sp => new EfEvidenceVerificationService(
+            sp.GetRequiredService<VeritasAtlasDbContext>(),
+            sp.GetRequiredService<IPublisherBindingVerifier>(),
+            sp.GetService<TimeProvider>() ?? TimeProvider.System));
         services.AddScoped<ITenantRetrievalCheckpointStore, EfTenantRetrievalCheckpointStore>();
         services.AddScoped<ITenantPublicationRevisionStore>(sp => new EfTenantPublicationRevisionStore(
             sp.GetRequiredService<VeritasAtlasDbContext>(),
