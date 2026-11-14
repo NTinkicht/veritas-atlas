@@ -10,7 +10,7 @@ import {
 
 // SYNTHETIC fixtures only.
 const policy = { evidenceRequired: true, historicalEvidenceAllowed: false, historicalTimeContextPreserved: false };
-const row = { evidenceRef: " ev1:abc ", parserName: "", parserVersion: " 1.0 ", scopeSourceEntryId: "" };
+const row = { evidenceRef: " ev1:abc ", parserName: " p ", parserVersion: " 1.0 ", scopeSourceEntryId: "" };
 const item = { evidenceRef: "ev1:abc", valid: true, code: null, freshness: 0, evaluatedAt: "2026-01-01T00:00:00Z", historicalAsOf: null };
 const accepted = { valid: true, code: null, items: [item] };
 const rejected = {
@@ -20,10 +20,10 @@ const rejected = {
 };
 
 describe("validation request body", () => {
-  it("trims, sends blank optional fields as null and keeps the policy flags", () => {
+  it("trims, sends a blank scope as null and keeps the policy flags", () => {
     expect(buildValidationBody(policy, [row])).toEqual({
       ...policy,
-      citations: [{ evidenceRef: "ev1:abc", parserName: null, parserVersion: "1.0", scopeSourceEntryId: null }],
+      citations: [{ evidenceRef: "ev1:abc", parserName: "p", parserVersion: "1.0", scopeSourceEntryId: null }],
     });
     expect(buildValidationBody(policy, []).citations).toEqual([]);
   });
@@ -31,6 +31,8 @@ describe("validation request body", () => {
     expect(() => buildValidationBody(policy, [{ ...row, evidenceRef: "  " }])).toThrow(InvalidCitationInput);
     expect(() => buildValidationBody(policy, [{ ...row, evidenceRef: "a\nb" }])).toThrow(InvalidCitationInput);
     expect(() => buildValidationBody(policy, [{ ...row, evidenceRef: "x".repeat(129) }])).toThrow(InvalidCitationInput);
+    expect(() => buildValidationBody(policy, [row, { ...row, parserName: "  " }])).toThrow("Citation 2 needs a parser name.");
+    expect(() => buildValidationBody(policy, [{ ...row, parserVersion: "" }])).toThrow("Citation 1 needs a parser version.");
     expect(() => buildValidationBody(policy, [{ ...row, scopeSourceEntryId: "not-a-guid" }])).toThrow(InvalidCitationInput);
     expect(() => buildValidationBody(policy, Array.from({ length: 21 }, () => row))).toThrow(InvalidCitationInput);
     expect(buildValidationBody(policy, Array.from({ length: 20 }, () => row)).citations).toHaveLength(20);

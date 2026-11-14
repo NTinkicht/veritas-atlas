@@ -52,11 +52,13 @@ describe("CitationInspectorPage", () => {
     inspect.mockReturnValue(d.promise);
     setup();
     fireEvent.change(screen.getByLabelText(/Evidence reference 1/), { target: { value: "ev1:a" } });
+    fireEvent.change(screen.getByLabelText(/Parser name 1/), { target: { value: "p" } });
+    fireEvent.change(screen.getByLabelText(/Parser version 1/), { target: { value: "1" } });
     fireEvent.click(screen.getByLabelText(/Historical \(non-current\)/));
     submit();
     expect(inspect).toHaveBeenCalledWith(
       { evidenceRequired: true, historicalEvidenceAllowed: true, historicalTimeContextPreserved: false },
-      [{ evidenceRef: "ev1:a", parserName: "", parserVersion: "", scopeSourceEntryId: "" }],
+      [{ evidenceRef: "ev1:a", parserName: "p", parserVersion: "1", scopeSourceEntryId: "" }],
     );
     expect(screen.getByRole("status").textContent).toContain("Inspecting");
     expect(screen.queryByText("Citations accepted")).toBeNull();

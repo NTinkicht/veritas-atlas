@@ -53,13 +53,13 @@ export function CitationInspectorPage() {
             </p>
             <p>
               <label>
-                Parser name {i + 1}{" "}
+                Parser name {i + 1} (required){" "}
                 <input value={row.parserName} onChange={(e) => update(i, "parserName", e.target.value)} spellCheck={false} autoComplete="off" />
               </label>
             </p>
             <p>
               <label>
-                Parser version {i + 1}{" "}
+                Parser version {i + 1} (required){" "}
                 <input value={row.parserVersion} onChange={(e) => update(i, "parserVersion", e.target.value)} spellCheck={false} autoComplete="off" />
               </label>
             </p>

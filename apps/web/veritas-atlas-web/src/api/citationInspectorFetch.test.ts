@@ -4,7 +4,7 @@ import { MalformedCitationResponse, inspectCitations } from "./citationInspector
 
 // SYNTHETIC fixtures only. Exercises the real http layer against a stubbed fetch.
 const policy = { evidenceRequired: true, historicalEvidenceAllowed: false, historicalTimeContextPreserved: false };
-const rows = [{ evidenceRef: "ev1:abc", parserName: "", parserVersion: "", scopeSourceEntryId: "" }];
+const rows = [{ evidenceRef: "ev1:abc", parserName: "p", parserVersion: "1", scopeSourceEntryId: "" }];
 const item = { evidenceRef: "ev1:abc", valid: true, code: null, freshness: 0, evaluatedAt: null, historicalAsOf: null };
 
 function stub(status: number, body: unknown) {

@@ -54,10 +54,15 @@ export function buildValidationBody(policy: CitationPolicy, rows: CitationRow[])
     if (evidenceRef === null) throw new InvalidCitationInput(`Citation ${n} needs an evidence reference.`);
     const scope = optionalText(`Citation ${n} scope source entry`, row.scopeSourceEntryId);
     if (scope !== null && !GUID.test(scope)) throw new InvalidCitationInput(`Citation ${n} scope source entry must be a GUID, or left blank.`);
+    // The server refuses a blank parser name/version with a generic 400, so require them here and name the citation.
+    const parserName = optionalText(`Citation ${n} parser name`, row.parserName);
+    if (parserName === null) throw new InvalidCitationInput(`Citation ${n} needs a parser name.`);
+    const parserVersion = optionalText(`Citation ${n} parser version`, row.parserVersion);
+    if (parserVersion === null) throw new InvalidCitationInput(`Citation ${n} needs a parser version.`);
     return {
       evidenceRef,
-      parserName: optionalText(`Citation ${n} parser name`, row.parserName),
-      parserVersion: optionalText(`Citation ${n} parser version`, row.parserVersion),
+      parserName,
+      parserVersion,
       scopeSourceEntryId: scope,
     };
   });
