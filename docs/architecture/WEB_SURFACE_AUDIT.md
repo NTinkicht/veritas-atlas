@@ -18,6 +18,7 @@ The table mirrors `src/routeAudit.ts`. `src/routes.test.ts` fails when a route h
 | `/investigations` | InvestigationBoardPage | REAL | /api/v1/tenant-investigations, /tenant-investigations/{id}/evidence-items |
 | `/publication-revisions` | PublicationRevisionDeskPage | REAL | /api/v1/tenant-publication-revisions/{id}, /transitions |
 | `/claim-confidence` | ClaimConfidencePage | REAL | /api/v1/tenant-claims/confidence |
+| `/claim-relations` | ClaimRelationGraphPage | REAL | /api/v1/tenant-claims/relation-graph |
 | `/workflow-audit` | WorkflowAuditPage | REAL | /api/v1/workflow-audit/entries/clear |
 | `/persistence` | PersistenceConsolePage | SEEDED-OR-DEMO | /api/v1/persistence/snapshot/reset: scenario snapshot of the seeded workflow scenario |
 | `/persistence-console` | PersistenceConsolePage | SEEDED-OR-DEMO | /api/v1/persistence/snapshot/reset: scenario snapshot of the seeded workflow scenario |
@@ -133,5 +134,6 @@ The table mirrors `src/routeAudit.ts`. `src/routes.test.ts` fails when a route h
 - `/investigations` is the read-only investigation board (VER-P0-17); it reads only the tenant investigation list and collected-evidence endpoints, rejects malformed responses whole, and has no seeded fallback.
 - `/publication-revisions` opens one tenant publication revision by id and posts lifecycle transitions with the expected version and a fresh operation id (VER-P0-17); authorization, self-approval denial and version races are decided only by the server, refusals (401/403/404/409) are shown and change nothing, malformed responses are rejected whole, and there is no seeded fallback.
 - `/claim-confidence` posts one claim's optional evidence-quality counts (blank stays omitted, never 0) and shows the server's coarse band and reasons with a statement that it is evidence quality, not truth, and verifies nothing (VER-P0-17); no seeded fallback, malformed responses are rejected whole.
+- `/claim-relations` posts 1-200 structured claims and shows per-claim status and attributed agreeing, conflicting, superseded and unresolved relations; integer enums are mapped explicitly and unknown values reject the whole response; evidence references are echoed, not verified (VER-P0-17); no seeded fallback.
 - `/evidence-search` (#161) is the analyst search and citation inspector; it reads only `/api/v1/tenant-evidence/search` and has no seeded fallback. The search hit carries no parser name/version, so the inspector says so rather than inventing one.
 - `/case-explorer`, `/case-scoreboard`: listed REAL because they call `/api/v1/cases`; neither reads seed modules (checked by search).

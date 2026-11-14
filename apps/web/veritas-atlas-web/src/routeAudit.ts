@@ -13,6 +13,7 @@ const REAL: Record<string, string> = {
   "/investigations": "/api/v1/tenant-investigations, /tenant-investigations/{id}/evidence-items",
   "/publication-revisions": "/api/v1/tenant-publication-revisions/{id}, /transitions",
   "/claim-confidence": "/api/v1/tenant-claims/confidence",
+  "/claim-relations": "/api/v1/tenant-claims/relation-graph",
   "/workflow-audit": "/api/v1/workflow-audit/entries|clear",
   "/case-flow-map": "/api/v1/cases/status-counts",
   "/cases": "/api/v1/cases",
