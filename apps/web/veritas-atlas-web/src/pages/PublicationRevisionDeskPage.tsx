@@ -9,6 +9,7 @@ import {
   type PublicationRevision,
   type RevisionFailure,
 } from "../api/publicationRevisions";
+import { runTransitionFlow } from "../api/revisionDeskFlow";
 import { AppSurface } from "../components/AppSurface";
 import { RevisionPanel, type Loadable } from "../components/PublicationRevisionView";
 
@@ -39,6 +40,9 @@ export function PublicationRevisionDeskPage() {
     event.preventDefault();
     const id = idText.trim();
     if (!isRevisionId(id)) {
+      latest.current += 1;
+      setNotice(null);
+      setActionFailure(null);
       setView({ kind: "error", failure: { kind: "malformed", message: "A revision id is a GUID such as 11111111-1111-4111-8111-111111111111." } });
       return;
     }
@@ -48,15 +52,20 @@ export function PublicationRevisionDeskPage() {
   async function act(action: LifecycleAction) {
     if (view.kind !== "loaded" || busy) return;
     const { id, version } = view.data;
+    const startedOn = latest.current;
     setBusy(true);
     setNotice(null);
     setActionFailure(null);
     try {
-      const result = await transitionRevision(id, action, version, crypto.randomUUID());
-      setNotice(`${action} accepted by the server${result.replayed ? " (already applied)" : ""}. Now ${result.revision.state}.`);
-      await load(id, true);
-    } catch (error) {
-      setActionFailure(classifyRevisionFailure(error, navigator.onLine));
+      await runTransitionFlow({
+        id, action, version, operationId: crypto.randomUUID(),
+        isCurrent: () => latest.current === startedOn,
+        transition: transitionRevision,
+        classify: (error) => classifyRevisionFailure(error, navigator.onLine),
+        onAccepted: setNotice,
+        onRefused: setActionFailure,
+        reload: (revisionId) => load(revisionId, true),
+      });
     } finally {
       setBusy(false);
     }
