@@ -306,6 +306,7 @@ public sealed class AuthorizationMatrixTests
         "POST api/v1/tenant-publication-revisions | denied: reviewer,publisher,admin,intruder",
         "POST api/v1/tenant-publication-revisions/{id:guid}/transitions | denied: admin,intruder",
         "POST api/v1/tenant-sources | denied: operator,analyst,reviewer,publisher,intruder",
+        "POST api/v1/tenant-sources/{id:guid}/retrievals | denied: operator,analyst,reviewer,publisher,intruder",
         "POST api/v1/workflow-audit/clear | denied: operator,analyst,reviewer,publisher,intruder",
         "PUT api/v1/tenant-investigations/{investigationId:guid}/evidence-items/{itemId:guid}/bookmark | denied: reviewer,publisher,admin,intruder",
         "PUT api/v1/tenant-investigations/{investigationId:guid}/shares/{grantee} | denied: reviewer,publisher,admin,intruder",
