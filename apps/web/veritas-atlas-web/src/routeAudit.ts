@@ -11,6 +11,7 @@ const REAL: Record<string, string> = {
   "/public/publications/:id": "/api/v1/public/publications/{id} (anonymous, credential-free, fail-closed)",
   "/evidence-search": "/api/v1/tenant-evidence/search",
   "/investigations": "/api/v1/tenant-investigations, /tenant-investigations/{id}/evidence-items",
+  "/publication-revisions": "/api/v1/tenant-publication-revisions/{id}, /transitions",
   "/workflow-audit": "/api/v1/workflow-audit/entries|clear",
   "/case-flow-map": "/api/v1/cases/status-counts",
   "/cases": "/api/v1/cases",
