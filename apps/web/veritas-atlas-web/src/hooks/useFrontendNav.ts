@@ -6,6 +6,7 @@ const NAV_LINKS = [
   { href: "/evidence-search", label: "Evidence Search" },
   { href: "/investigations", label: "Investigations" },
   { href: "/publication-revisions", label: "Publication Revisions" },
+  { href: "/claim-confidence", label: "Claim Confidence" },
   { href: "/cases", label: "Cases" },
   { href: "/claims", label: "Claims" },
   { href: "/contradictions", label: "Contradictions" },
