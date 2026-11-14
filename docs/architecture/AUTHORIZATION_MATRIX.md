@@ -64,6 +64,7 @@ Source of truth is the test; this table is generated from it.
 | `POST tenant-investigations/{investigationId:guid}/evidence-items/{itemId:guid}/annotations` | reviewer, publisher, admin, intruder |
 | `POST tenant-publication-revisions` | reviewer, publisher, admin, intruder |
 | `POST tenant-publication-revisions/{id:guid}/transitions` | admin, intruder |
+| `POST tenant-raw-retrievals/{id:guid}/parses` | operator, analyst, reviewer, publisher, intruder |
 | `POST tenant-sources` | operator, analyst, reviewer, publisher, intruder |
 | `POST tenant-sources/{id:guid}/retrievals` | operator, analyst, reviewer, publisher, intruder |
 | `POST workflow-audit/clear` | operator, analyst, reviewer, publisher, intruder |
