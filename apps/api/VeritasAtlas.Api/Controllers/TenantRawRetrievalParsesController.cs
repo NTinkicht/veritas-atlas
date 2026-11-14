@@ -44,6 +44,11 @@ public sealed class TenantRawRetrievalParsesController : ControllerBase
             return Error(StatusCodes.Status403Forbidden, "admin_required",
                 "Only a tenant admin may parse a raw retrieval.");
 
+        // An all-zero ID can never name a stored retrieval; the parse service rejects it with an
+        // ArgumentException (a 500), so answer with the same not-found response as any unknown ID.
+        if (id == Guid.Empty)
+            return Error(StatusCodes.Status404NotFound, "retrieval_not_found", "The raw retrieval was not found.");
+
         var result = await _parser.ParseAsync(tenantId, id, actor, cancellationToken);
         return result.Outcome switch
         {

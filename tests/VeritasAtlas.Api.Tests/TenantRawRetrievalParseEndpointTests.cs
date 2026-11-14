@@ -104,6 +104,24 @@ public sealed class TenantRawRetrievalParseEndpointTests
     }
 
     [TestMethod]
+    public async Task EmptyRetrievalIdIsNotFoundForAdminAndNeverReachesTheParseService()
+    {
+        var parser = new RecordingParser();
+        using var factory = new ApiFactory(parser: parser);
+        using var client = factory.CreateClient();
+        using var response = await Post(client, Path(Guid.Empty), Sign("synthetic-admin-b", ["admin"], [TenantB.ToString("D")]));
+        var text = await response.Content.ReadAsStringAsync();
+        Assert.AreEqual(HttpStatusCode.NotFound, response.StatusCode, text);
+        StringAssert.Contains(text, "retrieval_not_found");
+        Assert.AreEqual(0, parser.Calls);
+
+        // Positive control: the same admin with a non-empty ID does reach the parse service.
+        using var control = await Post(client, Path(Guid.NewGuid()), Sign("synthetic-admin-b", ["admin"], [TenantB.ToString("D")]));
+        Assert.AreEqual(1, parser.Calls);
+        Assert.AreNotEqual(HttpStatusCode.NotFound, control.StatusCode);
+    }
+
+    [TestMethod]
     public async Task TenantComesFromTheClaimAndOutcomesMapToDistinctResponses()
     {
         var run = new TenantParseRunModel(
