@@ -14,7 +14,9 @@ public static class EvidenceSearchLimits
 /// <summary>
 /// One tenant-scoped full-text search request over verified evidence (VER-P0-09, #159).
 /// <see cref="Freshness"/> restricts results to evidence whose server-side re-evaluation yields
-/// that state; null returns every state with its honest label.
+/// that state; null returns every state with its honest label. <see cref="ParserName"/> and
+/// <see cref="ParserVersion"/> are the provenance filters: they match the stored parse run behind the
+/// verification exactly (ordinal, case-sensitive), so evidence without a parse run never matches.
 /// </summary>
 public sealed record EvidenceSearchRequest(
     string Query,
@@ -25,7 +27,9 @@ public sealed record EvidenceSearchRequest(
     DateTime? RetrievedToUtc,
     FreshnessState? Freshness,
     int PageSize,
-    string? Cursor);
+    string? Cursor,
+    string? ParserName = null,
+    string? ParserVersion = null);
 
 public sealed record EvidenceSearchHit(
     string EvidenceRef,
