@@ -8,7 +8,10 @@ test until the pinned matrix and this document are updated together.
 ## Roles and trust model
 
 - Roles in tokens: `operator`, `analyst`, `reviewer`, `publisher`, `admin`.
-  Any other role value is unknown and must not be trusted.
+  Any other role value is unknown and must not be trusted: a principal with no
+  role claim, or with any role claim outside this set (even next to a known one),
+  is refused with 403 at the authorization gate (default and fallback policy,
+  `KnownRoles`, #264) before any controller runs.
 - Authentication: deny by default (fallback policy requires an authenticated
   principal; VER-P0-02, `DefaultAuthenticatedEndpointTests`). The anonymous
   surface is exactly: `/health`, `/health/live`, `/health/ready`,
@@ -35,7 +38,7 @@ query -> evidence -> claims -> review -> publication:
 
 ## Pinned matrix (endpoints where at least one role is denied with 403)
 
-Every other protected endpoint denies **no** role at the authorization gate.
+Every other protected endpoint denies **no known** role at the authorization gate.
 Source of truth is the test; this table is generated from it.
 
 | Endpoint (under `api/v1/`) | Roles answered with 403 |
@@ -71,10 +74,13 @@ Source of truth is the test; this table is generated from it.
 
 ## Known gaps found while pinning (not fixed here)
 
-1. **Unknown roles pass on legacy endpoints.** An authenticated token with an
-   unrecognized role is not denied by any of the legacy non-tenant endpoints
-   (about 70 routes). The destructive `POST persistence/reset` and
-   `POST workflow-audit/clear` are now admin-only (#237).
+1. ~~Unknown roles pass on legacy endpoints.~~ Fixed in #264: the default and
+   fallback authorization policies require every role claim to be one of the
+   five known roles, so an unknown, mixed or missing role answers 403 on every
+   protected endpoint (`UnknownRoleGateTests`). Legacy endpoints still do not
+   distinguish between known roles. `analyst` and the other known roles are
+   unchanged, and `POST persistence/reset` and `POST workflow-audit/clear`
+   remain admin-only (#237).
 2. **Probe limitation.** The probe sends an empty JSON body. Endpoints that
    answer 400 from model binding do so before in-action role checks, so their
    role gating is not asserted by this matrix (rows with no denied role may
@@ -100,7 +106,7 @@ Source of truth is the test; this table is generated from it.
    | `POST review-workflow/contradictions/{id}/escalate` | EscalateContradiction | reviewer, publisher, admin |
    | `POST review-workflow/reviews/{id}/reopen` | ReopenReview | reviewer, publisher, admin |
 
-   `analyst` and unknown roles are denied everywhere; `operator` may only
+   `analyst` is denied everywhere and unknown roles are refused earlier by the gate; `operator` may only
    submit. Denied calls answer 403 with the role-policy message on every route, including
    the six `actions/cases/{id:guid}/...` routes (fixed in #241; an invalid
    transition answers 400). The record is unchanged on denial.

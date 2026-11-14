@@ -46,6 +46,20 @@ public sealed class TenantSourceRetrievalEndpointTests
         pinnedContentSha256 = pin
     };
 
+    // Roles outside the known five (#264) are refused earlier, at the authorization gate, so the controller's
+    // admin_required body must be absent for them and present for every known-role refusal.
+    private static void AssertRefusalReason(string body, string label)
+    {
+        if (label is "no role" or "administrator" or "anonymous")
+        {
+            StringAssert.DoesNotMatch(body, new System.Text.RegularExpressions.Regex("admin_required"), label + " must be refused by the gate");
+        }
+        else
+        {
+            StringAssert.Contains(body, "admin_required", label);
+        }
+    }
+
     [TestMethod]
     public async Task EveryNonAdminCallerIsRefusedBeforeTheFetcher()
     {
@@ -68,7 +82,7 @@ public sealed class TenantSourceRetrievalEndpointTests
         {
             using var response = await Send(client, Path(Guid.NewGuid()), bearer, Body());
             Assert.AreEqual(HttpStatusCode.Forbidden, response.StatusCode, label);
-            StringAssert.Contains(await response.Content.ReadAsStringAsync(), "admin_required", label);
+            AssertRefusalReason(await response.Content.ReadAsStringAsync(), label);
         }
 
         Assert.AreEqual(0, fetcher.Calls, "no fetcher access for a non-admin caller");
