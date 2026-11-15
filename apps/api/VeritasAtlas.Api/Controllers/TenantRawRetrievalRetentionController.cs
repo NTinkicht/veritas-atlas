@@ -43,14 +43,25 @@ public sealed class TenantRawRetrievalRetentionController : ControllerBase
     public async Task<IActionResult> Record(Guid id, [FromBody] RetentionRecordRequest? request, CancellationToken cancellationToken)
     {
         if (Gate(out var tenantId, out var actor) is { } refused) return refused;
-        if (request is null || (request.RetainUntilUtc is { } u && u.UtcDateTime <= DateTime.UtcNow))
+        if (request is not { LegalHold: { } legalHold })
             return Error(StatusCodes.Status400BadRequest, "retention_invalid",
-                "A legal hold flag is required and a retain-until instant must be in the future.");
+                "An explicit legalHold flag is required.");
         if (id == Guid.Empty || await _retrievals.GetAsync(tenantId, id, cancellationToken) is null)
             return Error(StatusCodes.Status404NotFound, "retrieval_not_found", "The raw retrieval was not found.");
 
+        // A new window must be in the future; resubmitting the latest recorded window unchanged is allowed
+        // (even once elapsed) so a hold can be set or released. Earlier windows are still refused by the store.
+        if (request.RetainUntilUtc is { } u && u.UtcDateTime <= DateTime.UtcNow)
+        {
+            var latest = await _records.GetLatestAsync(tenantId, id, cancellationToken);
+            var ticks = u.UtcDateTime.Ticks - u.UtcDateTime.Ticks % 10;
+            if (latest?.RetainUntilUtc is not { } existing || existing.Ticks - existing.Ticks % 10 != ticks)
+                return Error(StatusCodes.Status400BadRequest, "retention_invalid",
+                    "A retain-until instant must be in the future unless it repeats the recorded window.");
+        }
+
         var result = await _records.AppendAsync(
-            tenantId, id, request.LegalHold, request.RetainUntilUtc?.UtcDateTime, actor, cancellationToken);
+            tenantId, id, legalHold, request.RetainUntilUtc?.UtcDateTime, actor, cancellationToken);
         return result.Outcome switch
         {
             RetentionRecordAppendOutcome.Appended or RetentionRecordAppendOutcome.NoChange => Ok(new RetentionRecordResponse(
@@ -120,6 +131,6 @@ public sealed record RetentionEligibilityResponse(
     int RecordVersion, bool LegalHold, DateTime? RetainUntilUtc);
 
 /// <summary>Body of the retention PUT; the retain-until must be in the future when present.</summary>
-public sealed record RetentionRecordRequest(bool LegalHold, DateTimeOffset? RetainUntilUtc);
+public sealed record RetentionRecordRequest(bool? LegalHold, DateTimeOffset? RetainUntilUtc);
 
 public sealed record RetentionRecordResponse(int Version, bool LegalHold, DateTime? RetainUntilUtc, bool Appended);

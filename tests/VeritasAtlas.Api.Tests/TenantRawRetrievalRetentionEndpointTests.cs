@@ -200,6 +200,10 @@ public sealed class TenantRawRetrievalRetentionEndpointTests
         Assert.AreEqual(HttpStatusCode.BadRequest, past.StatusCode);
         using var missingBody = await Put(client, PutPath(known), adminA, null);
         Assert.AreEqual(HttpStatusCode.BadRequest, missingBody.StatusCode);
+        using var noHold = await Put(client, PutPath(known), adminA, new { });
+        using var onlyWindow = await Put(client, PutPath(known), adminA, new { retainUntilUtc = DateTime.UtcNow.AddDays(5) });
+        Assert.AreEqual(HttpStatusCode.BadRequest, noHold.StatusCode, "an omitted legalHold must not default to false");
+        Assert.AreEqual(HttpStatusCode.BadRequest, onlyWindow.StatusCode);
         Assert.AreEqual(0, ledger.Appends.Count);
 
         using var foreign = await Put(client, PutPath(known), adminB, new { legalHold = true });
@@ -213,6 +217,17 @@ public sealed class TenantRawRetrievalRetentionEndpointTests
         using var ok = await Put(client, PutPath(known), adminA, new { legalHold = false, retainUntilUtc = future });
         Assert.AreEqual(HttpStatusCode.OK, ok.StatusCode, "positive control");
         Assert.AreEqual(1, ledger.Appends.Count);
+
+        // An elapsed recorded window may be resubmitted unchanged (to set/release a hold), never a different past one.
+        var elapsed = DateTime.UtcNow.AddDays(-1);
+        ledger.Record = new TenantRetentionRecordModel(2, true, elapsed, "synthetic-admin", At);
+        var before = ledger.Appends.Count;
+        using var same = await Put(client, PutPath(known), adminA, new { legalHold = false, retainUntilUtc = elapsed });
+        Assert.AreEqual(HttpStatusCode.OK, same.StatusCode, "unchanged elapsed window is accepted");
+        Assert.AreEqual(before + 1, ledger.Appends.Count);
+        using var other = await Put(client, PutPath(known), adminA, new { legalHold = false, retainUntilUtc = elapsed.AddHours(-1) });
+        Assert.AreEqual(HttpStatusCode.BadRequest, other.StatusCode);
+        Assert.AreEqual(before + 1, ledger.Appends.Count);
 
         ledger.AppendOutcome = RetentionRecordAppendOutcome.WindowShortened;
         using var shortened = await Put(client, PutPath(known), adminA, new { legalHold = false, retainUntilUtc = future });
