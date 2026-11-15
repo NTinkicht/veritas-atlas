@@ -64,8 +64,9 @@ public sealed class EvidenceSearchTests
     private static EvidenceSearchRequest Req(
         string q = "section", Guid? source = null, string? jurisdiction = null, string? type = null,
         FreshnessState? freshness = null, int size = 20, string? cursor = null,
-        DateTime? from = null, DateTime? to = null, string? parser = null, string? parserVersion = null) =>
-        new(q, source, jurisdiction, type, from, to, freshness, size, cursor, parser, parserVersion);
+        DateTime? from = null, DateTime? to = null, string? parser = null, string? parserVersion = null,
+        string? subject = null) =>
+        new(q, source, jurisdiction, type, from, to, freshness, size, cursor, parser, parserVersion, subject);
 
     private static EfEvidenceSearchService Search(VeritasAtlasDbContext db, MutableTime time, SourceFreshnessPolicy? policy) =>
         new(db, new EfEvidenceFreshnessService(db, new FixedPolicies(policy), new NoProofRevisions(), time));
@@ -82,6 +83,7 @@ public sealed class EvidenceSearchTests
                      Req(type: new string('x', EvidenceSearchLimits.MaxFilterLength + 1)),
                      Req(from: At.AddDays(1), to: At), Req(freshness: (FreshnessState)99), Req(cursor: ""),
                      Req(parser: "a\u0001"), Req(parserVersion: new string('x', EvidenceSearchLimits.MaxFilterLength + 1)),
+                     Req(subject: " "), Req(subject: "a\u0001"), Req(subject: new string('x', EvidenceSearchLimits.MaxFilterLength + 1)),
                      Req(cursor: new string('A', EvidenceSearchLimits.MaxCursorLength + 1)),
                  })
         {
@@ -190,6 +192,36 @@ public sealed class EvidenceSearchTests
         var replay = await service.SearchAsync(TenantA, Req(size: 1, cursor: paged.NextCursor, parser: name), CancellationToken.None);
         Assert.AreEqual(EvidenceSearchOutcome.InvalidRequest, replay.Outcome);
         Assert.AreEqual(EvidenceSearchOutcome.Ok, first.Outcome);
+    }
+
+    [TestMethod]
+    public async Task SubjectFilterMustMatchTheSameVerifiedChunkAsTheQuery()
+    {
+        if (Database() is not { } cs) return;
+        await ResetAsync(cs);
+        await using var db = new VeritasAtlasDbContext(Options(cs));
+        await SeedAsync(db, TenantA, "r1", "alpha", verify: true);
+        await SeedAsync(db, TenantA, "r2", "beta", verify: true);
+        await SeedAsync(db, TenantB, "r3", "gamma", verify: true);
+        await SeedAsync(db, TenantA, "r4", "delta", verify: false);
+        var service = Search(db, new MutableTime(At.AddMinutes(30)), Policy);
+
+        async Task<EvidenceSearchPage> Run(EvidenceSearchRequest r, Guid? tenant = null) =>
+            await service.SearchAsync(tenant ?? TenantA, r, CancellationToken.None);
+        Assert.AreEqual(2, (await Run(Req())).Hits.Count, "positive control: both verified records match the query");
+        var alpha = await Run(Req(subject: "alpha"));
+        Assert.AreEqual(1, alpha.Hits.Count);
+        StringAssert.Contains(alpha.Hits[0].Snippet, "alpha");
+        Assert.AreEqual(1, (await Run(Req(subject: " BETA "))).Hits.Count, "subject is case-insensitive full text");
+        Assert.AreEqual(0, (await Run(Req(subject: "nonexistent"))).Hits.Count);
+        Assert.AreEqual(0, (await Run(Req(subject: "delta"))).Hits.Count, "unverified evidence is never reachable through a subject");
+        Assert.AreEqual(0, (await Run(Req(subject: "gamma"))).Hits.Count, "a foreign tenant's text is never reachable");
+        Assert.AreEqual(1, (await Run(Req(subject: "gamma"), TenantB)).Hits.Count);
+
+        var paged = await Run(Req(size: 1));
+        Assert.IsNotNull(paged.NextCursor);
+        var replay = await Run(Req(size: 1, cursor: paged.NextCursor, subject: "alpha"));
+        Assert.AreEqual(EvidenceSearchOutcome.InvalidRequest, replay.Outcome, "a cursor minted without a subject cannot be replayed with one");
     }
 
     [TestMethod]
@@ -317,7 +349,7 @@ public sealed class EvidenceSearchTests
         Assert.AreEqual(0, recording.Calls, "no search without a valid tenant");
 
         var good = Sign("synthetic-an", "analyst", [TenantA.ToString("D")]);
-        using (var ok = await Get(client, Path + "&freshness=current&limit=5&jurisdiction=gb-uk&parser=p1&parser_version=2.0&tenant=" + TenantB, good))
+        using (var ok = await Get(client, Path + "&freshness=current&limit=5&jurisdiction=gb-uk&parser=p1&parser_version=2.0&subject=alpha&tenant=" + TenantB, good))
         {
             Assert.AreEqual(HttpStatusCode.OK, ok.StatusCode);
             StringAssert.Contains(await ok.Content.ReadAsStringAsync(), "results");
@@ -328,6 +360,7 @@ public sealed class EvidenceSearchTests
         Assert.AreEqual(5, recording.Last.PageSize);
         Assert.AreEqual("p1", recording.Last.ParserName);
         Assert.AreEqual("2.0", recording.Last.ParserVersion);
+        Assert.AreEqual("alpha", recording.Last.Subject);
     }
 
     [TestMethod]

@@ -40,6 +40,7 @@ public sealed class EfEvidenceSearchService : IEvidenceSearchService
         if (request.Cursor is not null && !TryReadCursor(request.Cursor, fingerprint, out after)) return Invalid();
 
         var query = request.Query.Trim();
+        var subject = request.Subject?.Trim();
         var hits = new List<EvidenceSearchHit>();
         var batchSize = Math.Min(EvidenceSearchLimits.MaxPageSize, request.PageSize * 2);
         string? lastScanned = after;
@@ -53,6 +54,7 @@ public sealed class EfEvidenceSearchService : IEvidenceSearchService
                     on new { c.TenantId, c.ParseRunId } equals new { v.TenantId, v.ParseRunId }
                 where c.TenantId == tenantId
                     && EF.Functions.ToTsVector("simple", c.Text).Matches(EF.Functions.PlainToTsQuery("simple", query))
+                    && (subject == null || EF.Functions.ToTsVector("simple", c.Text).Matches(EF.Functions.PlainToTsQuery("simple", subject)))
                     && (lastScanned == null || v.ParentEvidenceRef.CompareTo(lastScanned) > 0)
                 select v.ParentEvidenceRef)
                 .Distinct().OrderBy(r => r).Take(batchSize)
@@ -61,7 +63,7 @@ public sealed class EfEvidenceSearchService : IEvidenceSearchService
             if (refs.Count == 0) break;
 
             var latest = await LoadLatestAsync(tenantId, refs, cancellationToken);
-            var snippets = await LoadSnippetsAsync(tenantId, refs, query, cancellationToken);
+            var snippets = await LoadSnippetsAsync(tenantId, refs, query, subject, cancellationToken);
             foreach (var evidenceRef in refs)
             {
                 lastScanned = evidenceRef;
@@ -100,7 +102,7 @@ public sealed class EfEvidenceSearchService : IEvidenceSearchService
     }
 
     private async Task<Dictionary<string, string>> LoadSnippetsAsync(
-        Guid tenantId, List<string> refs, string query, CancellationToken cancellationToken)
+        Guid tenantId, List<string> refs, string query, string? subject, CancellationToken cancellationToken)
     {
         // Same verified-only join and tenant scope as the candidate query: a snippet never comes from
         // an unverified or foreign chunk.
@@ -111,6 +113,7 @@ public sealed class EfEvidenceSearchService : IEvidenceSearchService
             where c.TenantId == tenantId
                 && refs.Contains(v.ParentEvidenceRef)
                 && EF.Functions.ToTsVector("simple", c.Text).Matches(EF.Functions.PlainToTsQuery("simple", query))
+                && (subject == null || EF.Functions.ToTsVector("simple", c.Text).Matches(EF.Functions.PlainToTsQuery("simple", subject)))
             // Bound the projected text in the database: only the first MaxSnippetLength code points of each
             // matching chunk leave Postgres, never the full chunk body.
             select new { v.ParentEvidenceRef, c.Ordinal, c.Id, Text = c.Text.Substring(0, EvidenceSearchLimits.MaxSnippetLength) })
@@ -188,10 +191,13 @@ public sealed class EfEvidenceSearchService : IEvidenceSearchService
         && !r.Query.Any(char.IsControl)
         && r.PageSize is >= 1 and <= EvidenceSearchLimits.MaxPageSize
         && ValidFilter(r.Jurisdiction) && ValidFilter(r.SourceType)
-        && ValidFilter(r.ParserName) && ValidFilter(r.ParserVersion)
+        && ValidFilter(r.ParserName) && ValidFilter(r.ParserVersion) && ValidSubject(r.Subject)
         && (r.RetrievedFromUtc is null || r.RetrievedToUtc is null || r.RetrievedFromUtc <= r.RetrievedToUtc)
         && (r.Freshness is null || Enum.IsDefined(r.Freshness.Value))
         && (r.Cursor is null || (r.Cursor.Length <= EvidenceSearchLimits.MaxCursorLength && r.Cursor.Length > 0));
+
+    // A subject is a text term, so a blank one is refused rather than silently ignored.
+    private static bool ValidSubject(string? value) => value is null || (!string.IsNullOrWhiteSpace(value) && ValidFilter(value));
 
     private static bool ValidFilter(string? value) =>
         value is null || (value.Length is >= 1 and <= EvidenceSearchLimits.MaxFilterLength && !value.Any(char.IsControl));
@@ -204,7 +210,7 @@ public sealed class EfEvidenceSearchService : IEvidenceSearchService
             r.Jurisdiction?.ToLowerInvariant() ?? "", r.SourceType?.ToLowerInvariant() ?? "",
             r.RetrievedFromUtc?.ToString("O") ?? "", r.RetrievedToUtc?.ToString("O") ?? "",
             r.Freshness?.ToString() ?? "", r.PageSize,
-            r.ParserName ?? "\u0000", r.ParserVersion ?? "\u0000");
+            r.ParserName ?? "\u0000", r.ParserVersion ?? "\u0000", r.Subject?.Trim() ?? "\u0000");
         return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(text)));
     }
 

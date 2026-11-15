@@ -34,6 +34,7 @@ public sealed class TenantEvidenceSearchController : ControllerBase
         [FromQuery] DateTime? from,
         [FromQuery] DateTime? to,
         [FromQuery] string? freshness,
+        [FromQuery] string? subject,
         [FromQuery] string? parser,
         [FromQuery(Name = "parser_version")] string? parserVersion,
         [FromQuery] int? limit,
@@ -61,7 +62,7 @@ public sealed class TenantEvidenceSearchController : ControllerBase
         var request = new EvidenceSearchRequest(
             q ?? string.Empty, source, jurisdiction, type,
             from?.ToUniversalTime(), to?.ToUniversalTime(), state,
-            limit ?? EvidenceSearchLimits.DefaultPageSize, cursor, parser, parserVersion);
+            limit ?? EvidenceSearchLimits.DefaultPageSize, cursor, parser, parserVersion, subject);
         var page = await _search.SearchAsync(tenantId, request, cancellationToken);
         return page.Outcome == EvidenceSearchOutcome.Ok
             ? Ok(new EvidenceSearchResponse(page.Hits, page.NextCursor))
