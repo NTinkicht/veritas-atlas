@@ -158,6 +158,15 @@ public sealed class EfEvidenceVerificationService : IEvidenceVerificationService
             : _db.TenantEvidenceVerifications.AsNoTracking()
                 .AnyAsync(x => x.TenantId == tenantId && x.ParseRunId == parseRunId, cancellationToken);
 
+    public async Task<EvidenceVerificationModel?> GetAsync(
+        Guid tenantId, Guid parseRunId, CancellationToken cancellationToken)
+    {
+        if (tenantId == Guid.Empty || parseRunId == Guid.Empty) return null;
+        var row = await _db.TenantEvidenceVerifications.AsNoTracking()
+            .SingleOrDefaultAsync(x => x.TenantId == tenantId && x.ParseRunId == parseRunId, cancellationToken);
+        return row is null ? null : ToModel(row);
+    }
+
     private static EvidenceVerificationResult Refuse(string reason) =>
         new(EvidenceVerificationOutcome.Refused, null, reason);
 

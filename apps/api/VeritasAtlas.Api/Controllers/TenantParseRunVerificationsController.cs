@@ -38,6 +38,40 @@ public sealed class TenantParseRunVerificationsController : ControllerBase
         _policies = policies;
     }
 
+    /// <summary>
+    /// VER-P0-07 (#274): admin read of one parse run's verification state. Same fail-closed gate and
+    /// identical 404 for unknown, foreign and mismatched IDs as the trigger; a run that exists but is not
+    /// verified answers 404 <c>verification_not_found</c>. Identifiers and times only, never the reference.
+    /// </summary>
+    [HttpGet]
+    public async Task<IActionResult> Get(Guid id, Guid parseRunId, CancellationToken cancellationToken)
+    {
+        if (TenantClaim.GetTenantId(User) is not { } tenantId)
+            return Error(StatusCodes.Status403Forbidden, "tenant_required",
+                "The access token carries no valid organization tenant.");
+
+        var actor = User.FindFirstValue(ClaimTypes.Name);
+        if (string.IsNullOrWhiteSpace(actor)
+            || actor.Length > TenantAuditEventLimits.MaxSubjectLength
+            || actor.Any(char.IsControl))
+            return Error(StatusCodes.Status403Forbidden, "actor_required",
+                "The access token carries no usable subject name.");
+
+        if (!TenantAdminRole.IsSatisfiedBy(User))
+            return Error(StatusCodes.Status403Forbidden, "admin_required",
+                "Only a tenant admin may read a parse run's verification.");
+
+        if (id == Guid.Empty || parseRunId == Guid.Empty) return NotFound();
+        if (await _retrievals.GetAsync(tenantId, id, cancellationToken) is null) return NotFound();
+        var runs = await _runs.ListForRetrievalAsync(tenantId, id, cancellationToken);
+        if (runs.All(r => r.Id != parseRunId)) return NotFound();
+
+        var verification = await _verifier.GetAsync(tenantId, parseRunId, cancellationToken);
+        return verification is null
+            ? Error(StatusCodes.Status404NotFound, "verification_not_found", "The parse run is not verified.")
+            : Ok(ToResponse(new EvidenceVerificationResult(EvidenceVerificationOutcome.Replayed, verification, null), "verified"));
+    }
+
     [HttpPost]
     public async Task<IActionResult> Post(Guid id, Guid parseRunId, CancellationToken cancellationToken)
     {

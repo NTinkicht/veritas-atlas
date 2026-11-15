@@ -42,6 +42,9 @@ public interface IEvidenceVerificationService
 
     /// <summary>True only when a verified row exists for this parse run of the caller's tenant.</summary>
     Task<bool> IsVerifiedAsync(Guid tenantId, Guid parseRunId, CancellationToken cancellationToken);
+
+    /// <summary>The verified row of this parse run for the caller's tenant, or null (never throws on unknown IDs).</summary>
+    Task<EvidenceVerificationModel?> GetAsync(Guid tenantId, Guid parseRunId, CancellationToken cancellationToken);
 }
 
 public enum EvidenceVerificationOutcome
