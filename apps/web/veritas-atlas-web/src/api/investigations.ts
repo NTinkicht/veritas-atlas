@@ -1,4 +1,4 @@
-import { apiDelete, apiGet, apiPut } from "./http";
+import { apiDelete, apiGet, apiPost, apiPut } from "./http";
 
 // VER-P0-17: read-only client for the tenant-scoped investigation workspace API
 // (VER-P0-10, /api/v1/tenant-investigations). No seeded or cached fallback: what is shown is
@@ -238,4 +238,76 @@ export async function putBookmark(investigationId: string, itemId: string): Prom
 
 export async function removeBookmark(investigationId: string, itemId: string): Promise<void> {
   await apiDelete(bookmarkPath(investigationId, itemId));
+}
+
+export type EvidenceAnnotation = {
+  id: string;
+  investigationId: string;
+  evidenceItemId: string;
+  text: string;
+  authorSubject: string;
+  createdAtUtc: string;
+};
+
+/** Mirrors TenantInvestigationAnnotationLimits on the server. */
+export const ANNOTATION_MAX_TEXT_LENGTH = 1000;
+
+/** Client-side mirror of the server text rule so invalid text never reaches the network. */
+export function isValidAnnotationText(value: string): boolean {
+  if (value.length === 0 || value.length > ANNOTATION_MAX_TEXT_LENGTH) return false;
+  if (value.trim().length === 0 || value !== value.trim()) return false;
+  // eslint-disable-next-line no-control-regex
+  return !/[\u0000-\u0009\u000b-\u001f\u007f-\u009f]/.test(value);
+}
+
+export function annotationsPath(investigationId: string, itemId: string): string {
+  if (!GUID.test(itemId)) throw new MalformedInvestigationResponse("item id is not a GUID");
+  return `${evidenceItemsPath(investigationId)}/${itemId}/annotations`;
+}
+
+function toAnnotation(r: Record<string, unknown>, index: number): EvidenceAnnotation {
+  return {
+    id: guid(r, "id", index, "annotation"),
+    investigationId: guid(r, "investigationId", index, "annotation"),
+    evidenceItemId: guid(r, "evidenceItemId", index, "annotation"),
+    text: text(r, "text", index, "annotation"),
+    authorSubject: text(r, "authorSubject", index, "annotation"),
+    createdAtUtc: text(r, "createdAtUtc", index, "annotation"),
+  };
+}
+
+export function parseAnnotations(raw: unknown): EvidenceAnnotation[] {
+  return items(raw).map(toAnnotation);
+}
+
+export function parseAnnotation(raw: unknown): EvidenceAnnotation {
+  if (typeof raw !== "object" || raw === null) throw new MalformedInvestigationResponse("annotation is not an object");
+  return toAnnotation(raw as Record<string, unknown>, 0);
+}
+
+function sameIds(a: EvidenceAnnotation, investigationId: string, itemId: string): boolean {
+  return (
+    a.investigationId.toLowerCase() === investigationId.toLowerCase() &&
+    a.evidenceItemId.toLowerCase() === itemId.toLowerCase()
+  );
+}
+
+export async function listAnnotations(investigationId: string, itemId: string): Promise<EvidenceAnnotation[]> {
+  const list = parseAnnotations(await apiGet<unknown>(annotationsPath(investigationId, itemId)));
+  // Fail closed on a list that mentions some other item or investigation.
+  if (!list.every((a) => sameIds(a, investigationId, itemId))) {
+    throw new MalformedInvestigationResponse("annotation does not match the requested item");
+  }
+  return list;
+}
+
+/** Append-only: the server never edits or deletes. Invalid text is refused before any request. */
+export async function addAnnotation(investigationId: string, itemId: string, value: string): Promise<EvidenceAnnotation> {
+  const path = annotationsPath(investigationId, itemId);
+  if (!isValidAnnotationText(value)) throw new MalformedInvestigationResponse("annotation text is not valid");
+  const annotation = parseAnnotation(await apiPost<unknown, { text: string }>(path, { text: value }));
+  if (!sameIds(annotation, investigationId, itemId) || annotation.text !== value) {
+    throw new MalformedInvestigationResponse("annotation does not match the request");
+  }
+  return annotation;
 }

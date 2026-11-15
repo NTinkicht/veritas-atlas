@@ -1,6 +1,8 @@
 import { formatInstant } from "../api/evidenceSearch";
+import { ANNOTATION_MAX_TEXT_LENGTH, isValidAnnotationText } from "../api/investigations";
 import type {
   CollectedEvidenceItem,
+  EvidenceAnnotation,
   ComparedEvidence,
   EvidenceComparison as EvidenceComparisonData,
   Investigation,
@@ -64,6 +66,19 @@ type BoardProps = {
   bookmarkNotice?: InvestigationFailure | null;
   /** False until the caller's bookmarks were read successfully: mutations stay disabled (fail closed). */
   bookmarksReady?: boolean;
+  /** Annotations: omit onToggleAnnotations to hide the controls. */
+  annotations?: AnnotationsState | null;
+  onToggleAnnotations?: (itemId: string) => void;
+};
+
+export type AnnotationsState = {
+  itemId: string;
+  view: Loadable<EvidenceAnnotation[]>;
+  draft: string;
+  submitting: boolean;
+  notice: InvestigationFailure | null;
+  onDraftChange: (value: string) => void;
+  onSubmit: () => void;
 };
 
 export function EvidenceBoard({
@@ -77,6 +92,8 @@ export function EvidenceBoard({
   busyIds,
   bookmarkNotice,
   bookmarksReady = true,
+  annotations,
+  onToggleAnnotations,
 }: BoardProps) {
   return (
     <section className="panel" aria-label={`Collected evidence for ${investigation.title}`}>
@@ -101,6 +118,18 @@ export function EvidenceBoard({
                   onToggle={(next) => onToggleBookmark(item.id, next)}
                 />
               ) : null}
+              {onToggleAnnotations ? (
+                <div>
+                  <button
+                    type="button"
+                    aria-expanded={annotations?.itemId === item.id}
+                    onClick={() => onToggleAnnotations(item.id)}
+                  >
+                    {annotations?.itemId === item.id ? "Hide annotations" : "Annotations"}
+                  </button>
+                  {annotations?.itemId === item.id ? <AnnotationPanel state={annotations} signInHref={signInHref} /> : null}
+                </div>
+              ) : null}
               {onTogglePick ? (
                 <label>
                   <input
@@ -115,6 +144,47 @@ export function EvidenceBoard({
             </li>
           ))}
         </ul>
+      ) : null}
+    </section>
+  );
+}
+
+export function AnnotationPanel({ state, signInHref }: { state: AnnotationsState; signInHref: string }) {
+  const { view, draft, submitting, notice } = state;
+  const canSubmit = !submitting && view.kind === "loaded" && isValidAnnotationText(draft);
+  return (
+    <section aria-label="Annotations">
+      {view.kind === "loading" ? <p className="notice-card" role="status">Loading annotations...</p> : null}
+      {view.kind === "error" ? <FailureNotice failure={view.failure} signInHref={signInHref} /> : null}
+      {view.kind === "loaded" && view.data.length === 0 ? <p className="empty-card">No annotations yet.</p> : null}
+      {view.kind === "loaded" && view.data.length > 0 ? (
+        <ul aria-label="Annotation list">
+          {view.data.map((a) => (
+            <li key={a.id}>
+              <p style={{ whiteSpace: "pre-wrap" }}>{a.text}</p>
+              <div className="muted">{a.authorSubject} at {formatInstant(a.createdAtUtc)}</div>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+      {notice ? <FailureNotice failure={notice} signInHref={signInHref} /> : null}
+      {view.kind === "loaded" ? (
+        <form
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (canSubmit) state.onSubmit();
+          }}
+        >
+          <label>
+            Add an annotation (append-only, cannot be edited later)
+            <textarea
+              value={draft}
+              maxLength={ANNOTATION_MAX_TEXT_LENGTH}
+              onChange={(event) => state.onDraftChange(event.target.value)}
+            />
+          </label>
+          <button type="submit" disabled={!canSubmit}>Add annotation</button>
+        </form>
       ) : null}
     </section>
   );

@@ -1,6 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   MalformedInvestigationResponse,
+  addAnnotation,
+  annotationsPath,
+  isValidAnnotationText,
+  listAnnotations,
+  parseAnnotation,
+  parseAnnotations,
   bookmarkPath,
   bookmarksPath,
   parseBookmark,
@@ -158,5 +164,65 @@ describe("bookmark client", () => {
     expect(url).toContain(`/${EV}/bookmark`);
     vi.stubGlobal("fetch", vi.fn(async () => new Response("{}", { status: 403 })));
     await expect(removeBookmark(ID, EV)).rejects.toMatchObject({ status: 403 });
+  });
+});
+
+describe("annotation client", () => {
+  const ITEM = "66666666-6666-4666-8666-666666666666";
+  const an = { id: ID, investigationId: ID, evidenceItemId: ITEM, text: "Looks consistent", authorSubject: "analyst-1", createdAtUtc: "2026-11-02T09:00:00Z" };
+  beforeEach(() => vi.stubGlobal("localStorage", { getItem: () => null, setItem: () => undefined, removeItem: () => undefined }));
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("builds GUID-validated paths", () => {
+    expect(annotationsPath(ID, ITEM)).toBe(`/api/v1/tenant-investigations/${ID}/evidence-items/${ITEM}/annotations`);
+    expect(() => annotationsPath(ID, "x/y")).toThrow(MalformedInvestigationResponse);
+    expect(() => annotationsPath("../x", ITEM)).toThrow(MalformedInvestigationResponse);
+  });
+  it("parses valid annotations and rejects a malformed list whole", () => {
+    expect(parseAnnotations({ items: [an] })).toEqual([an]);
+    expect(parseAnnotation(an)).toEqual(an);
+    expect(() => parseAnnotations({ items: [an, { ...an, text: "" }] })).toThrow(MalformedInvestigationResponse);
+    expect(() => parseAnnotations({ items: [{ ...an, evidenceItemId: "nope" }] })).toThrow(MalformedInvestigationResponse);
+    expect(() => parseAnnotations({})).toThrow(MalformedInvestigationResponse);
+    expect(() => parseAnnotation(null)).toThrow(MalformedInvestigationResponse);
+  });
+  it("mirrors the server text rule", () => {
+    expect(isValidAnnotationText("ok")).toBe(true);
+    expect(isValidAnnotationText("line one\nline two")).toBe(true);
+    expect(isValidAnnotationText("x".repeat(1000))).toBe(true);
+    expect(isValidAnnotationText("x".repeat(1001))).toBe(false);
+    for (const bad of ["", "   ", " lead", "trail ", "tab\there", "nul\u0000", "bell\u0007", "c1\u0085x"]) {
+      expect(isValidAnnotationText(bad)).toBe(false);
+    }
+  });
+  it("lists annotations for the requested item (positive control)", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ items: [an] }), { status: 200 })));
+    await expect(listAnnotations(ID, ITEM)).resolves.toEqual([an]);
+  });
+  it("rejects a list that mentions another item", async () => {
+    const other = "77777777-7777-4777-8777-777777777777";
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ items: [an, { ...an, evidenceItemId: other }] }), { status: 200 })));
+    await expect(listAnnotations(ID, ITEM)).rejects.toBeInstanceOf(MalformedInvestigationResponse);
+  });
+  it("posts the text and accepts the matching answer", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify(an), { status: 201 })));
+    await expect(addAnnotation(ID, ITEM, "Looks consistent")).resolves.toEqual(an);
+    const call = (fetch as unknown as ReturnType<typeof vi.fn>).mock.calls[0];
+    expect(call[1].method).toBe("POST");
+    expect(JSON.parse(call[1].body)).toEqual({ text: "Looks consistent" });
+  });
+  it("rejects an answer about another item or with different text", async () => {
+    const other = "77777777-7777-4777-8777-777777777777";
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ ...an, evidenceItemId: other }), { status: 201 })));
+    await expect(addAnnotation(ID, ITEM, "Looks consistent")).rejects.toBeInstanceOf(MalformedInvestigationResponse);
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ ...an, text: "Something else" }), { status: 201 })));
+    await expect(addAnnotation(ID, ITEM, "Looks consistent")).rejects.toBeInstanceOf(MalformedInvestigationResponse);
+  });
+  it("never sends invalid text", async () => {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify(an), { status: 201 }));
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(addAnnotation(ID, ITEM, " padded ")).rejects.toBeInstanceOf(MalformedInvestigationResponse);
+    await expect(addAnnotation(ID, ITEM, "")).rejects.toBeInstanceOf(MalformedInvestigationResponse);
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });

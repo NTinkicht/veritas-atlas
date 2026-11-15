@@ -1,7 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
 import {
+  addAnnotation,
   classifyInvestigationFailure,
+  listAnnotations,
+  type EvidenceAnnotation,
   compareEvidenceItems,
   listBookmarks,
   listEvidenceItems,
@@ -14,7 +17,7 @@ import {
   type Investigation,
 } from "../api/investigations";
 import { AppSurface } from "../components/AppSurface";
-import { EvidenceBoard, EvidenceComparison, InvestigationList, type Loadable } from "../components/InvestigationBoardView";
+import { EvidenceBoard, EvidenceComparison, InvestigationList, type AnnotationsState, type Loadable } from "../components/InvestigationBoardView";
 
 export function InvestigationBoardPage() {
   const location = useLocation();
@@ -27,6 +30,12 @@ export function InvestigationBoardPage() {
   const [bookmarksReady, setBookmarksReady] = useState(false);
   const [busy, setBusy] = useState<string[]>([]);
   const [bookmarkNotice, setBookmarkNotice] = useState<InvestigationFailure | null>(null);
+  const [annotationItem, setAnnotationItem] = useState<string | null>(null);
+  const [annotationView, setAnnotationView] = useState<Loadable<EvidenceAnnotation[]>>({ kind: "loading" });
+  const [draft, setDraft] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [annotationNotice, setAnnotationNotice] = useState<InvestigationFailure | null>(null);
+  const latestAnnotations = useRef(0);
   const latest = useRef(0);
   const latestComparison = useRef(0);
   const signInHref = `/login?returnTo=${encodeURIComponent(`${location.pathname}${location.search}`)}`;
@@ -51,6 +60,11 @@ export function InvestigationBoardPage() {
     setBookmarksReady(false);
     setBusy([]);
     setBookmarkNotice(null);
+    latestAnnotations.current++;
+    setAnnotationItem(null);
+    setDraft("");
+    setSubmitting(false);
+    setAnnotationNotice(null);
     setSelected(investigation);
     setBoard({ kind: "loading" });
     // A failed bookmark read is shown, never treated as "no bookmarks".
@@ -91,6 +105,61 @@ export function InvestigationBoardPage() {
     );
   }
 
+  function toggleAnnotations(itemId: string) {
+    if (!selected) return;
+    // Any change of the open item invalidates a read or write still in flight for the previous one.
+    const ticket = ++latestAnnotations.current;
+    setDraft("");
+    setSubmitting(false);
+    setAnnotationNotice(null);
+    if (annotationItem === itemId) {
+      setAnnotationItem(null);
+      return;
+    }
+    setAnnotationItem(itemId);
+    setAnnotationView({ kind: "loading" });
+    listAnnotations(selected.id, itemId).then(
+      (data) => ticket === latestAnnotations.current && setAnnotationView({ kind: "loaded", data }),
+      (error) =>
+        ticket === latestAnnotations.current &&
+        setAnnotationView({ kind: "error", failure: classifyInvestigationFailure(error, navigator.onLine) }),
+    );
+  }
+
+  function submitAnnotation() {
+    if (!selected || !annotationItem || submitting || annotationView.kind !== "loaded") return;
+    const ticket = ++latestAnnotations.current;
+    const current = annotationView.data;
+    setSubmitting(true);
+    setAnnotationNotice(null);
+    addAnnotation(selected.id, annotationItem, draft).then(
+      (created) => {
+        if (ticket !== latestAnnotations.current) return;
+        // A replayed answer returns the stored row: never show it twice.
+        setAnnotationView({ kind: "loaded", data: [...current.filter((a) => a.id !== created.id), created] });
+        setDraft("");
+        setSubmitting(false);
+      },
+      (error) => {
+        if (ticket !== latestAnnotations.current) return;
+        setAnnotationNotice(classifyInvestigationFailure(error, navigator.onLine));
+        setSubmitting(false);
+      },
+    );
+  }
+
+  const annotations: AnnotationsState | null = annotationItem
+    ? {
+        itemId: annotationItem,
+        view: annotationView,
+        draft,
+        submitting,
+        notice: annotationNotice,
+        onDraftChange: setDraft,
+        onSubmit: submitAnnotation,
+      }
+    : null;
+
   function togglePick(itemId: string) {
     // Any change to the selection invalidates a comparison already shown or in flight.
     latestComparison.current++;
@@ -127,6 +196,8 @@ export function InvestigationBoardPage() {
           busyIds={busy}
           bookmarksReady={bookmarksReady}
           bookmarkNotice={bookmarkNotice}
+          annotations={annotations}
+          onToggleAnnotations={toggleAnnotations}
         />
       ) : null}
       {selected && board.kind === "loaded" && board.data.length >= 2 ? (
