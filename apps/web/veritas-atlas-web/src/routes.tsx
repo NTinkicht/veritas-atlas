@@ -110,6 +110,7 @@ import { HomePage } from "./pages/HomePage";
 import { EvidenceSearchPage } from "./pages/EvidenceSearchPage";
 import { InvestigationBoardPage } from "./pages/InvestigationBoardPage";
 import { ClaimConfidencePage } from "./pages/ClaimConfidencePage";
+import { AnswerReportPage } from "./pages/AnswerReportPage";
 import { CitationInspectorPage } from "./pages/CitationInspectorPage";
 import { ClaimRelationGraphPage } from "./pages/ClaimRelationGraphPage";
 import { PublicationRevisionDeskPage } from "./pages/PublicationRevisionDeskPage";
@@ -130,6 +131,7 @@ const allRoutes: RouteObject[] = [
   { path: "/investigations", element: protect(<InvestigationBoardPage />) },
   { path: "/publication-revisions", element: protect(<PublicationRevisionDeskPage />) },
   { path: "/claim-confidence", element: protect(<ClaimConfidencePage />) },
+  { path: "/answer-report", element: protect(<AnswerReportPage />) },
   { path: "/citation-inspector", element: protect(<CitationInspectorPage />) },
   { path: "/claim-relations", element: protect(<ClaimRelationGraphPage />) },
   { path: "/workflow-audit", element: protect(<WorkflowAuditPage />) },
