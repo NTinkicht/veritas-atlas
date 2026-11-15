@@ -76,6 +76,11 @@ public sealed class EfTenantInvestigationShareStore : ITenantInvestigationShareS
             await _db.SaveChangesAsync(cancellationToken);
             return new ShareGrantResult(ShareGrantOutcome.Granted, ToModel(row));
         }
+        catch (DbUpdateException ex) when (InvestigationStateQueries.IsClosedViolation(ex))
+        {
+            Detach(row, audit);
+            return new ShareGrantResult(ShareGrantOutcome.InvestigationClosed, null);
+        }
         catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: GuardViolation })
         {
             Detach(row, audit);
@@ -111,12 +116,21 @@ public sealed class EfTenantInvestigationShareStore : ITenantInvestigationShareS
         var now = ToPostgresPrecision(_timeProvider.GetUtcNow().UtcDateTime);
         await using var tx = await _db.Database.BeginTransactionAsync(cancellationToken);
         // The conditional update makes concurrent revocations race safely: exactly one wins.
-        var changed = await _db.TenantInvestigationShares
-            .Where(x => x.TenantId == tenantId && x.InvestigationId == investigationId
-                        && x.GranteeSubject == grantee && x.RevokedAtUtc == null)
-            .ExecuteUpdateAsync(u => u
-                .SetProperty(x => x.RevokedAtUtc, now)
-                .SetProperty(x => x.RevokedBySubject, owner), cancellationToken);
+        int changed;
+        try
+        {
+            changed = await _db.TenantInvestigationShares
+                .Where(x => x.TenantId == tenantId && x.InvestigationId == investigationId
+                            && x.GranteeSubject == grantee && x.RevokedAtUtc == null)
+                .ExecuteUpdateAsync(u => u
+                    .SetProperty(x => x.RevokedAtUtc, now)
+                    .SetProperty(x => x.RevokedBySubject, owner), cancellationToken);
+        }
+        catch (Exception ex) when (InvestigationStateQueries.IsClosedViolation(ex))
+        {
+            return ShareRevokeOutcome.InvestigationClosed; // the transaction rolls back on dispose
+        }
+
         if (changed == 0)
         {
             return ShareRevokeOutcome.NotActive;
@@ -174,13 +188,22 @@ public sealed class EfTenantInvestigationShareStore : ITenantInvestigationShareS
         Guid tenantId, Guid investigationId, string owner, string grantee, DateTime now, CancellationToken cancellationToken)
     {
         await using var tx = await _db.Database.BeginTransactionAsync(cancellationToken);
-        var changed = await _db.TenantInvestigationShares
-            .Where(x => x.TenantId == tenantId && x.InvestigationId == investigationId
-                        && x.GranteeSubject == grantee && x.RevokedAtUtc != null)
-            .ExecuteUpdateAsync(u => u
-                .SetProperty(x => x.GrantedAtUtc, now)
-                .SetProperty(x => x.RevokedAtUtc, (DateTime?)null)
-                .SetProperty(x => x.RevokedBySubject, (string?)null), cancellationToken);
+        int changed;
+        try
+        {
+            changed = await _db.TenantInvestigationShares
+                .Where(x => x.TenantId == tenantId && x.InvestigationId == investigationId
+                            && x.GranteeSubject == grantee && x.RevokedAtUtc != null)
+                .ExecuteUpdateAsync(u => u
+                    .SetProperty(x => x.GrantedAtUtc, now)
+                    .SetProperty(x => x.RevokedAtUtc, (DateTime?)null)
+                    .SetProperty(x => x.RevokedBySubject, (string?)null), cancellationToken);
+        }
+        catch (Exception ex) when (InvestigationStateQueries.IsClosedViolation(ex))
+        {
+            return new ShareGrantResult(ShareGrantOutcome.InvestigationClosed, null);
+        }
+
         if (changed == 0)
         {
             // Another caller reactivated it first: report their result as a replay.

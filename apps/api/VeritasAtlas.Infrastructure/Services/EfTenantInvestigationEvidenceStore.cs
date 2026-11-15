@@ -90,6 +90,12 @@ public sealed class EfTenantInvestigationEvidenceStore : ITenantInvestigationEvi
         {
             await _db.SaveChangesAsync(cancellationToken);
         }
+        catch (DbUpdateException ex) when (InvestigationStateQueries.IsClosedViolation(ex))
+        {
+            _db.Entry(row).State = EntityState.Detached;
+            _db.Entry(audit).State = EntityState.Detached;
+            return new EvidenceItemCollectResult(EvidenceItemCollectOutcome.InvestigationClosed, null);
+        }
         catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: UniqueViolation })
         {
             _db.Entry(row).State = EntityState.Detached;

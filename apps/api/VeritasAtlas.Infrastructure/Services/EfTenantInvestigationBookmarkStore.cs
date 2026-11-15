@@ -69,6 +69,12 @@ public sealed class EfTenantInvestigationBookmarkStore : ITenantInvestigationBoo
                 await _db.SaveChangesAsync(cancellationToken);
                 return new BookmarkPutResult(BookmarkPutOutcome.Added, ToModel(row));
             }
+            catch (DbUpdateException ex) when (InvestigationStateQueries.IsClosedViolation(ex))
+            {
+                _db.Entry(row).State = EntityState.Detached;
+                _db.Entry(audit).State = EntityState.Detached;
+                return new BookmarkPutResult(BookmarkPutOutcome.InvestigationClosed, null);
+            }
             catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: GuardViolation })
             {
                 // The guard trigger refused: the item vanished after the existence check.
@@ -119,6 +125,11 @@ public sealed class EfTenantInvestigationBookmarkStore : ITenantInvestigationBoo
         try
         {
             await _db.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException ex) when (InvestigationStateQueries.IsClosedViolation(ex))
+        {
+            _db.ChangeTracker.Clear();
+            return BookmarkRemoveOutcome.InvestigationClosed;
         }
         catch (DbUpdateConcurrencyException)
         {

@@ -312,6 +312,150 @@ public sealed class TenantInvestigationStateTests
             });
     }
 
+    [TestMethod]
+    public async Task CloseCommittingAfterTheCheckIsTranslatedToClosedOnEveryWritePathOverRealPostgres()
+    {
+        if (Database() is not { } cs) return;
+        await TenantInvestigationEvidenceItemTests.ResetAsync(cs);
+        var race = new CloseRaceInterceptor(cs);
+        await using var db = new VeritasAtlasDbContext(
+            new DbContextOptionsBuilder<VeritasAtlasDbContext>().UseNpgsql(cs).AddInterceptors(race).Options);
+        var verification = await TenantInvestigationEvidenceItemTests.SeedVerifiedAsync(db, TenantA, "a");
+        var investigations = new EfTenantInvestigationStore(db, TimeProvider.System);
+        var evidence = new EfTenantInvestigationEvidenceStore(db, TimeProvider.System);
+        var notes = new EfTenantInvestigationAnnotationStore(db, TimeProvider.System);
+        var marks = new EfTenantInvestigationBookmarkStore(db, TimeProvider.System);
+        var shares = new EfTenantInvestigationShareStore(db, TimeProvider.System);
+        var n = 0;
+
+        async Task<Guid> NewInvestigation() =>
+            (await investigations.CreateAsync(
+                TenantA, new InvestigationInput($"race-{n++}", "Case", "synthetic-owner"), CancellationToken.None))
+            .Investigation!.Id;
+
+        async Task<Guid> NewItem(Guid inv) =>
+            (await evidence.CollectAsync(
+                TenantA, inv, new EvidenceItemInput(verification, null, "synthetic-owner"), CancellationToken.None)).Item!.Id;
+
+        // Positive control: with no race the same calls succeed.
+        var control = await NewInvestigation();
+        var controlItem = await NewItem(control);
+        Assert.AreEqual(AnnotationAddOutcome.Added,
+            (await notes.AddAsync(TenantA, control, controlItem, new AnnotationInput("note", "synthetic-owner"), CancellationToken.None)).Outcome);
+        Assert.AreEqual(BookmarkPutOutcome.Added,
+            (await marks.PutAsync(TenantA, control, controlItem, "synthetic-owner", CancellationToken.None)).Outcome);
+        Assert.AreEqual(ShareGrantOutcome.Granted,
+            (await shares.GrantAsync(TenantA, control, "synthetic-owner", "synthetic-bob", CancellationToken.None)).Outcome);
+
+        // Evidence collect.
+        var inv = await NewInvestigation();
+        race.Arm(inv);
+        Assert.AreEqual(EvidenceItemCollectOutcome.InvestigationClosed,
+            (await evidence.CollectAsync(TenantA, inv, new EvidenceItemInput(verification, null, "synthetic-owner"), CancellationToken.None)).Outcome);
+        Assert.AreEqual(0, await db.TenantInvestigationEvidenceItems.AsNoTracking().CountAsync(x => x.InvestigationId == inv));
+
+        // Annotation add.
+        inv = await NewInvestigation();
+        var item = await NewItem(inv);
+        race.Arm(inv);
+        Assert.AreEqual(AnnotationAddOutcome.InvestigationClosed,
+            (await notes.AddAsync(TenantA, inv, item, new AnnotationInput("note", "synthetic-owner"), CancellationToken.None)).Outcome);
+        Assert.AreEqual(0, await db.TenantInvestigationAnnotations.AsNoTracking().CountAsync(x => x.InvestigationId == inv));
+
+        // Bookmark put and remove.
+        inv = await NewInvestigation();
+        item = await NewItem(inv);
+        race.Arm(inv);
+        Assert.AreEqual(BookmarkPutOutcome.InvestigationClosed,
+            (await marks.PutAsync(TenantA, inv, item, "synthetic-owner", CancellationToken.None)).Outcome);
+        inv = await NewInvestigation();
+        item = await NewItem(inv);
+        Assert.AreEqual(BookmarkPutOutcome.Added, (await marks.PutAsync(TenantA, inv, item, "synthetic-owner", CancellationToken.None)).Outcome);
+        race.Arm(inv);
+        Assert.AreEqual(BookmarkRemoveOutcome.InvestigationClosed,
+            await marks.RemoveAsync(TenantA, inv, item, "synthetic-owner", CancellationToken.None));
+        Assert.AreEqual(1, await db.TenantInvestigationBookmarks.AsNoTracking().CountAsync(x => x.InvestigationId == inv));
+
+        // Share grant, revoke and re-grant.
+        inv = await NewInvestigation();
+        race.Arm(inv);
+        Assert.AreEqual(ShareGrantOutcome.InvestigationClosed,
+            (await shares.GrantAsync(TenantA, inv, "synthetic-owner", "synthetic-bob", CancellationToken.None)).Outcome);
+        inv = await NewInvestigation();
+        await shares.GrantAsync(TenantA, inv, "synthetic-owner", "synthetic-bob", CancellationToken.None);
+        race.Arm(inv);
+        Assert.AreEqual(ShareRevokeOutcome.InvestigationClosed,
+            await shares.RevokeAsync(TenantA, inv, "synthetic-owner", "synthetic-bob", CancellationToken.None));
+        Assert.AreEqual(1, await db.TenantInvestigationShares.AsNoTracking().CountAsync(x => x.InvestigationId == inv && x.RevokedAtUtc == null));
+        inv = await NewInvestigation();
+        await shares.GrantAsync(TenantA, inv, "synthetic-owner", "synthetic-bob", CancellationToken.None);
+        await shares.RevokeAsync(TenantA, inv, "synthetic-owner", "synthetic-bob", CancellationToken.None);
+        race.Arm(inv);
+        Assert.AreEqual(ShareGrantOutcome.InvestigationClosed,
+            (await shares.GrantAsync(TenantA, inv, "synthetic-owner", "synthetic-bob", CancellationToken.None)).Outcome);
+        Assert.AreEqual(0, await db.TenantInvestigationShares.AsNoTracking().CountAsync(x => x.InvestigationId == inv && x.RevokedAtUtc == null));
+        Assert.AreEqual(7, race.Fired, "every armed scenario really raced");
+    }
+
+    /// <summary>Once armed, closes the investigation on a second connection just before the next guarded write runs.</summary>
+    private sealed class CloseRaceInterceptor(string connectionString)
+        : Microsoft.EntityFrameworkCore.Diagnostics.DbCommandInterceptor
+    {
+        private static readonly string[] Guarded =
+        [
+            "tenant_investigation_evidence_items", "tenant_investigation_annotations",
+            "tenant_investigation_bookmarks", "tenant_investigation_shares"
+        ];
+
+        private Guid? _armed;
+        public int Fired { get; private set; }
+
+        public void Arm(Guid investigation) => _armed = investigation;
+
+        public override async ValueTask<Microsoft.EntityFrameworkCore.Diagnostics.InterceptionResult<System.Data.Common.DbDataReader>> ReaderExecutingAsync(
+            System.Data.Common.DbCommand command,
+            Microsoft.EntityFrameworkCore.Diagnostics.CommandEventData eventData,
+            Microsoft.EntityFrameworkCore.Diagnostics.InterceptionResult<System.Data.Common.DbDataReader> result,
+            CancellationToken cancellationToken = default)
+        {
+            await CloseIfArmedAsync(command, cancellationToken);
+            return result;
+        }
+
+        public override async ValueTask<Microsoft.EntityFrameworkCore.Diagnostics.InterceptionResult<int>> NonQueryExecutingAsync(
+            System.Data.Common.DbCommand command,
+            Microsoft.EntityFrameworkCore.Diagnostics.CommandEventData eventData,
+            Microsoft.EntityFrameworkCore.Diagnostics.InterceptionResult<int> result,
+            CancellationToken cancellationToken = default)
+        {
+            await CloseIfArmedAsync(command, cancellationToken);
+            return result;
+        }
+
+        private async Task CloseIfArmedAsync(System.Data.Common.DbCommand command, CancellationToken cancellationToken)
+        {
+            var text = command.CommandText.TrimStart();
+            var write = text.StartsWith("INSERT", StringComparison.Ordinal)
+                        || text.StartsWith("UPDATE", StringComparison.Ordinal)
+                        || text.StartsWith("DELETE", StringComparison.Ordinal);
+            if (_armed is not { } investigation || !write || !Guarded.Any(text.Contains))
+            {
+                return;
+            }
+
+            _armed = null;
+            Fired++;
+            await using var connection = new NpgsqlConnection(connectionString);
+            await connection.OpenAsync(cancellationToken);
+            await using var close = new NpgsqlCommand(
+                "INSERT INTO tenant_investigation_state_events (tenant_id, investigation_id, version, state, actor_subject, created_at_utc) VALUES (@t, @i, 1, 'closed', 'synthetic-racer', now())",
+                connection);
+            close.Parameters.AddWithValue("t", TenantA);
+            close.Parameters.AddWithValue("i", investigation);
+            await close.ExecuteNonQueryAsync(cancellationToken);
+        }
+    }
+
     private static async Task AssertSqlState(VeritasAtlasDbContext db, string sqlState)
     {
         var ex = await Assert.ThrowsExactlyAsync<DbUpdateException>(() => db.SaveChangesAsync());

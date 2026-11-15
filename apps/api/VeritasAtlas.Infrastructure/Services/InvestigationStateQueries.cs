@@ -12,6 +12,25 @@ namespace VeritasAtlas.Infrastructure.Services;
 /// </summary>
 internal static class InvestigationStateQueries
 {
+    /// <summary>
+    /// True when the exception is the database closed-guard trigger firing (a close committed
+    /// between the application check and the write). Callers translate it to the closed outcome.
+    /// </summary>
+    public static bool IsClosedViolation(Exception exception)
+    {
+        for (var e = exception; e is not null; e = e.InnerException!)
+        {
+            if (e is Npgsql.PostgresException { SqlState: "P0001", MessageText: "the investigation is closed" })
+            {
+                return true;
+            }
+
+            if (e.InnerException is null) break;
+        }
+
+        return false;
+    }
+
     public static async Task<bool> IsClosedAsync(
         VeritasAtlasDbContext db, Guid tenantId, Guid investigationId, CancellationToken cancellationToken)
     {
