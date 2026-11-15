@@ -137,6 +137,19 @@ public sealed class EfTenantFetchAttemptLedger : ITenantFetchAttemptLedger
         return rows.Select(ToModel).ToList();
     }
 
+    public async Task<IReadOnlyList<TenantFetchAttemptModel>> ListRecentForSourceAsync(
+        Guid tenantId, Guid sourceEntryId, int limit, CancellationToken cancellationToken)
+    {
+        RequireTenant(tenantId);
+        ArgumentOutOfRangeException.ThrowIfLessThan(limit, 1);
+        var rows = await _db.TenantFetchAttempts.AsNoTracking()
+            .Where(x => x.TenantId == tenantId && x.SourceEntryId == sourceEntryId)
+            .OrderByDescending(x => x.AttemptedAtUtc).ThenByDescending(x => x.CreatedAtUtc).ThenByDescending(x => x.Id)
+            .Take(limit)
+            .ToListAsync(cancellationToken);
+        return rows.Select(ToModel).ToList();
+    }
+
     private Task<TenantFetchAttempt?> FindByKeyAsync(
         Guid tenantId, string attemptKey, CancellationToken cancellationToken) =>
         _db.TenantFetchAttempts.AsNoTracking()
