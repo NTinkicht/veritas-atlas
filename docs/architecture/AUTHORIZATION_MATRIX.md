@@ -73,6 +73,7 @@ Source of truth is the test; this table is generated from it.
 | `GET tenant-raw-retrievals/{id:guid}/parses` | operator, analyst, reviewer, publisher, intruder |
 | `GET tenant-raw-retrievals/{id:guid}/attestations` | operator, analyst, reviewer, publisher, intruder |
 | `GET tenant-raw-retrievals/{id:guid}/retention-eligibility` | operator, analyst, reviewer, publisher, intruder |
+| `PUT tenant-raw-retrievals/{id:guid}/retention` | operator, analyst, reviewer, publisher, intruder |
 | `GET tenant-raw-retrievals/{id:guid}/parses/{parseRunId:guid}/verification` | operator, analyst, reviewer, publisher, intruder |
 | `POST tenant-raw-retrievals/{id:guid}/parses/{parseRunId:guid}/verification` | operator, analyst, reviewer, publisher, intruder |
 | `POST tenant-sources` | operator, analyst, reviewer, publisher, intruder |

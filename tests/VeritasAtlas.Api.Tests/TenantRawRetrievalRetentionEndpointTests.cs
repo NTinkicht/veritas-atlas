@@ -1,6 +1,7 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Net;
 using System.Net.Http.Headers;
+using System.Net.Http.Json;
 using System.Security.Claims;
 using System.Text;
 using System.Text.Json;
@@ -141,6 +142,124 @@ public sealed class TenantRawRetrievalRetentionEndpointTests
         Assert.AreEqual(0, ledger.Writes, "a dry run never writes");
     }
 
+    private static string PutPath(Guid id) => $"/api/v1/tenant-raw-retrievals/{id}/retention";
+
+    private static Task<HttpResponseMessage> Put(HttpClient client, string path, string bearer, object? body)
+    {
+        var request = new HttpRequestMessage(HttpMethod.Put, path) { Content = JsonContent.Create(body) };
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", bearer);
+        return client.SendAsync(request);
+    }
+
+    [TestMethod]
+    public async Task RecordingRetentionRefusesEveryNonAdminCallerBeforeTheStore()
+    {
+        var ledger = new Ledgers();
+        using var factory = new ApiFactory(ledger);
+        using var client = factory.CreateClient();
+        var tokens = factory.Services.GetRequiredService<JwtTokenService>();
+        var tenant = new[] { TenantA.ToString("D") };
+        var body = new { legalHold = true };
+
+        foreach (var bearer in new[]
+                 {
+                     tokens.CreateToken("synthetic-op", "operator", TenantA).Token,
+                     tokens.CreateToken("synthetic-pub", "publisher", TenantA).Token,
+                     Sign("synthetic-none", [], tenant),
+                     Sign("synthetic-two", ["admin", "analyst"], tenant),
+                     Sign("synthetic-admin", ["admin"], ["not-a-uuid"]),
+                     Sign(null, ["admin"], tenant),
+                 })
+        {
+            using var response = await Put(client, PutPath(Guid.NewGuid()), bearer, body);
+            Assert.AreEqual(HttpStatusCode.Forbidden, response.StatusCode);
+        }
+
+        using var anonymous = await client.PutAsJsonAsync(PutPath(Guid.NewGuid()), body);
+        Assert.AreEqual(HttpStatusCode.Unauthorized, anonymous.StatusCode);
+        Assert.AreEqual(0, ledger.Calls, "no ledger access for a refused caller");
+        Assert.AreEqual(0, ledger.Appends.Count);
+
+        using var admin = await Put(client, PutPath(Guid.NewGuid()), Sign("synthetic-admin", ["admin"], tenant), body);
+        Assert.AreEqual(HttpStatusCode.OK, admin.StatusCode, "positive control");
+        Assert.AreEqual(1, ledger.Appends.Count);
+        Assert.AreEqual(("synthetic-admin", true), (ledger.Appends[0].Actor, ledger.Appends[0].Hold));
+    }
+
+    [TestMethod]
+    public async Task RecordingRetentionRejectsPastWindowsUnknownIdsAndMapsStoreConflicts()
+    {
+        var known = Guid.NewGuid();
+        var ledger = new Ledgers { Known = (TenantA, known) };
+        using var factory = new ApiFactory(ledger);
+        using var client = factory.CreateClient();
+        var adminA = Sign("synthetic-admin-a", ["admin"], [TenantA.ToString("D")]);
+        var adminB = Sign("synthetic-admin-b", ["admin"], [TenantB.ToString("D")]);
+
+        using var past = await Put(client, PutPath(known), adminA, new { legalHold = false, retainUntilUtc = "2020-01-01T00:00:00Z" });
+        Assert.AreEqual(HttpStatusCode.BadRequest, past.StatusCode);
+        using var missingBody = await Put(client, PutPath(known), adminA, null);
+        Assert.AreEqual(HttpStatusCode.BadRequest, missingBody.StatusCode);
+        Assert.AreEqual(0, ledger.Appends.Count);
+
+        using var foreign = await Put(client, PutPath(known), adminB, new { legalHold = true });
+        using var unknown = await Put(client, PutPath(Guid.NewGuid()), adminA, new { legalHold = true });
+        using var empty = await Put(client, PutPath(Guid.Empty), adminA, new { legalHold = true });
+        foreach (var r in new[] { foreign, unknown, empty }) Assert.AreEqual(HttpStatusCode.NotFound, r.StatusCode);
+        Assert.AreEqual(await unknown.Content.ReadAsStringAsync(), await foreign.Content.ReadAsStringAsync());
+        Assert.AreEqual(0, ledger.Appends.Count, "a foreign or unknown retrieval is never recorded");
+
+        var future = DateTime.UtcNow.AddDays(30);
+        using var ok = await Put(client, PutPath(known), adminA, new { legalHold = false, retainUntilUtc = future });
+        Assert.AreEqual(HttpStatusCode.OK, ok.StatusCode, "positive control");
+        Assert.AreEqual(1, ledger.Appends.Count);
+
+        ledger.AppendOutcome = RetentionRecordAppendOutcome.WindowShortened;
+        using var shortened = await Put(client, PutPath(known), adminA, new { legalHold = false, retainUntilUtc = future });
+        Assert.AreEqual(HttpStatusCode.Conflict, shortened.StatusCode);
+        StringAssert.Contains(await shortened.Content.ReadAsStringAsync(), "retention_window_shortened");
+    }
+
+    [TestMethod]
+    public async Task EligibilityUsesTheLatestRecordedHoldAndWindowAndAllowsOnlyWhenAllGatesPass()
+    {
+        var id = Guid.NewGuid();
+        var ledger = new Ledgers { Known = (TenantA, id), Attestations = 1, Runs = 0 };
+        using var factory = new ApiFactory(ledger);
+        using var client = factory.CreateClient();
+        var admin = Sign("synthetic-admin", ["admin"], [TenantA.ToString("D")]);
+
+        async Task<JsonElement> Read()
+        {
+            using var r = await Get(client, Path(id), admin);
+            return JsonDocument.Parse(await r.Content.ReadAsStringAsync()).RootElement.Clone();
+        }
+
+        var none = await Read();
+        Assert.AreEqual("retention_not_elapsed", none.GetProperty("denialCode").GetString());
+        Assert.AreEqual(0, none.GetProperty("recordVersion").GetInt32());
+
+        var past = DateTime.UtcNow.AddDays(-1);
+        ledger.Record = new TenantRetentionRecordModel(2, true, past, "synthetic-admin", At);
+        var held = await Read();
+        Assert.AreEqual(("Deny", "legal_hold", 2, true),
+            (held.GetProperty("outcome").GetString(), held.GetProperty("denialCode").GetString(),
+                held.GetProperty("recordVersion").GetInt32(), held.GetProperty("legalHold").GetBoolean()),
+            "a legal hold denies even after the window elapsed");
+
+        ledger.Record = new TenantRetentionRecordModel(3, false, DateTime.UtcNow.AddDays(30), "synthetic-admin", At);
+        Assert.AreEqual("retention_not_elapsed", (await Read()).GetProperty("denialCode").GetString());
+
+        ledger.Record = new TenantRetentionRecordModel(4, false, past, "synthetic-admin", At);
+        var allowed = await Read();
+        Assert.AreEqual("Allow", allowed.GetProperty("outcome").GetString(), "positive control: all gates pass");
+        Assert.AreEqual(JsonValueKind.Null, allowed.GetProperty("denialCode").ValueKind);
+
+        ledger.Runs = 1;
+        Assert.AreEqual("live_reference", (await Read()).GetProperty("denialCode").GetString());
+        Assert.AreEqual(0, ledger.Writes, "a dry run never writes");
+    }
+
     private static Task<HttpResponseMessage> Get(HttpClient client, string path, string bearer)
     {
         var request = new HttpRequestMessage(HttpMethod.Get, path);
@@ -166,8 +285,25 @@ public sealed class TenantRawRetrievalRetentionEndpointTests
                 SecurityAlgorithms.HmacSha256)));
     }
 
-    private sealed class Ledgers : ITenantRawRetrievalLedger, ITenantRetrievalAttestationLedger, ITenantParseRunLedger
+    private sealed class Ledgers : ITenantRawRetrievalLedger, ITenantRetrievalAttestationLedger, ITenantParseRunLedger,
+        ITenantRetentionRecordStore
     {
+        public TenantRetentionRecordModel? Record { get; set; }
+        public RetentionRecordAppendOutcome AppendOutcome { get; set; } = RetentionRecordAppendOutcome.Appended;
+        public List<(bool Hold, DateTime? Until, string Actor)> Appends { get; } = [];
+
+        public Task<TenantRetentionRecordModel?> GetLatestAsync(Guid tenantId, Guid id, CancellationToken ct) =>
+            Task.FromResult(Record);
+
+        public Task<RetentionRecordAppendResult> AppendAsync(
+            Guid tenantId, Guid id, bool legalHold, DateTime? until, string actor, CancellationToken ct)
+        {
+            Appends.Add((legalHold, until, actor));
+            return Task.FromResult(new RetentionRecordAppendResult(AppendOutcome,
+                AppendOutcome is RetentionRecordAppendOutcome.Appended or RetentionRecordAppendOutcome.NoChange
+                    ? new TenantRetentionRecordModel(1, legalHold, until, actor, At) : null));
+        }
+
         private int _calls;
         public int Calls => _calls;
         public int Writes { get; private set; }
@@ -235,6 +371,7 @@ public sealed class TenantRawRetrievalRetentionEndpointTests
                 services.AddSingleton<ITenantRawRetrievalLedger>(ledger);
                 services.AddSingleton<ITenantRetrievalAttestationLedger>(ledger);
                 services.AddSingleton<ITenantParseRunLedger>(ledger);
+                services.AddSingleton<ITenantRetentionRecordStore>(ledger);
             });
         }
     }
