@@ -6,6 +6,7 @@ import {
   classifyInvestigationFailure,
   createInvestigation,
   mergeCreated,
+  transitionInvestigation,
   listAnnotations,
   type EvidenceAnnotation,
   compareEvidenceItems,
@@ -20,7 +21,7 @@ import {
   type Investigation,
 } from "../api/investigations";
 import { AppSurface } from "../components/AppSurface";
-import { CreateInvestigationForm, EvidenceBoard, EvidenceComparison, InvestigationList, type AnnotationsState, type Loadable } from "../components/InvestigationBoardView";
+import { CreateInvestigationForm, EvidenceBoard, InvestigationStateControl, EvidenceComparison, InvestigationList, type AnnotationsState, type Loadable } from "../components/InvestigationBoardView";
 
 export function InvestigationBoardPage() {
   const location = useLocation();
@@ -45,6 +46,8 @@ export function InvestigationBoardPage() {
   const creationKey = useRef<{ title: string; key: string } | null>(null);
   // Rows created here, kept so a creation that finishes before the initial list read is not lost.
   const createdHere = useRef<Investigation[]>([]);
+  const [transitioning, setTransitioning] = useState(false);
+  const [transitionNotice, setTransitionNotice] = useState<InvestigationFailure | null>(null);
   const latestAnnotations = useRef(0);
   const latest = useRef(0);
   const latestComparison = useRef(0);
@@ -76,6 +79,8 @@ export function InvestigationBoardPage() {
     setSubmitting(false);
     setAnnotationNotice(null);
     setSelected(investigation);
+    setTransitioning(false);
+    setTransitionNotice(null);
     setBoard({ kind: "loading" });
     // A failed bookmark read is shown, never treated as "no bookmarks".
     listBookmarks(investigation.id).then(
@@ -161,6 +166,31 @@ export function InvestigationBoardPage() {
     );
   }
 
+  function transition(close: boolean) {
+    if (!selected || transitioning) return;
+    const target = selected;
+    const ticket = latest.current;
+    setTransitioning(true);
+    setTransitionNotice(null);
+    transitionInvestigation(target, close).then(
+      (updated) => {
+        // Show only what the server returned.
+        createdHere.current = createdHere.current.map((i) => (i.id === updated.id ? updated : i));
+        setList((current) =>
+          current.kind === "loaded" ? { kind: "loaded", data: current.data.map((i) => (i.id === updated.id ? updated : i)) } : current,
+        );
+        if (ticket !== latest.current) return;
+        setSelected(updated);
+        setTransitioning(false);
+      },
+      (error) => {
+        if (ticket !== latest.current) return;
+        setTransitionNotice(classifyInvestigationFailure(error, navigator.onLine));
+        setTransitioning(false);
+      },
+    );
+  }
+
   function submitAnnotation() {
     if (!selected || !annotationItem || submitting || annotationView.kind !== "loaded") return;
     const ticket = ++latestAnnotations.current;
@@ -228,6 +258,15 @@ export function InvestigationBoardPage() {
         signInHref={signInHref}
       />
       <InvestigationList view={list} selectedId={selected?.id ?? null} onSelect={open} signInHref={signInHref} />
+      {selected ? (
+        <InvestigationStateControl
+          investigation={selected}
+          pending={transitioning}
+          notice={transitionNotice}
+          onTransition={transition}
+          signInHref={signInHref}
+        />
+      ) : null}
       {selected ? (
         <EvidenceBoard
           investigation={selected}
