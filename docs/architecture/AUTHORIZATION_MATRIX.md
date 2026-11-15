@@ -35,6 +35,7 @@ query -> evidence -> claims -> review -> publication:
   public-scope revisions.
 - Tenant source registry writes (create, fetch policy): denied to every role except `admin`.
 - Legacy destructive `POST persistence/reset` and `POST workflow-audit/clear`: denied to every role except `admin`.
+- Raw-retrieval retention (`PUT .../retention`, `GET .../retention-eligibility`): admin-only; every other role and `intruder` is answered with 403, so the rows below list the denied roles, not the allowed ones.
 
 ## Pinned matrix (endpoints where at least one role is denied with 403)
 
