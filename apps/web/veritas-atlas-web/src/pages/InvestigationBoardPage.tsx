@@ -5,6 +5,7 @@ import {
   draftAfterSave,
   classifyInvestigationFailure,
   createInvestigation,
+  mergeCreated,
   listAnnotations,
   type EvidenceAnnotation,
   compareEvidenceItems,
@@ -42,6 +43,8 @@ export function InvestigationBoardPage() {
   const [createNotice, setCreateNotice] = useState<InvestigationFailure | null>(null);
   // Same title keeps the same key so a retry replays instead of duplicating; success or an edited title rotates it.
   const creationKey = useRef<{ title: string; key: string } | null>(null);
+  // Rows created here, kept so a creation that finishes before the initial list read is not lost.
+  const createdHere = useRef<Investigation[]>([]);
   const latestAnnotations = useRef(0);
   const latest = useRef(0);
   const latestComparison = useRef(0);
@@ -50,7 +53,7 @@ export function InvestigationBoardPage() {
   useEffect(() => {
     let live = true;
     listInvestigations().then(
-      (data) => live && setList({ kind: "loaded", data }),
+      (data) => live && setList({ kind: "loaded", data: mergeCreated(createdHere.current, data) }),
       (error) => live && setList({ kind: "error", failure: classifyInvestigationFailure(error, navigator.onLine) }),
     );
     return () => {
@@ -144,10 +147,9 @@ export function InvestigationBoardPage() {
       (created) => {
         creationKey.current = null;
         setNewTitle((now) => (now === title ? "" : now));
+        createdHere.current = mergeCreated(createdHere.current, [created]);
         setList((current) =>
-          current.kind === "loaded"
-            ? { kind: "loaded", data: [created, ...current.data.filter((i) => i.id !== created.id)] }
-            : current,
+          current.kind === "loaded" ? { kind: "loaded", data: mergeCreated([created], current.data) } : current,
         );
         setCreating(false);
         open(created);

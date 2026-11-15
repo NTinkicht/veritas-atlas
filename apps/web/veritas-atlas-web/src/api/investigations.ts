@@ -348,3 +348,9 @@ export async function createInvestigation(title: string, creationKey: string): P
   if (created.title !== title) throw new MalformedInvestigationResponse("investigation does not match the request");
   return created;
 }
+
+/** Created rows first, then the server list without duplicates of them. */
+export function mergeCreated(created: Investigation[], listed: Investigation[]): Investigation[] {
+  const ids = new Set(created.map((i) => i.id));
+  return [...created, ...listed.filter((i) => !ids.has(i.id))];
+}
