@@ -318,6 +318,7 @@ public sealed class AuthorizationMatrixTests
         "GET api/v1/tenant-raw-retrievals/{id:guid}/parses | denied: operator,analyst,reviewer,publisher,intruder",
         "GET api/v1/tenant-raw-retrievals/{id:guid}/attestations | denied: operator,analyst,reviewer,publisher,intruder",
         "GET api/v1/tenant-raw-retrievals/{id:guid}/retention-eligibility | denied: operator,analyst,reviewer,publisher,intruder",
+        "PUT api/v1/tenant-raw-retrievals/{id:guid}/retention | denied: operator,analyst,reviewer,publisher,intruder",
         "GET api/v1/tenant-raw-retrievals/{id:guid}/parses/{parseRunId:guid}/verification | denied: operator,analyst,reviewer,publisher,intruder",
         "POST api/v1/tenant-raw-retrievals/{id:guid}/parses/{parseRunId:guid}/verification | denied: operator,analyst,reviewer,publisher,intruder",
         "POST api/v1/tenant-sources | denied: operator,analyst,reviewer,publisher,intruder",

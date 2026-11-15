@@ -1477,6 +1477,39 @@ public sealed class TenantInvestigationStateEventConfiguration : IEntityTypeConf
     }
 }
 
+public sealed class TenantRetentionRecordConfiguration : IEntityTypeConfiguration<VeritasAtlas.Infrastructure.Persistence.TenantRetentionRecord>
+{
+    public void Configure(EntityTypeBuilder<VeritasAtlas.Infrastructure.Persistence.TenantRetentionRecord> builder)
+    {
+        builder.ToTable("tenant_raw_retrieval_retention_records", table =>
+        {
+            table.HasCheckConstraint(
+                "ck_tenant_raw_retrieval_retention_records_tenant_id_not_empty",
+                "tenant_id <> '00000000-0000-0000-0000-000000000000'::uuid");
+            table.HasCheckConstraint(
+                "ck_tenant_raw_retrieval_retention_records_version_positive",
+                "version >= 1");
+            table.HasCheckConstraint(
+                "ck_tenant_raw_retrieval_retention_records_actor_subject_shape",
+                "length(btrim(actor_subject)) > 0 AND actor_subject !~ '[\\x01-\\x1f\\x7f-\\x9f]'");
+        });
+
+        builder.HasKey(x => new { x.TenantId, x.RawRetrievalId, x.Version })
+            .HasName("pk_tenant_raw_retrieval_retention_records");
+        builder.Property(x => x.TenantId).HasColumnName("tenant_id").IsRequired();
+        builder.Property(x => x.RawRetrievalId).HasColumnName("raw_retrieval_id").IsRequired();
+        builder.Property(x => x.Version).HasColumnName("version").IsRequired();
+        builder.Property(x => x.LegalHold).HasColumnName("legal_hold").IsRequired();
+        builder.Property(x => x.RetainUntilUtc).HasColumnName("retain_until_utc");
+        builder.Property(x => x.ActorSubject)
+            .HasColumnName("actor_subject")
+            .HasMaxLength(VeritasAtlas.Application.Interfaces.TenantAuditEventLimits.MaxSubjectLength)
+            .IsRequired();
+        builder.Property(x => x.CreatedAtUtc).HasColumnName("created_at_utc").IsRequired();
+        // No FK (raw retrievals are immutable parents): the insert guard trigger checks the retrieval and the chain.
+    }
+}
+
 public sealed class TenantInvestigationConfiguration : IEntityTypeConfiguration<VeritasAtlas.Infrastructure.Persistence.TenantInvestigation>
 {
     public void Configure(EntityTypeBuilder<VeritasAtlas.Infrastructure.Persistence.TenantInvestigation> builder)

@@ -85,6 +85,7 @@ public static class ServiceCollectionExtensions
             sp.GetRequiredService<VeritasAtlasDbContext>(),
             sp.GetService<TimeProvider>() ?? TimeProvider.System));
         services.AddScoped<ITenantInvestigationStore, EfTenantInvestigationStore>();
+        services.AddScoped<ITenantRetentionRecordStore, EfTenantRetentionRecordStore>();
         services.AddScoped<ITenantInvestigationEvidenceStore, EfTenantInvestigationEvidenceStore>();
         services.AddScoped<ITenantInvestigationAnnotationStore, EfTenantInvestigationAnnotationStore>();
         services.AddScoped<ITenantInvestigationBookmarkStore, EfTenantInvestigationBookmarkStore>();

@@ -50,6 +50,7 @@ public sealed class VeritasAtlasDbContext : DbContext
     public DbSet<TenantInvestigationBookmark> TenantInvestigationBookmarks => Set<TenantInvestigationBookmark>();
     public DbSet<TenantInvestigationShare> TenantInvestigationShares => Set<TenantInvestigationShare>();
     public DbSet<TenantInvestigationStateEvent> TenantInvestigationStateEvents => Set<TenantInvestigationStateEvent>();
+    public DbSet<TenantRetentionRecord> TenantRetentionRecords => Set<TenantRetentionRecord>();
 
     public DbSet<TenantAuditEvent> TenantAuditEvents => Set<TenantAuditEvent>();
 
@@ -90,6 +91,7 @@ public sealed class VeritasAtlasDbContext : DbContext
         modelBuilder.ApplyConfiguration(new TenantInvestigationBookmarkConfiguration());
         modelBuilder.ApplyConfiguration(new TenantInvestigationShareConfiguration());
         modelBuilder.ApplyConfiguration(new TenantInvestigationStateEventConfiguration());
+        modelBuilder.ApplyConfiguration(new TenantRetentionRecordConfiguration());
         modelBuilder.ApplyConfiguration(new TenantAuditEventConfiguration());
         modelBuilder.ApplyConfiguration(new TenantPublicationRevisionConfiguration());
         modelBuilder.ApplyConfiguration(new TenantPublicationTransitionConfiguration());
