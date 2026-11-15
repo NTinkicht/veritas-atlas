@@ -1,5 +1,10 @@
 import { formatInstant } from "../api/evidenceSearch";
-import { ANNOTATION_MAX_TEXT_LENGTH, isValidAnnotationText } from "../api/investigations";
+import {
+  ANNOTATION_MAX_TEXT_LENGTH,
+  INVESTIGATION_MAX_TITLE_LENGTH,
+  isValidAnnotationText,
+  isValidInvestigationTitle,
+} from "../api/investigations";
 import type {
   CollectedEvidenceItem,
   EvidenceAnnotation,
@@ -23,6 +28,45 @@ export function FailureNotice({ failure, signInHref }: { failure: InvestigationF
       {failure.message}
       {failure.kind === "unauthenticated" ? <> <a href={signInHref}>Sign in</a></> : null}
     </p>
+  );
+}
+
+type CreateProps = {
+  title: string;
+  submitting: boolean;
+  notice: InvestigationFailure | null;
+  onTitleChange: (value: string) => void;
+  onSubmit: () => void;
+  signInHref: string;
+};
+
+export function CreateInvestigationForm({ title, submitting, notice, onTitleChange, onSubmit, signInHref }: CreateProps) {
+  const valid = isValidInvestigationTitle(title);
+  return (
+    <form
+      aria-label="Open an investigation"
+      onSubmit={(event) => {
+        event.preventDefault();
+        if (valid && !submitting) onSubmit();
+      }}
+    >
+      <label htmlFor="new-investigation-title">New investigation title</label>
+      <input
+        id="new-investigation-title"
+        type="text"
+        value={title}
+        maxLength={INVESTIGATION_MAX_TITLE_LENGTH}
+        aria-describedby="new-investigation-hint"
+        onChange={(event) => onTitleChange(event.target.value)}
+      />
+      <p id="new-investigation-hint" className="muted">
+        1-{INVESTIGATION_MAX_TITLE_LENGTH} characters, no leading or trailing spaces. {title.length}/{INVESTIGATION_MAX_TITLE_LENGTH}
+      </p>
+      <button type="submit" disabled={!valid || submitting}>
+        {submitting ? "Opening..." : "Open investigation"}
+      </button>
+      {notice ? <FailureNotice failure={notice} signInHref={signInHref} /> : null}
+    </form>
   );
 }
 

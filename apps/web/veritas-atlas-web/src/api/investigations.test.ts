@@ -21,6 +21,9 @@ import {
   parseEvidenceComparison,
   parseEvidenceItems,
   parseInvestigations,
+  createInvestigation,
+  mergeCreated,
+  isValidInvestigationTitle,
 } from "./investigations";
 
 // SYNTHETIC fixtures only.
@@ -235,5 +238,59 @@ describe("draftAfterSave", () => {
   it("keeps text typed while the save was pending", () => {
     expect(draftAfterSave("note and more", "note")).toBe("note and more");
     expect(draftAfterSave("", "note")).toBe("");
+  });
+});
+
+describe("create investigation client", () => {
+  const created = { id: ID, creationKey: "key-1", title: "Synthetic inquiry", createdBySubject: "analyst-1", createdAtUtc: "2026-11-02T09:00:00Z" };
+  beforeEach(() => vi.stubGlobal("localStorage", { getItem: () => null, setItem: () => undefined, removeItem: () => undefined }));
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("mirrors the server title rule", () => {
+    expect(isValidInvestigationTitle("Synthetic inquiry")).toBe(true);
+    expect(isValidInvestigationTitle("x".repeat(200))).toBe(true);
+    for (const bad of ["", "   ", " lead", "trail ", "x".repeat(201), "tab\there", "line\nbreak", "nul\u0000", "c1\u0085x"]) {
+      expect(isValidInvestigationTitle(bad)).toBe(false);
+    }
+  });
+  it("posts the title and creation key and returns the stored row (positive control)", async () => {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify(created), { status: 201 }));
+    vi.stubGlobal("fetch", fetchMock);
+    const result = await createInvestigation("Synthetic inquiry", "key-1");
+    expect(result).toEqual({ id: ID, title: "Synthetic inquiry", createdBySubject: "analyst-1", createdAtUtc: "2026-11-02T09:00:00Z" });
+    const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toContain("/api/v1/tenant-investigations");
+    expect(init.method).toBe("POST");
+    expect(JSON.parse(init.body as string)).toEqual({ creationKey: "key-1", title: "Synthetic inquiry" });
+  });
+  it("refuses an invalid title or key before any request", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(createInvestigation(" padded", "key-1")).rejects.toBeInstanceOf(MalformedInvestigationResponse);
+    await expect(createInvestigation("ok", "")).rejects.toBeInstanceOf(MalformedInvestigationResponse);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+  it("rejects an answer about a different investigation or a malformed body", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ ...created, title: "Other" }), { status: 200 })));
+    await expect(createInvestigation("Synthetic inquiry", "key-1")).rejects.toBeInstanceOf(MalformedInvestigationResponse);
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ ...created, id: "nope" }), { status: 200 })));
+    await expect(createInvestigation("Synthetic inquiry", "key-1")).rejects.toBeInstanceOf(MalformedInvestigationResponse);
+  });
+  it("surfaces a server refusal instead of faking success", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response("{}", { status: 403 })));
+    await expect(createInvestigation("Synthetic inquiry", "key-1")).rejects.toMatchObject({ status: 403 });
+    vi.stubGlobal("fetch", vi.fn(async () => new Response("{}", { status: 409 })));
+    await expect(createInvestigation("Synthetic inquiry", "key-1")).rejects.toMatchObject({ status: 409 });
+  });
+});
+
+describe("mergeCreated", () => {
+  const row = (id: string, title: string) => ({ id, title, createdBySubject: "analyst-1", createdAtUtc: "2026-11-02T09:00:00Z" });
+  const A = row("11111111-1111-4111-8111-111111111111", "A");
+  const B = row("22222222-2222-4222-8222-222222222222", "B");
+  it("keeps a row created before the initial list read finished, without duplicating it", () => {
+    expect(mergeCreated([A], [B])).toEqual([A, B]);
+    expect(mergeCreated([A], [B, A])).toEqual([A, B]);
+    expect(mergeCreated([], [B])).toEqual([B]);
   });
 });
