@@ -44,6 +44,11 @@ public sealed class EfTenantInvestigationAnnotationStore : ITenantInvestigationA
             return new AnnotationAddResult(AnnotationAddOutcome.NotFound, null);
         }
 
+        if (await InvestigationStateQueries.IsClosedAsync(_db, tenantId, investigationId, cancellationToken))
+        {
+            return new AnnotationAddResult(AnnotationAddOutcome.InvestigationClosed, null);
+        }
+
         var existing = await FindAsync(tenantId, evidenceItemId, input, cancellationToken);
         if (existing is not null)
         {
@@ -78,6 +83,12 @@ public sealed class EfTenantInvestigationAnnotationStore : ITenantInvestigationA
         try
         {
             await _db.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException ex) when (InvestigationStateQueries.IsClosedViolation(ex))
+        {
+            _db.Entry(row).State = EntityState.Detached;
+            _db.Entry(audit).State = EntityState.Detached;
+            return new AnnotationAddResult(AnnotationAddOutcome.InvestigationClosed, null);
         }
         catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: UniqueViolation })
         {

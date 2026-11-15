@@ -31,7 +31,8 @@ public enum AnnotationAddOutcome
 {
     Added,
     Replayed,
-    NotFound
+    NotFound,
+    InvestigationClosed
 }
 
 public sealed record AnnotationAddResult(AnnotationAddOutcome Outcome, TenantInvestigationAnnotationModel? Annotation);

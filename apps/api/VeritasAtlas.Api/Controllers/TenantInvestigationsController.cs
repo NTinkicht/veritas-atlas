@@ -84,8 +84,7 @@ public sealed class TenantInvestigationsController : ControllerBase
             ? await _store.GetAsync(tenantId, id, cancellationToken)
             : null;
         return entry is null
-            ? Error(StatusCodes.Status404NotFound, "tenant_investigation_not_found",
-                "The investigation was not found.")
+            ? NotFoundError()
             : Ok(ToResponse(entry));
     }
 
@@ -103,6 +102,60 @@ public sealed class TenantInvestigationsController : ControllerBase
             string.Equals(e.CreatedBySubject, actor, StringComparison.Ordinal) || granted.Contains(e.Id));
         return Ok(new TenantInvestigationListResponse(visible.Select(ToResponse).ToList()));
     }
+
+    /// <summary>
+    /// VER-P0-10 slice 8: closes the investigation. Only an operator or analyst who is the
+    /// creator or holds an active share may do so; anyone else (and another tenant) gets the
+    /// same 404 as an unknown id.
+    /// </summary>
+    [HttpPost("{id:guid}/close")]
+    public Task<IActionResult> Close(
+        Guid id, [FromBody] InvestigationTransitionRequest? request, CancellationToken cancellationToken) =>
+        TransitionAsync(id, close: true, request, cancellationToken);
+
+    /// <summary>Reopens a closed investigation; same authorization as <see cref="Close"/>.</summary>
+    [HttpPost("{id:guid}/reopen")]
+    public Task<IActionResult> Reopen(
+        Guid id, [FromBody] InvestigationTransitionRequest? request, CancellationToken cancellationToken) =>
+        TransitionAsync(id, close: false, request, cancellationToken);
+
+    private async Task<IActionResult> TransitionAsync(
+        Guid id, bool close, InvestigationTransitionRequest? request, CancellationToken cancellationToken)
+    {
+        if (TenantClaim.GetTenantId(User) is not { } tenantId) return TenantRequired();
+        if (ActorOrRefusal() is not { } actor) return ActorRequired();
+        if (!HasExactlyOneRoleIn(User, AuthorRoles))
+        {
+            return Error(StatusCodes.Status403Forbidden, "author_required",
+                "Only an operator or analyst may close or reopen an investigation.");
+        }
+
+        if (request?.ExpectedVersion is not { } expectedVersion || expectedVersion < 0)
+        {
+            return Error(StatusCodes.Status400BadRequest, "invalid_expected_version",
+                "expectedVersion must be the non-negative version last read from the investigation.");
+        }
+
+        if (!await _shares.IsAuthorizedAsync(tenantId, id, actor, cancellationToken))
+        {
+            return NotFoundError();
+        }
+
+        var result = await _store.TransitionAsync(tenantId, id, close, expectedVersion, actor, cancellationToken);
+        return result.Outcome switch
+        {
+            InvestigationTransitionOutcome.Transitioned or InvestigationTransitionOutcome.Replayed =>
+                Ok(ToResponse(result.Investigation!)),
+            InvestigationTransitionOutcome.StaleVersion => Error(StatusCodes.Status409Conflict, "version_conflict",
+                "The investigation changed since expectedVersion was read."),
+            InvestigationTransitionOutcome.NoChange => Error(StatusCodes.Status409Conflict, "state_unchanged",
+                close ? "The investigation is already closed." : "The investigation is already open."),
+            _ => NotFoundError()
+        };
+    }
+
+    private ObjectResult NotFoundError() =>
+        Error(StatusCodes.Status404NotFound, "tenant_investigation_not_found", "The investigation was not found.");
 
     private ObjectResult? Refuse()
     {
@@ -150,13 +203,17 @@ public sealed class TenantInvestigationsController : ControllerBase
         StatusCode(status, new TenantInvestigationError(code, message));
 
     private static TenantInvestigationResponse ToResponse(TenantInvestigationModel model) =>
-        new(model.Id, model.CreationKey, model.Title, model.CreatedBySubject, model.CreatedAtUtc);
+        new(model.Id, model.CreationKey, model.Title, model.CreatedBySubject, model.CreatedAtUtc,
+            model.State, model.Version);
 }
+
+public sealed record InvestigationTransitionRequest(int? ExpectedVersion);
 
 public sealed record CreateTenantInvestigationRequest(string? CreationKey, string? Title);
 
 public sealed record TenantInvestigationResponse(
-    Guid Id, string CreationKey, string Title, string CreatedBySubject, DateTime CreatedAtUtc);
+    Guid Id, string CreationKey, string Title, string CreatedBySubject, DateTime CreatedAtUtc,
+    string State, int Version);
 
 public sealed record TenantInvestigationListResponse(IReadOnlyList<TenantInvestigationResponse> Items);
 

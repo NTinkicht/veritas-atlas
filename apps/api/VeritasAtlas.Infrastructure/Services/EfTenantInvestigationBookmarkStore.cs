@@ -42,6 +42,11 @@ public sealed class EfTenantInvestigationBookmarkStore : ITenantInvestigationBoo
                 return new BookmarkPutResult(BookmarkPutOutcome.NotFound, null);
             }
 
+            if (await InvestigationStateQueries.IsClosedAsync(_db, tenantId, investigationId, cancellationToken))
+            {
+                return new BookmarkPutResult(BookmarkPutOutcome.InvestigationClosed, null);
+            }
+
             var existing = await FindAsync(tenantId, evidenceItemId, subject, cancellationToken);
             if (existing is not null)
             {
@@ -63,6 +68,12 @@ public sealed class EfTenantInvestigationBookmarkStore : ITenantInvestigationBoo
             {
                 await _db.SaveChangesAsync(cancellationToken);
                 return new BookmarkPutResult(BookmarkPutOutcome.Added, ToModel(row));
+            }
+            catch (DbUpdateException ex) when (InvestigationStateQueries.IsClosedViolation(ex))
+            {
+                _db.Entry(row).State = EntityState.Detached;
+                _db.Entry(audit).State = EntityState.Detached;
+                return new BookmarkPutResult(BookmarkPutOutcome.InvestigationClosed, null);
             }
             catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: GuardViolation })
             {
@@ -96,6 +107,11 @@ public sealed class EfTenantInvestigationBookmarkStore : ITenantInvestigationBoo
             return BookmarkRemoveOutcome.NotFound;
         }
 
+        if (await InvestigationStateQueries.IsClosedAsync(_db, tenantId, investigationId, cancellationToken))
+        {
+            return BookmarkRemoveOutcome.InvestigationClosed;
+        }
+
         var row = await _db.TenantInvestigationBookmarks.SingleOrDefaultAsync(
             x => x.TenantId == tenantId && x.EvidenceItemId == evidenceItemId && x.Subject == subject,
             cancellationToken);
@@ -109,6 +125,11 @@ public sealed class EfTenantInvestigationBookmarkStore : ITenantInvestigationBoo
         try
         {
             await _db.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException ex) when (InvestigationStateQueries.IsClosedViolation(ex))
+        {
+            _db.ChangeTracker.Clear();
+            return BookmarkRemoveOutcome.InvestigationClosed;
         }
         catch (DbUpdateConcurrencyException)
         {

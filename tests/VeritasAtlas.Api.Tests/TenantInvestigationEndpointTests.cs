@@ -276,6 +276,14 @@ public sealed class TenantInvestigationEndpointTests
             Interlocked.Increment(ref _calls);
             return Task.FromResult<IReadOnlyList<TenantInvestigationModel>>([]);
         }
+
+        public Task<InvestigationTransitionResult> TransitionAsync(
+            Guid tenantId, Guid investigationId, bool close, int expectedVersion, string actorSubject,
+            CancellationToken cancellationToken)
+        {
+            Interlocked.Increment(ref _calls);
+            return Task.FromResult(new InvestigationTransitionResult(InvestigationTransitionOutcome.NotFound, null));
+        }
     }
 
     private sealed class ApiFactory(string? connectionString = null, ITenantInvestigationStore? store = null)

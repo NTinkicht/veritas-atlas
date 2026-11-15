@@ -37,6 +37,8 @@ public sealed class TenantInvestigationBookmarksController : ControllerBase
         {
             BookmarkPutOutcome.Added => StatusCode(StatusCodes.Status201Created, ToResponse(result.Bookmark!)),
             BookmarkPutOutcome.Replayed => Ok(ToResponse(result.Bookmark!)),
+            BookmarkPutOutcome.InvestigationClosed => Error(StatusCodes.Status409Conflict, "investigation_closed",
+                "The investigation is closed; reopen it to change it."),
             _ => NotFoundError()
         };
     }
@@ -48,7 +50,13 @@ public sealed class TenantInvestigationBookmarksController : ControllerBase
             is not { } caller) return Refusal!;
 
         var outcome = await _store.RemoveAsync(caller.TenantId, investigationId, itemId, caller.Subject, cancellationToken);
-        return outcome == BookmarkRemoveOutcome.NotFound ? NotFoundError() : NoContent();
+        return outcome switch
+        {
+            BookmarkRemoveOutcome.NotFound => NotFoundError(),
+            BookmarkRemoveOutcome.InvestigationClosed => Error(StatusCodes.Status409Conflict, "investigation_closed",
+                "The investigation is closed; reopen it to change it."),
+            _ => NoContent()
+        };
     }
 
     [HttpGet("bookmarks")]

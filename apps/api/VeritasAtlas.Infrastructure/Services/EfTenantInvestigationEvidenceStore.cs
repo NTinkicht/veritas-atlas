@@ -45,6 +45,11 @@ public sealed class EfTenantInvestigationEvidenceStore : ITenantInvestigationEvi
             return new EvidenceItemCollectResult(EvidenceItemCollectOutcome.InvestigationNotFound, null);
         }
 
+        if (await InvestigationStateQueries.IsClosedAsync(_db, tenantId, investigationId, cancellationToken))
+        {
+            return new EvidenceItemCollectResult(EvidenceItemCollectOutcome.InvestigationClosed, null);
+        }
+
         if (!await _db.TenantEvidenceVerifications.AsNoTracking()
                 .AnyAsync(x => x.TenantId == tenantId && x.Id == input.EvidenceVerificationId, cancellationToken))
         {
@@ -84,6 +89,12 @@ public sealed class EfTenantInvestigationEvidenceStore : ITenantInvestigationEvi
         try
         {
             await _db.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException ex) when (InvestigationStateQueries.IsClosedViolation(ex))
+        {
+            _db.Entry(row).State = EntityState.Detached;
+            _db.Entry(audit).State = EntityState.Detached;
+            return new EvidenceItemCollectResult(EvidenceItemCollectOutcome.InvestigationClosed, null);
         }
         catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: UniqueViolation })
         {

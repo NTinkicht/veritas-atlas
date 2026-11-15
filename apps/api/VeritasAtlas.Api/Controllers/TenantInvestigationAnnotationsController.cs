@@ -61,6 +61,8 @@ public sealed class TenantInvestigationAnnotationsController : ControllerBase
         {
             AnnotationAddOutcome.Added => StatusCode(StatusCodes.Status201Created, ToResponse(result.Annotation!)),
             AnnotationAddOutcome.Replayed => Ok(ToResponse(result.Annotation!)),
+            AnnotationAddOutcome.InvestigationClosed => Error(StatusCodes.Status409Conflict, "investigation_closed",
+                "The investigation is closed; reopen it to change it."),
             // Anti-oracle: another tenant's ids answer exactly like unknown ones.
             _ => NotFoundError()
         };
