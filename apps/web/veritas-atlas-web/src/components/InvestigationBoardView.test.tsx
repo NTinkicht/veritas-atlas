@@ -1,7 +1,7 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import type { CollectedEvidenceItem, Investigation } from "../api/investigations";
-import { EvidenceBoard, EvidenceComparison, InvestigationList } from "./InvestigationBoardView";
+import type { CollectedEvidenceItem, EvidenceAnnotation, Investigation } from "../api/investigations";
+import { EvidenceBoard, EvidenceComparison, InvestigationList, type AnnotationsState } from "./InvestigationBoardView";
 
 // SYNTHETIC fixtures only.
 const inv: Investigation = { id: "11111111-1111-4111-8111-111111111111", title: "Synthetic <b>inquiry</b>", createdBySubject: "analyst-1", createdAtUtc: "2026-11-02T09:00:00Z" };
@@ -127,5 +127,73 @@ describe("bookmark controls", () => {
     expect(html).toContain('role="alert"');
     expect(html).toContain("Not permitted.");
     expect(html).toContain(item.evidenceVerificationId);
+  });
+});
+
+describe("annotation panel", () => {
+  const note: EvidenceAnnotation = {
+    id: "88888888-8888-4888-8888-888888888888",
+    investigationId: inv.id,
+    evidenceItemId: item.id,
+    text: "<img src=x onerror=alert(1)>",
+    authorSubject: "analyst-1",
+    createdAtUtc: "2026-11-02T09:00:00Z",
+  };
+  const state = (over: Partial<AnnotationsState> = {}): AnnotationsState => ({
+    itemId: item.id,
+    view: { kind: "loaded", data: [note] },
+    draft: "",
+    submitting: false,
+    notice: null,
+    onDraftChange: noop,
+    onSubmit: noop,
+    ...over,
+  });
+  const render = (annotations: AnnotationsState | null, withHandler = true) =>
+    renderToStaticMarkup(
+      <EvidenceBoard
+        investigation={inv}
+        view={{ kind: "loaded", data: [item] }}
+        signInHref="/login"
+        annotations={annotations}
+        onToggleAnnotations={withHandler ? noop : undefined}
+      />,
+    );
+  it("hides annotation controls when no handler is supplied", () => {
+    expect(render(state(), false)).not.toContain("Annotations");
+  });
+  it("offers a collapsed control until an item is opened", () => {
+    const html = render(null);
+    expect(html).toContain(">Annotations<");
+    expect(html).not.toContain("Add annotation");
+  });
+  it("lists annotations as escaped text with author", () => {
+    const html = render(state());
+    expect(html).toContain("&lt;img src=x onerror=alert(1)&gt;");
+    expect(html).not.toContain("<img");
+    expect(html).toContain("analyst-1");
+    expect(html).toContain("Hide annotations");
+  });
+  it("shows an honest empty state", () => {
+    expect(render(state({ view: { kind: "loaded", data: [] } }))).toContain("No annotations yet.");
+  });
+  it("shows a read failure as an alert with no form and no empty state", () => {
+    const html = render(state({ view: { kind: "error", failure: { kind: "forbidden", message: "Not permitted." } } }));
+    expect(html).toContain('role="alert"');
+    expect(html).toContain("Not permitted.");
+    expect(html).not.toContain("No annotations yet.");
+    expect(html).not.toContain("<form");
+  });
+  it("disables submit for empty or invalid drafts and while submitting, enables for valid text", () => {
+    const submit = (over: Partial<AnnotationsState>) => render(state(over)).match(/<button type="submit"[^>]*>/)?.[0] ?? "";
+    expect(submit({ draft: "" })).toContain("disabled");
+    expect(submit({ draft: " padded " })).toContain("disabled");
+    expect(submit({ draft: "fine", submitting: true })).toContain("disabled");
+    expect(submit({ draft: "fine" })).not.toContain("disabled");
+  });
+  it("shows a write failure without dropping the list", () => {
+    const html = render(state({ notice: { kind: "server", message: "Try again later." } }));
+    expect(html).toContain("Try again later.");
+    expect(html).toContain("onerror");
   });
 });
