@@ -20,10 +20,49 @@ namespace VeritasAtlas.Api.Controllers;
 public sealed class TenantRawRetrievalParsesController : ControllerBase
 {
     private readonly IEvidenceParseService _parser;
+    private readonly ITenantRawRetrievalLedger _retrievals;
+    private readonly ITenantParseRunLedger _runs;
 
-    public TenantRawRetrievalParsesController(IEvidenceParseService parser)
+    public TenantRawRetrievalParsesController(
+        IEvidenceParseService parser, ITenantRawRetrievalLedger retrievals, ITenantParseRunLedger runs)
     {
         _parser = parser;
+        _retrievals = retrievals;
+        _runs = runs;
+    }
+
+    /// <summary>
+    /// VER-P0-07 (#272): lists the parse runs recorded for one retrieval (run metadata only), so a
+    /// parser upgrade can be inspected. Same fail-closed gate as the trigger; unknown, empty and
+    /// another tenant's retrieval answer the same 404 before any run is listed.
+    /// </summary>
+    [HttpGet]
+    public async Task<IActionResult> List(Guid id, CancellationToken cancellationToken)
+    {
+        if (TenantClaim.GetTenantId(User) is not { } tenantId)
+            return Error(StatusCodes.Status403Forbidden, "tenant_required",
+                "The access token carries no valid organization tenant.");
+
+        var actor = User.FindFirstValue(ClaimTypes.Name);
+        if (string.IsNullOrWhiteSpace(actor)
+            || actor.Length > TenantAuditEventLimits.MaxSubjectLength
+            || actor.Any(char.IsControl))
+            return Error(StatusCodes.Status403Forbidden, "actor_required",
+                "The access token carries no usable subject name.");
+
+        if (!TenantAdminRole.IsSatisfiedBy(User))
+            return Error(StatusCodes.Status403Forbidden, "admin_required",
+                "Only a tenant admin may read parse runs.");
+
+        if (id == Guid.Empty || await _retrievals.GetAsync(tenantId, id, cancellationToken) is null)
+            return Error(StatusCodes.Status404NotFound, "retrieval_not_found", "The raw retrieval was not found.");
+
+        var runs = await _runs.ListForRetrievalAsync(tenantId, id, cancellationToken);
+        return Ok(runs
+            .OrderBy(r => r.StartedAtUtc).ThenBy(r => r.Id)
+            .Select(r => new ParseRunSummary(
+                r.Id, r.ParserName, r.ParserVersion, r.Outcome.ToString(), r.FailureClass?.ToString(), r.StartedAtUtc))
+            .ToList());
     }
 
     [HttpPost]
@@ -87,3 +126,12 @@ public sealed record ParseResponse(
     string? RunOutcome,
     string? FailureClass,
     int ChunkCount);
+
+/// <summary>Run metadata only; never the run key, raw bytes, chunk text or an evidence reference.</summary>
+public sealed record ParseRunSummary(
+    Guid ParseRunId,
+    string ParserName,
+    string ParserVersion,
+    string RunOutcome,
+    string? FailureClass,
+    DateTime StartedAtUtc);
