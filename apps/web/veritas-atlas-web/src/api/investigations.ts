@@ -311,3 +311,8 @@ export async function addAnnotation(investigationId: string, itemId: string, val
   }
   return annotation;
 }
+
+/** After a save succeeded: clear the draft only if the analyst did not keep typing while it was pending. */
+export function draftAfterSave(currentDraft: string, submitted: string): string {
+  return currentDraft === submitted ? "" : currentDraft;
+}

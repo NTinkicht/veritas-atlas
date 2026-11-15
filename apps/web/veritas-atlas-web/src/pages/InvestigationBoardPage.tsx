@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
 import {
   addAnnotation,
+  draftAfterSave,
   classifyInvestigationFailure,
   listAnnotations,
   type EvidenceAnnotation,
@@ -130,14 +131,15 @@ export function InvestigationBoardPage() {
     if (!selected || !annotationItem || submitting || annotationView.kind !== "loaded") return;
     const ticket = ++latestAnnotations.current;
     const current = annotationView.data;
+    const submitted = draft;
     setSubmitting(true);
     setAnnotationNotice(null);
-    addAnnotation(selected.id, annotationItem, draft).then(
+    addAnnotation(selected.id, annotationItem, submitted).then(
       (created) => {
         if (ticket !== latestAnnotations.current) return;
         // A replayed answer returns the stored row: never show it twice.
         setAnnotationView({ kind: "loaded", data: [...current.filter((a) => a.id !== created.id), created] });
-        setDraft("");
+        setDraft((now) => draftAfterSave(now, submitted));
         setSubmitting(false);
       },
       (error) => {

@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   MalformedInvestigationResponse,
   addAnnotation,
+  draftAfterSave,
   annotationsPath,
   isValidAnnotationText,
   listAnnotations,
@@ -224,5 +225,15 @@ describe("annotation client", () => {
     await expect(addAnnotation(ID, ITEM, " padded ")).rejects.toBeInstanceOf(MalformedInvestigationResponse);
     await expect(addAnnotation(ID, ITEM, "")).rejects.toBeInstanceOf(MalformedInvestigationResponse);
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("draftAfterSave", () => {
+  it("clears the draft when it still equals the saved text", () => {
+    expect(draftAfterSave("note", "note")).toBe("");
+  });
+  it("keeps text typed while the save was pending", () => {
+    expect(draftAfterSave("note and more", "note")).toBe("note and more");
+    expect(draftAfterSave("", "note")).toBe("");
   });
 });
