@@ -1,7 +1,7 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import type { CollectedEvidenceItem, Investigation } from "../api/investigations";
-import { EvidenceBoard, InvestigationList } from "./InvestigationBoardView";
+import { EvidenceBoard, EvidenceComparison, InvestigationList } from "./InvestigationBoardView";
 
 // SYNTHETIC fixtures only.
 const inv: Investigation = { id: "11111111-1111-4111-8111-111111111111", title: "Synthetic <b>inquiry</b>", createdBySubject: "analyst-1", createdAtUtc: "2026-11-02T09:00:00Z" };
@@ -39,5 +39,57 @@ describe("EvidenceBoard", () => {
   it("shows empty and error states", () => {
     expect(board({ kind: "loaded", data: [] })).toContain("No evidence has been collected");
     expect(board({ kind: "error", failure: { kind: "not-found", message: "That investigation was not found." } })).toContain("not found");
+  });
+});
+
+describe("EvidenceComparison and compare controls", () => {
+  const side = (itemId: string, over: Record<string, unknown> = {}) => ({
+    itemId,
+    evidenceVerificationId: "22222222-2222-4222-8222-222222222222",
+    note: "<img src=x onerror=alert(1)>",
+    parentEvidenceRef: "ev1:aaa",
+    rawRetrievalId: "11111111-1111-4111-8111-111111111111",
+    attestationId: "11111111-1111-4111-8111-111111111111",
+    parseRunId: "11111111-1111-4111-8111-111111111111",
+    verifiedAtUtc: "2026-11-02T09:00:00Z",
+    ...over,
+  });
+  const data = {
+    left: side("33333333-3333-4333-8333-333333333333"),
+    right: side("44444444-4444-4444-8444-444444444444", { parentEvidenceRef: "ev1:bbb", note: null }),
+    sameEvidenceRef: false,
+    sameRawRetrieval: true,
+    sameAttestation: true,
+    sameParseRun: true,
+  };
+  const render = (view: Parameters<typeof EvidenceComparison>[0]["view"]) =>
+    renderToStaticMarkup(<EvidenceComparison view={view} signInHref="/login" />);
+  it("shows both sides, honest same/different flags and escapes notes", () => {
+    const html = render({ kind: "loaded", data });
+    expect(html).toContain("Evidence reference: Different");
+    expect(html).toContain("Raw retrieval: Same");
+    expect(html).toContain("ev1:aaa");
+    expect(html).toContain("ev1:bbb");
+    expect(html).toContain("No note");
+    expect(html).toContain("&lt;img");
+    expect(html).not.toContain("<img");
+  });
+  it("shows failures and loading without any comparison data", () => {
+    const err = render({ kind: "error", failure: { kind: "not-found", message: "That investigation was not found." } });
+    expect(err).toContain('role="alert"');
+    expect(err).not.toContain("Evidence reference");
+    expect(render({ kind: "loading" })).toContain("Loading comparison");
+  });
+  it("renders compare checkboxes only when a handler is given and disables a third pick", () => {
+    const second = { ...item, id: "44444444-4444-4444-8444-444444444444" };
+    const third = { ...item, id: "55555555-5555-4555-8555-555555555555" };
+    const view = { kind: "loaded" as const, data: [item, second, third] };
+    const without = renderToStaticMarkup(<EvidenceBoard investigation={inv} view={view} signInHref="/login" />);
+    expect(without).not.toContain("Compare this item");
+    const html = renderToStaticMarkup(
+      <EvidenceBoard investigation={inv} view={view} signInHref="/login" pickedIds={[item.id, second.id]} onTogglePick={noop} />,
+    );
+    expect((html.match(/Compare this item/g) ?? []).length).toBe(3);
+    expect((html.match(/disabled=""/g) ?? []).length).toBe(1);
   });
 });

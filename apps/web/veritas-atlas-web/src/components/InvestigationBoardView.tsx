@@ -1,5 +1,11 @@
 import { formatInstant } from "../api/evidenceSearch";
-import type { CollectedEvidenceItem, Investigation, InvestigationFailure } from "../api/investigations";
+import type {
+  CollectedEvidenceItem,
+  ComparedEvidence,
+  EvidenceComparison as EvidenceComparisonData,
+  Investigation,
+  InvestigationFailure,
+} from "../api/investigations";
 
 // Presentational pieces of the investigation board (VER-P0-17). All API text (titles, notes,
 // subjects) is rendered as React text children, never as HTML.
@@ -43,9 +49,16 @@ export function InvestigationList({ view, selectedId, onSelect, signInHref }: Li
   );
 }
 
-type BoardProps = { investigation: Investigation; view: Loadable<CollectedEvidenceItem[]>; signInHref: string };
+type BoardProps = {
+  investigation: Investigation;
+  view: Loadable<CollectedEvidenceItem[]>;
+  signInHref: string;
+  /** Item ids picked for comparison (at most two). Omit to hide the comparison controls. */
+  pickedIds?: readonly string[];
+  onTogglePick?: (itemId: string) => void;
+};
 
-export function EvidenceBoard({ investigation, view, signInHref }: BoardProps) {
+export function EvidenceBoard({ investigation, view, signInHref, pickedIds, onTogglePick }: BoardProps) {
   return (
     <section className="panel" aria-label={`Collected evidence for ${investigation.title}`}>
       <h2>{investigation.title}</h2>
@@ -61,10 +74,64 @@ export function EvidenceBoard({ investigation, view, signInHref }: BoardProps) {
               <strong>Verified evidence {item.evidenceVerificationId}</strong>
               <div className="muted">collected {formatInstant(item.createdAtUtc)} by {item.collectedBySubject}</div>
               {item.note ? <p>{item.note}</p> : null}
+              {onTogglePick ? (
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={pickedIds?.includes(item.id) ?? false}
+                    disabled={!(pickedIds?.includes(item.id) ?? false) && (pickedIds?.length ?? 0) >= 2}
+                    onChange={() => onTogglePick(item.id)}
+                  />{" "}
+                  Compare this item
+                </label>
+              ) : null}
             </li>
           ))}
         </ul>
       ) : null}
+    </section>
+  );
+}
+
+function ComparedSide({ label, side }: { label: string; side: ComparedEvidence }) {
+  return (
+    <section aria-label={`${label} evidence`}>
+      <h3>{label}</h3>
+      <dl>
+        <dt>Evidence reference</dt>
+        <dd>{side.parentEvidenceRef}</dd>
+        <dt>Raw retrieval</dt>
+        <dd>{side.rawRetrievalId}</dd>
+        <dt>Attestation</dt>
+        <dd>{side.attestationId}</dd>
+        <dt>Parse run</dt>
+        <dd>{side.parseRunId}</dd>
+        <dt>Verified</dt>
+        <dd>{formatInstant(side.verifiedAtUtc)}</dd>
+        <dt>Note</dt>
+        <dd>{side.note ?? "No note"}</dd>
+      </dl>
+    </section>
+  );
+}
+
+const yesNo = (same: boolean) => (same ? "Same" : "Different");
+
+export function EvidenceComparison({ view, signInHref }: { view: Loadable<EvidenceComparisonData>; signInHref: string }) {
+  if (view.kind === "loading") return <p className="notice-card" role="status">Loading comparison...</p>;
+  if (view.kind === "error") return <FailureNotice failure={view.failure} signInHref={signInHref} />;
+  const c = view.data;
+  return (
+    <section className="panel" aria-label="Evidence comparison">
+      <h3>Comparison</h3>
+      <ul aria-label="Comparison summary">
+        <li>Evidence reference: {yesNo(c.sameEvidenceRef)}</li>
+        <li>Raw retrieval: {yesNo(c.sameRawRetrieval)}</li>
+        <li>Attestation: {yesNo(c.sameAttestation)}</li>
+        <li>Parse run: {yesNo(c.sameParseRun)}</li>
+      </ul>
+      <ComparedSide label="Left" side={c.left} />
+      <ComparedSide label="Right" side={c.right} />
     </section>
   );
 }
