@@ -18,6 +18,7 @@ public static class EvidenceSearchLimits
 /// that state; null returns every state with its honest label. <see cref="ParserName"/> and
 /// <see cref="ParserVersion"/> are the provenance filters: they match the stored parse run behind the
 /// verification exactly (ordinal, case-sensitive), so evidence without a parse run never matches.
+/// <see cref="Subject"/> is an extra full-text term that must match the same verified chunk as <see cref="Query"/>.
 /// </summary>
 public sealed record EvidenceSearchRequest(
     string Query,
@@ -30,7 +31,8 @@ public sealed record EvidenceSearchRequest(
     int PageSize,
     string? Cursor,
     string? ParserName = null,
-    string? ParserVersion = null);
+    string? ParserVersion = null,
+    string? Subject = null);
 
 /// <summary>
 /// <see cref="Snippet"/> is the text of the lowest-ordinal verified chunk of the hit that matches the query,
