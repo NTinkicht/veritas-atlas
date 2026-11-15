@@ -4,6 +4,7 @@ import {
   addAnnotation,
   draftAfterSave,
   classifyInvestigationFailure,
+  createInvestigation,
   listAnnotations,
   type EvidenceAnnotation,
   compareEvidenceItems,
@@ -18,7 +19,7 @@ import {
   type Investigation,
 } from "../api/investigations";
 import { AppSurface } from "../components/AppSurface";
-import { EvidenceBoard, EvidenceComparison, InvestigationList, type AnnotationsState, type Loadable } from "../components/InvestigationBoardView";
+import { CreateInvestigationForm, EvidenceBoard, EvidenceComparison, InvestigationList, type AnnotationsState, type Loadable } from "../components/InvestigationBoardView";
 
 export function InvestigationBoardPage() {
   const location = useLocation();
@@ -36,6 +37,11 @@ export function InvestigationBoardPage() {
   const [draft, setDraft] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [annotationNotice, setAnnotationNotice] = useState<InvestigationFailure | null>(null);
+  const [newTitle, setNewTitle] = useState("");
+  const [creating, setCreating] = useState(false);
+  const [createNotice, setCreateNotice] = useState<InvestigationFailure | null>(null);
+  // Same title keeps the same key so a retry replays instead of duplicating; success or an edited title rotates it.
+  const creationKey = useRef<{ title: string; key: string } | null>(null);
   const latestAnnotations = useRef(0);
   const latest = useRef(0);
   const latestComparison = useRef(0);
@@ -127,6 +133,32 @@ export function InvestigationBoardPage() {
     );
   }
 
+  function submitNewInvestigation() {
+    if (creating) return;
+    const title = newTitle;
+    if (creationKey.current?.title !== title) creationKey.current = { title, key: crypto.randomUUID() };
+    const key = creationKey.current.key;
+    setCreating(true);
+    setCreateNotice(null);
+    createInvestigation(title, key).then(
+      (created) => {
+        creationKey.current = null;
+        setNewTitle((now) => (now === title ? "" : now));
+        setList((current) =>
+          current.kind === "loaded"
+            ? { kind: "loaded", data: [created, ...current.data.filter((i) => i.id !== created.id)] }
+            : current,
+        );
+        setCreating(false);
+        open(created);
+      },
+      (error) => {
+        setCreateNotice(classifyInvestigationFailure(error, navigator.onLine));
+        setCreating(false);
+      },
+    );
+  }
+
   function submitAnnotation() {
     if (!selected || !annotationItem || submitting || annotationView.kind !== "loaded") return;
     const ticket = ++latestAnnotations.current;
@@ -185,6 +217,14 @@ export function InvestigationBoardPage() {
 
   return (
     <AppSurface title="Investigations" subtitle="Investigations visible to you and the verified evidence collected into them.">
+      <CreateInvestigationForm
+        title={newTitle}
+        submitting={creating}
+        notice={createNotice}
+        onTitleChange={setNewTitle}
+        onSubmit={submitNewInvestigation}
+        signInHref={signInHref}
+      />
       <InvestigationList view={list} selectedId={selected?.id ?? null} onSelect={open} signInHref={signInHref} />
       {selected ? (
         <EvidenceBoard

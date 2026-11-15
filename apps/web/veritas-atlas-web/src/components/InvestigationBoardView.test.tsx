@@ -1,7 +1,7 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import type { CollectedEvidenceItem, EvidenceAnnotation, Investigation } from "../api/investigations";
-import { EvidenceBoard, EvidenceComparison, InvestigationList, type AnnotationsState } from "./InvestigationBoardView";
+import { CreateInvestigationForm, EvidenceBoard, EvidenceComparison, InvestigationList, type AnnotationsState } from "./InvestigationBoardView";
 
 // SYNTHETIC fixtures only.
 const inv: Investigation = { id: "11111111-1111-4111-8111-111111111111", title: "Synthetic <b>inquiry</b>", createdBySubject: "analyst-1", createdAtUtc: "2026-11-02T09:00:00Z" };
@@ -195,5 +195,31 @@ describe("annotation panel", () => {
     const html = render(state({ notice: { kind: "server", message: "Try again later." } }));
     expect(html).toContain("Try again later.");
     expect(html).toContain("onerror");
+  });
+});
+
+describe("CreateInvestigationForm", () => {
+  const form = (over: Partial<Parameters<typeof CreateInvestigationForm>[0]> = {}) =>
+    renderToStaticMarkup(
+      <CreateInvestigationForm title="" submitting={false} notice={null} onTitleChange={noop} onSubmit={noop} signInHref="/login" {...over} />,
+    );
+  it("has a labelled input and a disabled submit while the title is empty", () => {
+    const html = form();
+    expect(html).toContain('for="new-investigation-title"');
+    expect(html).toContain('id="new-investigation-title"');
+    expect(html).toMatch(/<button type="submit" disabled="">Open investigation<\/button>/);
+  });
+  it("enables submit for a valid title and disables it for an invalid or pending one", () => {
+    expect(form({ title: "Synthetic inquiry" })).toMatch(/<button type="submit">Open investigation<\/button>/);
+    expect(form({ title: " padded" })).toContain('disabled=""');
+    const pending = form({ title: "Synthetic inquiry", submitting: true });
+    expect(pending).toContain("Opening...");
+    expect(pending).toContain('disabled=""');
+  });
+  it("shows a refusal as an alert and escapes the title", () => {
+    const html = form({ title: "<b>x</b>", notice: { kind: "forbidden", message: "Your account is not permitted to do that." } });
+    expect(html).toContain('role="alert"');
+    expect(html).toContain("not permitted");
+    expect(html).toContain("&lt;b&gt;x&lt;/b&gt;");
   });
 });

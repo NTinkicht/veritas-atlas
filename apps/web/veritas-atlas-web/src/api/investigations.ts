@@ -316,3 +316,35 @@ export async function addAnnotation(investigationId: string, itemId: string, val
 export function draftAfterSave(currentDraft: string, submitted: string): string {
   return currentDraft === submitted ? "" : currentDraft;
 }
+
+/** Mirrors TenantInvestigationLimits on the server. */
+export const INVESTIGATION_MAX_TITLE_LENGTH = 200;
+
+/** Client-side mirror of the server title rule so an invalid title never reaches the network. */
+export function isValidInvestigationTitle(value: string): boolean {
+  if (value.length === 0 || value.length > INVESTIGATION_MAX_TITLE_LENGTH) return false;
+  if (value.trim().length === 0 || value !== value.trim()) return false;
+  // eslint-disable-next-line no-control-regex
+  return !/[\u0000-\u001f\u007f-\u009f]/.test(value);
+}
+
+/**
+ * Opens an investigation. The server is idempotent on creationKey: resending the same key and title
+ * replays the stored row, so a retry after a lost answer never creates a second investigation.
+ */
+export async function createInvestigation(title: string, creationKey: string): Promise<Investigation> {
+  if (!isValidInvestigationTitle(title)) throw new MalformedInvestigationResponse("investigation title is not valid");
+  if (creationKey.length === 0 || creationKey.length > 200) throw new MalformedInvestigationResponse("creation key is not valid");
+  const raw = await apiPost<unknown, { creationKey: string; title: string }>(INVESTIGATIONS_PATH, { creationKey, title });
+  if (typeof raw !== "object" || raw === null) throw new MalformedInvestigationResponse("investigation is not an object");
+  const record = raw as Record<string, unknown>;
+  const created = {
+    id: guid(record, "id", 0, "investigation"),
+    title: text(record, "title", 0, "investigation"),
+    createdBySubject: text(record, "createdBySubject", 0, "investigation"),
+    createdAtUtc: text(record, "createdAtUtc", 0, "investigation"),
+  };
+  // Fail closed on an answer about some other investigation.
+  if (created.title !== title) throw new MalformedInvestigationResponse("investigation does not match the request");
+  return created;
+}
