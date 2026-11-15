@@ -56,9 +56,25 @@ type BoardProps = {
   /** Item ids picked for comparison (at most two). Omit to hide the comparison controls. */
   pickedIds?: readonly string[];
   onTogglePick?: (itemId: string) => void;
+  /** Item ids the caller has bookmarked. Omit together with onToggleBookmark to hide bookmark controls. */
+  bookmarkedIds?: readonly string[];
+  onToggleBookmark?: (itemId: string, bookmarked: boolean) => void;
+  /** Item ids with a bookmark request in flight. */
+  busyIds?: readonly string[];
+  bookmarkNotice?: InvestigationFailure | null;
 };
 
-export function EvidenceBoard({ investigation, view, signInHref, pickedIds, onTogglePick }: BoardProps) {
+export function EvidenceBoard({
+  investigation,
+  view,
+  signInHref,
+  pickedIds,
+  onTogglePick,
+  bookmarkedIds,
+  onToggleBookmark,
+  busyIds,
+  bookmarkNotice,
+}: BoardProps) {
   return (
     <section className="panel" aria-label={`Collected evidence for ${investigation.title}`}>
       <h2>{investigation.title}</h2>
@@ -67,6 +83,7 @@ export function EvidenceBoard({ investigation, view, signInHref, pickedIds, onTo
       {view.kind === "loaded" && view.data.length === 0 ? (
         <p className="empty-card">No evidence has been collected into this investigation yet.</p>
       ) : null}
+      {bookmarkNotice ? <FailureNotice failure={bookmarkNotice} signInHref={signInHref} /> : null}
       {view.kind === "loaded" && view.data.length > 0 ? (
         <ul aria-label="Collected evidence">
           {view.data.map((item) => (
@@ -74,6 +91,13 @@ export function EvidenceBoard({ investigation, view, signInHref, pickedIds, onTo
               <strong>Verified evidence {item.evidenceVerificationId}</strong>
               <div className="muted">collected {formatInstant(item.createdAtUtc)} by {item.collectedBySubject}</div>
               {item.note ? <p>{item.note}</p> : null}
+              {onToggleBookmark ? (
+                <BookmarkControl
+                  bookmarked={bookmarkedIds?.includes(item.id) ?? false}
+                  busy={busyIds?.includes(item.id) ?? false}
+                  onToggle={(next) => onToggleBookmark(item.id, next)}
+                />
+              ) : null}
               {onTogglePick ? (
                 <label>
                   <input
@@ -90,6 +114,17 @@ export function EvidenceBoard({ investigation, view, signInHref, pickedIds, onTo
         </ul>
       ) : null}
     </section>
+  );
+}
+
+function BookmarkControl({ bookmarked, busy, onToggle }: { bookmarked: boolean; busy: boolean; onToggle: (next: boolean) => void }) {
+  return (
+    <div>
+      {bookmarked ? <span className="muted">Bookmarked </span> : null}
+      <button type="button" disabled={busy} aria-pressed={bookmarked} onClick={() => onToggle(!bookmarked)}>
+        {bookmarked ? "Remove bookmark" : "Bookmark"}
+      </button>
+    </div>
   );
 }
 

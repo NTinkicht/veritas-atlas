@@ -62,3 +62,27 @@ export async function apiPostNoContent(url: string, auth = true): Promise<void> 
     throw await toApiError(response);
   }
 }
+
+export async function apiPut<TResponse>(url: string, auth = true): Promise<TResponse> {
+  const response = await fetch(toUrl(url), {
+    method: "PUT",
+    headers: createHeaders(auth, false),
+  });
+
+  if (!response.ok) {
+    throw await toApiError(response);
+  }
+
+  return (await response.json()) as TResponse;
+}
+
+export async function apiDelete(url: string, auth = true): Promise<void> {
+  const response = await fetch(toUrl(url), {
+    method: "DELETE",
+    headers: createHeaders(auth, false),
+  });
+
+  if (!response.ok) {
+    throw await toApiError(response);
+  }
+}

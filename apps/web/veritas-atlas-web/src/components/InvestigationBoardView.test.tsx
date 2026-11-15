@@ -93,3 +93,35 @@ describe("EvidenceComparison and compare controls", () => {
     expect((html.match(/disabled=""/g) ?? []).length).toBe(1);
   });
 });
+
+describe("bookmark controls", () => {
+  const render = (props: Partial<Parameters<typeof EvidenceBoard>[0]>) =>
+    renderToStaticMarkup(
+      <EvidenceBoard investigation={inv} view={{ kind: "loaded", data: [item] }} signInHref="/login" {...props} />,
+    );
+  it("hides bookmark controls when no handler is supplied", () => {
+    expect(render({})).not.toContain("Bookmark");
+  });
+  it("offers Bookmark for an unbookmarked item and Remove bookmark for a bookmarked one", () => {
+    const off = render({ bookmarkedIds: [], onToggleBookmark: noop });
+    expect(off).toContain(">Bookmark<");
+    expect(off).not.toContain("Remove bookmark");
+    const on = render({ bookmarkedIds: [item.id], onToggleBookmark: noop });
+    expect(on).toContain("Remove bookmark");
+    expect(on).toContain('aria-pressed="true"');
+  });
+  it("disables the control while a request is in flight", () => {
+    expect(render({ bookmarkedIds: [], onToggleBookmark: noop, busyIds: [item.id] })).toContain("disabled");
+    expect(render({ bookmarkedIds: [], onToggleBookmark: noop, busyIds: [] })).not.toContain("disabled");
+  });
+  it("shows a bookmark failure as an alert without hiding the evidence", () => {
+    const html = render({
+      bookmarkedIds: [],
+      onToggleBookmark: noop,
+      bookmarkNotice: { kind: "forbidden", message: "Not permitted." },
+    });
+    expect(html).toContain('role="alert"');
+    expect(html).toContain("Not permitted.");
+    expect(html).toContain(item.evidenceVerificationId);
+  });
+});

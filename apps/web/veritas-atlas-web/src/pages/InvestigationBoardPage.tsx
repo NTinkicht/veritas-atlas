@@ -3,7 +3,11 @@ import { useLocation } from "react-router-dom";
 import {
   classifyInvestigationFailure,
   compareEvidenceItems,
+  listBookmarks,
   listEvidenceItems,
+  putBookmark,
+  removeBookmark,
+  type InvestigationFailure,
   type EvidenceComparison as EvidenceComparisonData,
   listInvestigations,
   type CollectedEvidenceItem,
@@ -19,6 +23,9 @@ export function InvestigationBoardPage() {
   const [board, setBoard] = useState<Loadable<CollectedEvidenceItem[]>>({ kind: "loading" });
   const [picked, setPicked] = useState<string[]>([]);
   const [comparison, setComparison] = useState<Loadable<EvidenceComparisonData> | null>(null);
+  const [bookmarked, setBookmarked] = useState<string[]>([]);
+  const [busy, setBusy] = useState<string[]>([]);
+  const [bookmarkNotice, setBookmarkNotice] = useState<InvestigationFailure | null>(null);
   const latest = useRef(0);
   const latestComparison = useRef(0);
   const signInHref = `/login?returnTo=${encodeURIComponent(`${location.pathname}${location.search}`)}`;
@@ -39,13 +46,42 @@ export function InvestigationBoardPage() {
     latestComparison.current++;
     setPicked([]);
     setComparison(null);
+    setBookmarked([]);
+    setBusy([]);
+    setBookmarkNotice(null);
     setSelected(investigation);
     setBoard({ kind: "loading" });
+    // A failed bookmark read is shown, never treated as "no bookmarks".
+    listBookmarks(investigation.id).then(
+      (data) => ticket === latest.current && setBookmarked(data.map((b) => b.evidenceItemId)),
+      (error) =>
+        ticket === latest.current && setBookmarkNotice(classifyInvestigationFailure(error, navigator.onLine)),
+    );
     listEvidenceItems(investigation.id).then(
       (data) => ticket === latest.current && setBoard({ kind: "loaded", data }),
       (error) =>
         ticket === latest.current &&
         setBoard({ kind: "error", failure: classifyInvestigationFailure(error, navigator.onLine) }),
+    );
+  }
+
+  function toggleBookmark(itemId: string, next: boolean) {
+    if (!selected) return;
+    const ticket = latest.current;
+    const request = next ? putBookmark(selected.id, itemId).then(() => undefined) : removeBookmark(selected.id, itemId);
+    setBusy((current) => [...current, itemId]);
+    setBookmarkNotice(null);
+    request.then(
+      () => {
+        if (ticket !== latest.current) return;
+        setBookmarked((current) => (next ? [...current.filter((id) => id !== itemId), itemId] : current.filter((id) => id !== itemId)));
+        setBusy((current) => current.filter((id) => id !== itemId));
+      },
+      (error) => {
+        if (ticket !== latest.current) return;
+        setBookmarkNotice(classifyInvestigationFailure(error, navigator.onLine));
+        setBusy((current) => current.filter((id) => id !== itemId));
+      },
     );
   }
 
@@ -80,6 +116,10 @@ export function InvestigationBoardPage() {
           signInHref={signInHref}
           pickedIds={picked}
           onTogglePick={togglePick}
+          bookmarkedIds={bookmarked}
+          onToggleBookmark={toggleBookmark}
+          busyIds={busy}
+          bookmarkNotice={bookmarkNotice}
         />
       ) : null}
       {selected && board.kind === "loaded" && board.data.length >= 2 ? (

@@ -1,6 +1,11 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   MalformedInvestigationResponse,
+  bookmarkPath,
+  bookmarksPath,
+  parseBookmark,
+  parseBookmarks,
+  putBookmark,
   classifyInvestigationFailure,
   comparisonPath,
   evidenceItemsPath,
@@ -96,5 +101,37 @@ describe("evidence comparison client", () => {
     expect(() => comparisonPath(ID, L, L)).toThrow(MalformedInvestigationResponse);
     expect(() => comparisonPath(ID, L, "a&b=c")).toThrow(MalformedInvestigationResponse);
     expect(() => comparisonPath("../x", L, R)).toThrow(MalformedInvestigationResponse);
+  });
+});
+
+describe("bookmark client", () => {
+  const bm = { investigationId: ID, evidenceItemId: EV, createdAtUtc: "2026-11-02T09:00:00Z" };
+  beforeEach(() => vi.stubGlobal("localStorage", { getItem: () => null, setItem: () => undefined, removeItem: () => undefined }));
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("builds GUID-validated paths", () => {
+    expect(bookmarksPath(ID)).toBe(`/api/v1/tenant-investigations/${ID}/bookmarks`);
+    expect(bookmarkPath(ID, EV)).toBe(`/api/v1/tenant-investigations/${ID}/evidence-items/${EV}/bookmark`);
+    expect(() => bookmarksPath("../x")).toThrow(MalformedInvestigationResponse);
+    expect(() => bookmarkPath(ID, "x/y")).toThrow(MalformedInvestigationResponse);
+  });
+  it("parses valid bookmarks and rejects a malformed list whole", () => {
+    expect(parseBookmarks({ items: [bm] })).toEqual([bm]);
+    expect(parseBookmark(bm)).toEqual(bm);
+    expect(() => parseBookmarks({ items: [bm, { ...bm, evidenceItemId: "nope" }] })).toThrow(MalformedInvestigationResponse);
+    expect(() => parseBookmarks({ items: [{ ...bm, createdAtUtc: "" }] })).toThrow(MalformedInvestigationResponse);
+    expect(() => parseBookmarks({})).toThrow(MalformedInvestigationResponse);
+    expect(() => parseBookmark(null)).toThrow(MalformedInvestigationResponse);
+  });
+  it("accepts a PUT answer for the requested item (positive control)", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify(bm), { status: 201 })));
+    await expect(putBookmark(ID, EV)).resolves.toEqual(bm);
+    const call = (fetch as unknown as ReturnType<typeof vi.fn>).mock.calls[0];
+    expect(call[1].method).toBe("PUT");
+  });
+  it("rejects a PUT answer about a different item", async () => {
+    const other = "44444444-4444-4444-8444-444444444444";
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ ...bm, evidenceItemId: other }), { status: 200 })));
+    await expect(putBookmark(ID, EV)).rejects.toBeInstanceOf(MalformedInvestigationResponse);
   });
 });
