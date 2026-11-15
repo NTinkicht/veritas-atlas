@@ -110,6 +110,19 @@ public sealed class EfTenantRawRetrievalLedger : ITenantRawRetrievalLedger
         return row is null ? null : ToModel(row);
     }
 
+    public async Task<IReadOnlyList<TenantRawRetrievalModel>> ListForSourceAsync(
+        Guid tenantId, Guid sourceEntryId, int limit, CancellationToken cancellationToken)
+    {
+        RequireTenant(tenantId);
+        ArgumentOutOfRangeException.ThrowIfLessThan(limit, 1);
+        var rows = await _db.TenantRawRetrievals.AsNoTracking()
+            .Where(x => x.TenantId == tenantId && x.SourceEntryId == sourceEntryId)
+            .OrderByDescending(x => x.RetrievedAtUtc).ThenBy(x => x.Id)
+            .Take(limit)
+            .ToListAsync(cancellationToken);
+        return rows.Select(ToModel).ToList();
+    }
+
     private Task<TenantRawRetrieval?> FindByKeyAsync(
         Guid tenantId, string idempotencyKey, CancellationToken cancellationToken) =>
         _db.TenantRawRetrievals.AsNoTracking()

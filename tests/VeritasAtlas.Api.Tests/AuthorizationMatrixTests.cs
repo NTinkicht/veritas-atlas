@@ -253,6 +253,7 @@ public sealed class AuthorizationMatrixTests
         "GET api/v1/tenant-investigations/{investigationId:guid}/evidence-items/{itemId:guid}/annotations | denied: intruder",
         "GET api/v1/tenant-investigations/{investigationId:guid}/shares | denied: reviewer,publisher,admin,intruder",
         "GET api/v1/tenant-publication-revisions/{id:guid} | denied: admin,intruder",
+        "GET api/v1/tenant-raw-retrievals | denied: operator,analyst,reviewer,publisher,intruder",
         "GET api/v1/tenant-raw-retrievals/{id:guid} | denied: operator,analyst,reviewer,publisher,intruder",
         "GET api/v1/tenant-sources | denied: intruder",
         "GET api/v1/tenant-sources/{id:guid} | denied: intruder",

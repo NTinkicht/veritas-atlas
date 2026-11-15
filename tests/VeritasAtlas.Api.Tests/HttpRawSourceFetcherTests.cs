@@ -106,6 +106,10 @@ public sealed class HttpRawSourceFetcherTests
             Items.Add((m, i.RawBytes));
             return Task.FromResult(new RawRetrievalRecordResult(RawRetrievalRecordOutcome.Recorded, m));
         }
+        public Task<IReadOnlyList<TenantRawRetrievalModel>> ListForSourceAsync(
+            Guid tenantId, Guid sourceEntryId, int limit, CancellationToken cancellationToken) =>
+            throw new NotSupportedException();
+
         public Task<TenantRawRetrievalModel?> GetAsync(Guid t, Guid id, CancellationToken c) =>
             Task.FromResult(Items.Select(x => x.Model).FirstOrDefault(x => x.Id == id));
     }

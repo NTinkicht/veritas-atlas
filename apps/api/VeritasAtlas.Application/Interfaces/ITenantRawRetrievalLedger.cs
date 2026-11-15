@@ -15,6 +15,13 @@ public interface ITenantRawRetrievalLedger
 
     Task<TenantRawRetrievalModel?> GetAsync(
         Guid tenantId, Guid id, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// The newest rows recorded for one source entry, newest first (ties by id), at most
+    /// <paramref name="limit"/>. Tenant-scoped: another tenant's or an unknown source yields an empty list.
+    /// </summary>
+    Task<IReadOnlyList<TenantRawRetrievalModel>> ListForSourceAsync(
+        Guid tenantId, Guid sourceEntryId, int limit, CancellationToken cancellationToken);
 }
 
 public sealed record RawRetrievalInput(
