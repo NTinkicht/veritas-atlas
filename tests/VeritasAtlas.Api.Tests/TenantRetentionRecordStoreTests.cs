@@ -27,6 +27,7 @@ public sealed class TenantRetentionRecordStoreTests
         var store = new EfTenantRetentionRecordStore(null!, TimeProvider.System);
         var id = Guid.NewGuid();
         await Assert.ThrowsExactlyAsync<ArgumentException>(() => store.GetLatestAsync(Guid.Empty, id, CancellationToken.None));
+        await Assert.ThrowsExactlyAsync<ArgumentException>(() => store.ListAsync(Guid.Empty, id, CancellationToken.None));
         await Assert.ThrowsExactlyAsync<ArgumentException>(() => store.AppendAsync(Guid.Empty, id, true, null, Actor, CancellationToken.None));
         foreach (var actor in new[] { "", "  ", "a\nb", "a\u007f", new string('x', TenantAuditEventLimits.MaxSubjectLength + 1) })
             await Assert.ThrowsExactlyAsync<ArgumentException>(() => store.AppendAsync(TenantA, id, true, null, actor, CancellationToken.None), actor);
@@ -55,6 +56,10 @@ public sealed class TenantRetentionRecordStoreTests
         Assert.AreEqual((RetentionRecordAppendOutcome.Appended, 2), (hold.Outcome, hold.Record!.Version), "a hold toggles");
         var later = await store.AppendAsync(TenantA, retrieval, false, Soon.AddYears(1), Actor, CancellationToken.None);
         Assert.AreEqual((RetentionRecordAppendOutcome.Appended, 3), (later.Outcome, later.Record!.Version), "the window may extend");
+        var history = await store.ListAsync(TenantA, retrieval, CancellationToken.None);
+        CollectionAssert.AreEqual(new[] { 1, 2, 3 }, history.Select(h => h.Version).ToArray(), "oldest first, gapless");
+        Assert.AreEqual((false, true, false), (history[0].LegalHold, history[1].LegalHold, history[2].LegalHold));
+        Assert.AreEqual(Soon.AddYears(1), history[2].RetainUntilUtc);
 
         foreach (var until in new DateTime?[] { Soon, null })
         {
@@ -87,6 +92,8 @@ public sealed class TenantRetentionRecordStoreTests
         Assert.AreEqual(RetentionRecordAppendOutcome.Appended,
             (await store.AppendAsync(TenantA, a, true, null, Actor, CancellationToken.None)).Outcome, "positive control");
         Assert.IsNull(await store.GetLatestAsync(TenantB, a, CancellationToken.None), "another tenant reads nothing");
+        Assert.AreEqual(0, (await store.ListAsync(TenantB, a, CancellationToken.None)).Count, "another tenant lists nothing");
+        Assert.AreEqual(1, (await store.ListAsync(TenantA, a, CancellationToken.None)).Count, "positive control");
     }
 
     [TestMethod]

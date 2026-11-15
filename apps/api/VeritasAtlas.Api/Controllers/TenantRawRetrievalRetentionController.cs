@@ -7,7 +7,7 @@ using VeritasAtlas.Domain.Provenance;
 namespace VeritasAtlas.Api.Controllers;
 
 /// <summary>
-/// VER-P0-18 slices 2-3 (#298, #300): read-only dry run of <see cref="RetentionDeletionGate"/> for one stored raw
+/// VER-P0-18 slices 2-4 (#298, #300, #302): read-only history and dry run of <see cref="RetentionDeletionGate"/> for one stored raw
 /// retrieval. It never deletes anything. The tenant comes only from the signed <c>tenant</c> claim, the caller
 /// needs a usable subject name and a single <c>admin</c> role, and every other caller is refused before a
 /// ledger is touched. Unknown, empty and another tenant's retrieval answer the same 404. No retention window
@@ -75,6 +75,19 @@ public sealed class TenantRawRetrievalRetentionController : ControllerBase
         };
     }
 
+    /// <summary>Every recorded retention version (who set which hold or window, and when), oldest first.</summary>
+    [HttpGet("retention")]
+    public async Task<IActionResult> History(Guid id, CancellationToken cancellationToken)
+    {
+        if (Gate(out var tenantId, out _) is { } refused) return refused;
+        if (id == Guid.Empty || await _retrievals.GetAsync(tenantId, id, cancellationToken) is null)
+            return Error(StatusCodes.Status404NotFound, "retrieval_not_found", "The raw retrieval was not found.");
+
+        var versions = await _records.ListAsync(tenantId, id, cancellationToken);
+        return Ok(new RetentionHistoryResponse(versions.Select(v => new RetentionHistoryEntry(
+            v.Version, v.LegalHold, v.RetainUntilUtc, v.ActorSubject, v.CreatedAtUtc)).ToList()));
+    }
+
     [HttpGet("retention-eligibility")]
     public async Task<IActionResult> Evaluate(Guid id, CancellationToken cancellationToken)
     {
@@ -132,5 +145,11 @@ public sealed record RetentionEligibilityResponse(
 
 /// <summary>Body of the retention PUT; the retain-until must be in the future when present.</summary>
 public sealed record RetentionRecordRequest(bool? LegalHold, DateTimeOffset? RetainUntilUtc);
+
+/// <summary>Append-only retention versions of one raw retrieval; never bytes, keys or evidence references.</summary>
+public sealed record RetentionHistoryResponse(IReadOnlyList<RetentionHistoryEntry> Versions);
+
+public sealed record RetentionHistoryEntry(
+    int Version, bool LegalHold, DateTime? RetainUntilUtc, string ActorSubject, DateTime CreatedAtUtc);
 
 public sealed record RetentionRecordResponse(int Version, bool LegalHold, DateTime? RetainUntilUtc, bool Appended);

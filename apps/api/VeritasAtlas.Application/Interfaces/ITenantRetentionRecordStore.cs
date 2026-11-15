@@ -11,6 +11,10 @@ public interface ITenantRetentionRecordStore
     Task<TenantRetentionRecordModel?> GetLatestAsync(
         Guid tenantId, Guid rawRetrievalId, CancellationToken cancellationToken);
 
+    /// <summary>Every recorded version of one retrieval in this tenant, oldest first (empty when none).</summary>
+    Task<IReadOnlyList<TenantRetentionRecordModel>> ListAsync(
+        Guid tenantId, Guid rawRetrievalId, CancellationToken cancellationToken);
+
     /// <summary>Appends the next version; an identical request to the latest version is a no-change replay.</summary>
     Task<RetentionRecordAppendResult> AppendAsync(
         Guid tenantId, Guid rawRetrievalId, bool legalHold, DateTime? retainUntilUtc, string actorSubject,

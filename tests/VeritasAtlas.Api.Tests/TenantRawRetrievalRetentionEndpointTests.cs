@@ -275,6 +275,65 @@ public sealed class TenantRawRetrievalRetentionEndpointTests
         Assert.AreEqual(0, ledger.Writes, "a dry run never writes");
     }
 
+    [TestMethod]
+    public async Task HistoryIsAdminOnlyTenantScopedAndListsEveryVersionWithoutSecrets()
+    {
+        var known = Guid.NewGuid();
+        var ledger = new Ledgers { Known = (TenantA, known), Attestations = 1, Runs = 1 };
+        using var factory = new ApiFactory(ledger);
+        using var client = factory.CreateClient();
+        var tokens = factory.Services.GetRequiredService<JwtTokenService>();
+        var tenant = new[] { TenantA.ToString("D") };
+        var path = PutPath(known);
+
+        foreach (var bearer in new[]
+                 {
+                     tokens.CreateToken("synthetic-op", "operator", TenantA).Token,
+                     tokens.CreateToken("synthetic-rev", "reviewer", TenantA).Token,
+                     Sign("synthetic-two", ["admin", "analyst"], tenant),
+                     Sign("synthetic-admin", ["admin"], ["not-a-uuid"]),
+                     Sign(null, ["admin"], tenant),
+                 })
+        {
+            using var denied = await Get(client, path, bearer);
+            Assert.AreEqual(HttpStatusCode.Forbidden, denied.StatusCode);
+        }
+        using var anonymous = await client.GetAsync(path);
+        Assert.AreEqual(HttpStatusCode.Unauthorized, anonymous.StatusCode);
+        Assert.AreEqual(0, ledger.Calls, "no ledger access for a refused caller");
+        Assert.AreEqual(0, ledger.Lists);
+
+        var adminA = Sign("synthetic-admin-a", ["admin"], tenant);
+        var adminB = Sign("synthetic-admin-b", ["admin"], [TenantB.ToString("D")]);
+        using var foreign = await Get(client, path, adminB);
+        using var unknown = await Get(client, PutPath(Guid.NewGuid()), adminA);
+        using var empty = await Get(client, PutPath(Guid.Empty), adminA);
+        foreach (var r in new[] { foreign, unknown, empty }) Assert.AreEqual(HttpStatusCode.NotFound, r.StatusCode);
+        Assert.AreEqual(await unknown.Content.ReadAsStringAsync(), await foreign.Content.ReadAsStringAsync());
+        Assert.AreEqual(0, ledger.Lists, "a foreign or unknown retrieval never reaches the store");
+
+        using var none = await Get(client, path, adminA);
+        Assert.AreEqual(HttpStatusCode.OK, none.StatusCode, "positive control: owner admin");
+        Assert.AreEqual(0, JsonDocument.Parse(await none.Content.ReadAsStringAsync()).RootElement.GetProperty("versions").GetArrayLength());
+
+        var until = At.AddDays(30);
+        ledger.History.Add(new TenantRetentionRecordModel(1, false, until, "synthetic-admin-a", At));
+        ledger.History.Add(new TenantRetentionRecordModel(2, true, until.AddDays(1), "synthetic-admin-b", At.AddHours(1)));
+        using var listed = await Get(client, path, adminA);
+        var text = await listed.Content.ReadAsStringAsync();
+        var versions = JsonDocument.Parse(text).RootElement.GetProperty("versions");
+        Assert.AreEqual(2, versions.GetArrayLength());
+        Assert.AreEqual((1, false, "synthetic-admin-a"),
+            (versions[0].GetProperty("version").GetInt32(), versions[0].GetProperty("legalHold").GetBoolean(),
+                versions[0].GetProperty("actorSubject").GetString()));
+        Assert.AreEqual((2, true, "synthetic-admin-b"),
+            (versions[1].GetProperty("version").GetInt32(), versions[1].GetProperty("legalHold").GetBoolean(),
+                versions[1].GetProperty("actorSubject").GetString()));
+        StringAssert.DoesNotMatch(text, new Regex("ev1:|secret-|rawBytes|attestationKey|bindingReference"));
+        Assert.AreEqual(0, ledger.Writes, "a history read never writes");
+        Assert.AreEqual(0, ledger.Appends.Count);
+    }
+
     private static Task<HttpResponseMessage> Get(HttpClient client, string path, string bearer)
     {
         var request = new HttpRequestMessage(HttpMethod.Get, path);
@@ -309,6 +368,15 @@ public sealed class TenantRawRetrievalRetentionEndpointTests
 
         public Task<TenantRetentionRecordModel?> GetLatestAsync(Guid tenantId, Guid id, CancellationToken ct) =>
             Task.FromResult(Record);
+
+        public List<TenantRetentionRecordModel> History { get; } = [];
+        public int Lists { get; private set; }
+
+        public Task<IReadOnlyList<TenantRetentionRecordModel>> ListAsync(Guid tenantId, Guid id, CancellationToken ct)
+        {
+            Lists++;
+            return Task.FromResult<IReadOnlyList<TenantRetentionRecordModel>>(History.ToList());
+        }
 
         public Task<RetentionRecordAppendResult> AppendAsync(
             Guid tenantId, Guid id, bool legalHold, DateTime? until, string actor, CancellationToken ct)

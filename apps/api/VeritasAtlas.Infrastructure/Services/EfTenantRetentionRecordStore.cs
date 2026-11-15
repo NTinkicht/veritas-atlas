@@ -26,6 +26,16 @@ public sealed class EfTenantRetentionRecordStore : ITenantRetentionRecordStore
         return ToModel(await LatestAsync(tenantId, rawRetrievalId, cancellationToken));
     }
 
+    public async Task<IReadOnlyList<TenantRetentionRecordModel>> ListAsync(
+        Guid tenantId, Guid rawRetrievalId, CancellationToken cancellationToken)
+    {
+        if (tenantId == Guid.Empty) throw new ArgumentException("A tenant id is required.", nameof(tenantId));
+        var rows = await _db.TenantRetentionRecords.AsNoTracking()
+            .Where(x => x.TenantId == tenantId && x.RawRetrievalId == rawRetrievalId)
+            .OrderBy(x => x.Version).ToListAsync(cancellationToken);
+        return rows.Select(r => ToModel(r)!).ToList();
+    }
+
     public async Task<RetentionRecordAppendResult> AppendAsync(
         Guid tenantId, Guid rawRetrievalId, bool legalHold, DateTime? retainUntilUtc, string actorSubject,
         CancellationToken cancellationToken)
