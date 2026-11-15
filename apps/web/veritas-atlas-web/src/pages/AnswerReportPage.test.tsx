@@ -69,6 +69,16 @@ describe("AnswerReportPage", () => {
     expect(asOf.disabled).toBe(false);
   });
 
+  it("clears a typed as-of date when switching back to current-state mode", () => {
+    compose.mockResolvedValue(served("Register lists X"));
+    setup();
+    fireEvent.click(screen.getByLabelText(/Current-state claim/));
+    fireEvent.change(screen.getByLabelText(/Historical as-of date/), { target: { value: "2020-01-31" } });
+    fireEvent.click(screen.getByLabelText(/Current-state claim/));
+    submit();
+    expect(compose).toHaveBeenCalledWith(expect.objectContaining({ currentState: true, historicalAsOf: "" }));
+  });
+
   it("shows blocker codes and no claim text for a blocked answer", async () => {
     compose.mockResolvedValue({ decision: "block", blockers: [{ code: "citation_not_verified", claimId: "c-1", detail: null }] });
     setup();

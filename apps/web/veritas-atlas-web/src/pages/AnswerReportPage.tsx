@@ -37,7 +37,7 @@ export function AnswerReportPage() {
         </p>
         <p>
           <label>
-            <input type="checkbox" checked={currentState} onChange={(e) => setCurrentState(e.target.checked)} /> Current-state claim
+            <input type="checkbox" checked={currentState} onChange={(e) => { setCurrentState(e.target.checked); if (e.target.checked) setHistoricalAsOf(""); }} /> Current-state claim
           </label>
         </p>
         <p>

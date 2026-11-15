@@ -42,6 +42,7 @@ export function ReportResult({ view, signInHref }: { view: ReportView; signInHre
       <p className="muted">Human verification: {result.humanVerification} (asserted by the caller, not recorded by the server)</p>
       <p>{claim.text}</p>
       <p className="muted">Scope: {claim.temporalScope}</p>
+      {claim.historicalAsOf ? <p className="muted">As of: {claim.historicalAsOf}</p> : null}
       {claim.nonCurrentEvidence ? (
         <p className="notice-card" role="note">
           Historical evidence: this claim rests on non-current evidence, as of {claim.historicalAsOf}. It is not a current-state assertion.

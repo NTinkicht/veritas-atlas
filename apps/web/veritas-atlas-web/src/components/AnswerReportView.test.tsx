@@ -27,6 +27,11 @@ describe("ReportResult", () => {
     const out = html({ kind: "loaded", result: { decision: "serve", humanVerification: "Verified", claim: { ...claim, nonCurrentEvidence: true, historicalAsOf: "2020-01-31" } } });
     expect(out).toContain("as of 2020-01-31");
   });
+  it("shows the as-of date for a historical claim citing only current evidence", () => {
+    const out = html({ kind: "loaded", result: { decision: "serve", humanVerification: "Verified", claim: { ...claim, temporalScope: "historical", nonCurrentEvidence: false, historicalAsOf: "2020-01-31" } } });
+    expect(out).toContain("As of: 2020-01-31");
+    expect(out).not.toContain("Historical evidence");
+  });
   it("shows only blocker codes, never claim text, for a blocked answer", () => {
     const out = html({ kind: "loaded", result: { decision: "block", blockers: [{ code: "human_verification_missing", claimId: "c-1", detail: null }] } });
     expect(out).toContain("Report blocked");
