@@ -1,4 +1,4 @@
-import { apiGet } from "./http";
+import { apiDelete, apiGet, apiPut } from "./http";
 
 // VER-P0-17: read-only client for the tenant-scoped investigation workspace API
 // (VER-P0-10, /api/v1/tenant-investigations). No seeded or cached fallback: what is shown is
@@ -88,7 +88,7 @@ export function classifyInvestigationFailure(error: unknown, online: boolean = t
   if (error instanceof MalformedInvestigationResponse) return { kind: "malformed", message: error.message };
   const status = typeof error === "object" && error !== null ? (error as { status?: unknown }).status : undefined;
   if (status === 401) return { kind: "unauthenticated", message: "Your session has ended or is not valid. Sign in again." };
-  if (status === 403) return { kind: "forbidden", message: "Your account is not permitted to read investigations for an organization." };
+  if (status === 403) return { kind: "forbidden", message: "Your account is not permitted to do that in this organization's investigations." };
   if (status === 404) return { kind: "not-found", message: "That investigation was not found or is not shared with you." };
   if (typeof status === "number") {
     return { kind: "server", message: `The investigation service failed (HTTP ${status}). Nothing is shown rather than a guess.` };
@@ -188,4 +188,54 @@ export async function compareEvidenceItems(
   rightItemId: string,
 ): Promise<EvidenceComparison> {
   return parseEvidenceComparison(await apiGet<unknown>(comparisonPath(investigationId, leftItemId, rightItemId)));
+}
+
+export type EvidenceBookmark = { investigationId: string; evidenceItemId: string; createdAtUtc: string };
+
+export function bookmarksPath(investigationId: string): string {
+  if (!GUID.test(investigationId)) throw new MalformedInvestigationResponse("investigation id is not a GUID");
+  return `${INVESTIGATIONS_PATH}/${investigationId}/bookmarks`;
+}
+
+export function bookmarkPath(investigationId: string, itemId: string): string {
+  if (!GUID.test(itemId)) throw new MalformedInvestigationResponse("item id is not a GUID");
+  return `${evidenceItemsPath(investigationId)}/${itemId}/bookmark`;
+}
+
+function toBookmark(r: Record<string, unknown>, index: number): EvidenceBookmark {
+  return {
+    investigationId: guid(r, "investigationId", index, "bookmark"),
+    evidenceItemId: guid(r, "evidenceItemId", index, "bookmark"),
+    createdAtUtc: text(r, "createdAtUtc", index, "bookmark"),
+  };
+}
+
+export function parseBookmarks(raw: unknown): EvidenceBookmark[] {
+  return items(raw).map(toBookmark);
+}
+
+export function parseBookmark(raw: unknown): EvidenceBookmark {
+  if (typeof raw !== "object" || raw === null) throw new MalformedInvestigationResponse("bookmark is not an object");
+  return toBookmark(raw as Record<string, unknown>, 0);
+}
+
+export async function listBookmarks(investigationId: string): Promise<EvidenceBookmark[]> {
+  return parseBookmarks(await apiGet<unknown>(bookmarksPath(investigationId)));
+}
+
+/** Idempotent on the server: bookmarking an already bookmarked item replays the original row. */
+export async function putBookmark(investigationId: string, itemId: string): Promise<EvidenceBookmark> {
+  const bookmark = parseBookmark(await apiPut<unknown>(bookmarkPath(investigationId, itemId)));
+  // Fail closed on an answer about some other item or investigation.
+  if (
+    bookmark.evidenceItemId.toLowerCase() !== itemId.toLowerCase() ||
+    bookmark.investigationId.toLowerCase() !== investigationId.toLowerCase()
+  ) {
+    throw new MalformedInvestigationResponse("bookmark does not match the requested item");
+  }
+  return bookmark;
+}
+
+export async function removeBookmark(investigationId: string, itemId: string): Promise<void> {
+  await apiDelete(bookmarkPath(investigationId, itemId));
 }
