@@ -9,6 +9,7 @@ public static class EvidenceSearchLimits
     public const int MaxCursorLength = 1024;
     public const int DefaultPageSize = 20;
     public const int MaxPageSize = 50;
+    public const int MaxSnippetLength = 240;
 }
 
 /// <summary>
@@ -31,6 +32,10 @@ public sealed record EvidenceSearchRequest(
     string? ParserName = null,
     string? ParserVersion = null);
 
+/// <summary>
+/// <see cref="Snippet"/> is the text of the lowest-ordinal verified chunk of the hit that matches the query,
+/// truncated to <see cref="EvidenceSearchLimits.MaxSnippetLength"/> characters.
+/// </summary>
 public sealed record EvidenceSearchHit(
     string EvidenceRef,
     string SourceUri,
@@ -44,7 +49,8 @@ public sealed record EvidenceSearchHit(
     string? FreshnessReason,
     string? FreshnessEvaluatedAt,
     string? ParserName = null,
-    string? ParserVersion = null);
+    string? ParserVersion = null,
+    string? Snippet = null);
 
 public enum EvidenceSearchOutcome
 {
