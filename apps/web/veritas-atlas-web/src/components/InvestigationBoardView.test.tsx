@@ -4,7 +4,7 @@ import type { CollectedEvidenceItem, EvidenceAnnotation, Investigation } from ".
 import { CreateInvestigationForm, EvidenceBoard, EvidenceComparison, InvestigationList, type AnnotationsState } from "./InvestigationBoardView";
 
 // SYNTHETIC fixtures only.
-const inv: Investigation = { id: "11111111-1111-4111-8111-111111111111", title: "Synthetic <b>inquiry</b>", createdBySubject: "analyst-1", createdAtUtc: "2026-11-02T09:00:00Z" };
+const inv: Investigation = { id: "11111111-1111-4111-8111-111111111111", title: "Synthetic <b>inquiry</b>", createdBySubject: "analyst-1", createdAtUtc: "2026-11-02T09:00:00Z", state: "open", version: 0 };
 const item: CollectedEvidenceItem = { id: "33333333-3333-4333-8333-333333333333", evidenceVerificationId: "22222222-2222-4222-8222-222222222222", note: "<script>alert(1)</script>", collectedBySubject: "analyst-1", createdAtUtc: "2026-11-02T09:00:00Z" };
 const noop = () => undefined;
 const list = (view: Parameters<typeof InvestigationList>[0]["view"]) =>

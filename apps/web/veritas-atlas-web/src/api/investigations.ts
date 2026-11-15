@@ -4,11 +4,16 @@ import { apiDelete, apiGet, apiPost, apiPut } from "./http";
 // (VER-P0-10, /api/v1/tenant-investigations). No seeded or cached fallback: what is shown is
 // exactly what the API returned, and a malformed response is rejected whole (fail closed).
 
+export type InvestigationState = "open" | "closed";
+
 export type Investigation = {
   id: string;
   title: string;
   createdBySubject: string;
   createdAtUtc: string;
+  state: InvestigationState;
+  /** Optimistic-concurrency version last read; sent back as expectedVersion on close/reopen. */
+  version: number;
 };
 
 export type CollectedEvidenceItem = {
@@ -56,13 +61,25 @@ function guid(record: Record<string, unknown>, key: string, index: number, label
   return value;
 }
 
-export function parseInvestigations(raw: unknown): Investigation[] {
-  return items(raw).map((r, i) => ({
+function toInvestigation(r: Record<string, unknown>, i: number): Investigation {
+  const state = r.state;
+  if (state !== "open" && state !== "closed") throw new MalformedInvestigationResponse(`item ${i} state`);
+  const version = r.version;
+  if (typeof version !== "number" || !Number.isInteger(version) || version < 0) {
+    throw new MalformedInvestigationResponse(`item ${i} version`);
+  }
+  return {
     id: guid(r, "id", i),
     title: text(r, "title", i),
     createdBySubject: text(r, "createdBySubject", i),
     createdAtUtc: text(r, "createdAtUtc", i),
-  }));
+    state,
+    version,
+  };
+}
+
+export function parseInvestigations(raw: unknown): Investigation[] {
+  return items(raw).map(toInvestigation);
 }
 
 export function parseEvidenceItems(raw: unknown): CollectedEvidenceItem[] {
@@ -81,7 +98,7 @@ export function parseEvidenceItems(raw: unknown): CollectedEvidenceItem[] {
   });
 }
 
-export type InvestigationFailureKind = "unauthenticated" | "forbidden" | "not-found" | "offline" | "server" | "malformed";
+export type InvestigationFailureKind = "unauthenticated" | "forbidden" | "not-found" | "conflict" | "offline" | "server" | "malformed";
 export type InvestigationFailure = { kind: InvestigationFailureKind; message: string };
 
 export function classifyInvestigationFailure(error: unknown, online: boolean = true): InvestigationFailure {
@@ -89,6 +106,7 @@ export function classifyInvestigationFailure(error: unknown, online: boolean = t
   const status = typeof error === "object" && error !== null ? (error as { status?: unknown }).status : undefined;
   if (status === 401) return { kind: "unauthenticated", message: "Your session has ended or is not valid. Sign in again." };
   if (status === 403) return { kind: "forbidden", message: "Your account is not permitted to do that in this organization's investigations." };
+  if (status === 409) return { kind: "conflict", message: "The investigation changed or is already in that state. Reload the list and try again." };
   if (status === 404) return { kind: "not-found", message: "That investigation was not found or is not shared with you." };
   if (typeof status === "number") {
     return { kind: "server", message: `The investigation service failed (HTTP ${status}). Nothing is shown rather than a guess.` };
@@ -337,13 +355,7 @@ export async function createInvestigation(title: string, creationKey: string): P
   if (creationKey.length === 0 || creationKey.length > 200) throw new MalformedInvestigationResponse("creation key is not valid");
   const raw = await apiPost<unknown, { creationKey: string; title: string }>(INVESTIGATIONS_PATH, { creationKey, title });
   if (typeof raw !== "object" || raw === null) throw new MalformedInvestigationResponse("investigation is not an object");
-  const record = raw as Record<string, unknown>;
-  const created = {
-    id: guid(record, "id", 0, "investigation"),
-    title: text(record, "title", 0, "investigation"),
-    createdBySubject: text(record, "createdBySubject", 0, "investigation"),
-    createdAtUtc: text(record, "createdAtUtc", 0, "investigation"),
-  };
+  const created = toInvestigation(raw as Record<string, unknown>, 0);
   // Fail closed on an answer about some other investigation.
   if (created.title !== title) throw new MalformedInvestigationResponse("investigation does not match the request");
   return created;
@@ -353,4 +365,27 @@ export async function createInvestigation(title: string, creationKey: string): P
 export function mergeCreated(created: Investigation[], listed: Investigation[]): Investigation[] {
   const ids = new Set(created.map((i) => i.id));
   return [...created, ...listed.filter((i) => !ids.has(i.id))];
+}
+
+/**
+ * Closes or reopens an investigation. Never optimistic: the caller shows the new state only from the
+ * returned row, which must be about the same investigation, be in the requested state and carry a
+ * version that did not go backwards; anything else is rejected whole.
+ */
+export async function transitionInvestigation(investigation: Investigation, close: boolean): Promise<Investigation> {
+  if (!GUID.test(investigation.id)) throw new MalformedInvestigationResponse("investigation id is not a GUID");
+  const raw = await apiPost<unknown, { expectedVersion: number }>(
+    `${INVESTIGATIONS_PATH}/${investigation.id}/${close ? "close" : "reopen"}`,
+    { expectedVersion: investigation.version },
+  );
+  if (typeof raw !== "object" || raw === null) throw new MalformedInvestigationResponse("investigation is not an object");
+  const updated = toInvestigation(raw as Record<string, unknown>, 0);
+  if (
+    updated.id.toLowerCase() !== investigation.id.toLowerCase() ||
+    updated.state !== (close ? "closed" : "open") ||
+    updated.version < investigation.version
+  ) {
+    throw new MalformedInvestigationResponse("investigation does not match the request");
+  }
+  return updated;
 }

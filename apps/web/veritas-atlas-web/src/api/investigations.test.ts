@@ -22,6 +22,7 @@ import {
   parseEvidenceItems,
   parseInvestigations,
   createInvestigation,
+  transitionInvestigation,
   mergeCreated,
   isValidInvestigationTitle,
 } from "./investigations";
@@ -29,7 +30,7 @@ import {
 // SYNTHETIC fixtures only.
 const ID = "11111111-1111-4111-8111-111111111111";
 const EV = "22222222-2222-4222-8222-222222222222";
-const inv = { id: ID, title: "Synthetic inquiry", createdBySubject: "analyst-1", createdAtUtc: "2026-11-02T09:00:00Z" };
+const inv = { id: ID, title: "Synthetic inquiry", createdBySubject: "analyst-1", createdAtUtc: "2026-11-02T09:00:00Z", state: "open" as const, version: 0 };
 const item = { id: ID, evidenceVerificationId: EV, note: "n", collectedBySubject: "analyst-1", createdAtUtc: "2026-11-02T09:00:00Z" };
 
 describe("investigation client parsing", () => {
@@ -242,7 +243,7 @@ describe("draftAfterSave", () => {
 });
 
 describe("create investigation client", () => {
-  const created = { id: ID, creationKey: "key-1", title: "Synthetic inquiry", createdBySubject: "analyst-1", createdAtUtc: "2026-11-02T09:00:00Z" };
+  const created = { id: ID, creationKey: "key-1", title: "Synthetic inquiry", createdBySubject: "analyst-1", createdAtUtc: "2026-11-02T09:00:00Z", state: "open", version: 0 };
   beforeEach(() => vi.stubGlobal("localStorage", { getItem: () => null, setItem: () => undefined, removeItem: () => undefined }));
   afterEach(() => vi.unstubAllGlobals());
 
@@ -257,7 +258,7 @@ describe("create investigation client", () => {
     const fetchMock = vi.fn(async () => new Response(JSON.stringify(created), { status: 201 }));
     vi.stubGlobal("fetch", fetchMock);
     const result = await createInvestigation("Synthetic inquiry", "key-1");
-    expect(result).toEqual({ id: ID, title: "Synthetic inquiry", createdBySubject: "analyst-1", createdAtUtc: "2026-11-02T09:00:00Z" });
+    expect(result).toEqual(inv);
     const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
     expect(url).toContain("/api/v1/tenant-investigations");
     expect(init.method).toBe("POST");
@@ -285,12 +286,64 @@ describe("create investigation client", () => {
 });
 
 describe("mergeCreated", () => {
-  const row = (id: string, title: string) => ({ id, title, createdBySubject: "analyst-1", createdAtUtc: "2026-11-02T09:00:00Z" });
+  const row = (id: string, title: string) => ({ id, title, createdBySubject: "analyst-1", createdAtUtc: "2026-11-02T09:00:00Z", state: "open" as const, version: 0 });
   const A = row("11111111-1111-4111-8111-111111111111", "A");
   const B = row("22222222-2222-4222-8222-222222222222", "B");
   it("keeps a row created before the initial list read finished, without duplicating it", () => {
     expect(mergeCreated([A], [B])).toEqual([A, B]);
     expect(mergeCreated([A], [B, A])).toEqual([A, B]);
     expect(mergeCreated([], [B])).toEqual([B]);
+  });
+});
+
+describe("investigation state parsing", () => {
+  it("rejects an unknown state or a bad version, whole list", () => {
+    expect(() => parseInvestigations({ items: [{ ...inv, state: "archived" }] })).toThrow(MalformedInvestigationResponse);
+    expect(() => parseInvestigations({ items: [{ ...inv, state: undefined }] })).toThrow(MalformedInvestigationResponse);
+    for (const version of [-1, 1.5, "1", null, undefined]) {
+      expect(() => parseInvestigations({ items: [{ ...inv, version }] })).toThrow(MalformedInvestigationResponse);
+    }
+    expect(parseInvestigations({ items: [{ ...inv, state: "closed", version: 3 }] })[0]).toMatchObject({ state: "closed", version: 3 });
+  });
+  it("classifies a 409 as a conflict", () => {
+    expect(classifyInvestigationFailure({ status: 409 }).kind).toBe("conflict");
+  });
+});
+
+describe("transitionInvestigation", () => {
+  beforeEach(() => vi.stubGlobal("localStorage", { getItem: () => null, setItem: () => undefined, removeItem: () => undefined }));
+  afterEach(() => vi.unstubAllGlobals());
+  const reply = (body: unknown, status = 200) => vi.fn(async () => new Response(JSON.stringify(body), { status }));
+  it("posts expectedVersion to /close and returns the closed row (positive control)", async () => {
+    const fetchMock = reply({ ...inv, state: "closed", version: 1 });
+    vi.stubGlobal("fetch", fetchMock);
+    const result = await transitionInvestigation({ ...inv, version: 0 }, true);
+    expect(result).toMatchObject({ state: "closed", version: 1 });
+    const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toContain(`/api/v1/tenant-investigations/${ID}/close`);
+    expect(init.method).toBe("POST");
+    expect(JSON.parse(init.body as string)).toEqual({ expectedVersion: 0 });
+  });
+  it("posts to /reopen for a reopen", async () => {
+    const fetchMock = reply({ ...inv, state: "open", version: 3 });
+    vi.stubGlobal("fetch", fetchMock);
+    await transitionInvestigation({ ...inv, state: "closed", version: 2 }, false);
+    expect((fetchMock.mock.calls[0] as unknown as [string])[0]).toContain(`/${ID}/reopen`);
+  });
+  it("rejects an answer in the wrong state, for another investigation, or with an older version", async () => {
+    vi.stubGlobal("fetch", reply({ ...inv, state: "open", version: 1 }));
+    await expect(transitionInvestigation(inv, true)).rejects.toBeInstanceOf(MalformedInvestigationResponse);
+    vi.stubGlobal("fetch", reply({ ...inv, id: "33333333-3333-4333-8333-333333333333", state: "closed", version: 1 }));
+    await expect(transitionInvestigation(inv, true)).rejects.toBeInstanceOf(MalformedInvestigationResponse);
+    vi.stubGlobal("fetch", reply({ ...inv, state: "closed", version: 4 }));
+    await expect(transitionInvestigation({ ...inv, version: 5 }, true)).rejects.toBeInstanceOf(MalformedInvestigationResponse);
+  });
+  it("surfaces a 409 and refuses a non-GUID id before any request", async () => {
+    vi.stubGlobal("fetch", reply({}, 409));
+    await expect(transitionInvestigation(inv, true)).rejects.toMatchObject({ status: 409 });
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(transitionInvestigation({ ...inv, id: "nope" }, true)).rejects.toBeInstanceOf(MalformedInvestigationResponse);
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });

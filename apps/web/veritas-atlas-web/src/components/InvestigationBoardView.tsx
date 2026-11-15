@@ -70,6 +70,29 @@ export function CreateInvestigationForm({ title, submitting, notice, onTitleChan
   );
 }
 
+type StateControlProps = {
+  investigation: Investigation;
+  pending: boolean;
+  notice: InvestigationFailure | null;
+  onTransition: (close: boolean) => void;
+  signInHref: string;
+};
+
+export function InvestigationStateControl({ investigation, pending, notice, onTransition, signInHref }: StateControlProps) {
+  const closed = investigation.state === "closed";
+  return (
+    <section className="panel" aria-label={`State of ${investigation.title}`}>
+      <p>
+        State: <strong>{closed ? "Closed" : "Open"}</strong>
+      </p>
+      <button type="button" disabled={pending} onClick={() => onTransition(!closed)}>
+        {pending ? "Saving..." : closed ? "Reopen investigation" : "Close investigation"}
+      </button>
+      {notice ? <FailureNotice failure={notice} signInHref={signInHref} /> : null}
+    </section>
+  );
+}
+
 type ListProps = {
   view: Loadable<Investigation[]>;
   selectedId: string | null;
@@ -88,7 +111,7 @@ export function InvestigationList({ view, selectedId, onSelect, signInHref }: Li
           <button type="button" aria-pressed={investigation.id === selectedId} onClick={() => onSelect(investigation)}>
             {investigation.title}
           </button>
-          <span className="muted"> opened {formatInstant(investigation.createdAtUtc)} by {investigation.createdBySubject}</span>
+          <span className="muted"> {investigation.state === "closed" ? "closed; " : ""}opened {formatInstant(investigation.createdAtUtc)} by {investigation.createdBySubject}</span>
         </li>
       ))}
     </ul>
