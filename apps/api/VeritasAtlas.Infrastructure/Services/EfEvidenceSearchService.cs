@@ -111,7 +111,9 @@ public sealed class EfEvidenceSearchService : IEvidenceSearchService
             where c.TenantId == tenantId
                 && refs.Contains(v.ParentEvidenceRef)
                 && EF.Functions.ToTsVector("simple", c.Text).Matches(EF.Functions.PlainToTsQuery("simple", query))
-            select new { v.ParentEvidenceRef, c.Ordinal, c.Id, c.Text })
+            // Bound the projected text in the database: only the first MaxSnippetLength code points of each
+            // matching chunk leave Postgres, never the full chunk body.
+            select new { v.ParentEvidenceRef, c.Ordinal, c.Id, Text = c.Text.Substring(0, EvidenceSearchLimits.MaxSnippetLength) })
             .ToListAsync(cancellationToken);
 
         return rows
