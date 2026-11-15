@@ -61,6 +61,7 @@ public sealed class EfEvidenceSearchService : IEvidenceSearchService
             if (refs.Count == 0) break;
 
             var latest = await LoadLatestAsync(tenantId, refs, cancellationToken);
+            var snippets = await LoadSnippetsAsync(tenantId, refs, query, cancellationToken);
             foreach (var evidenceRef in refs)
             {
                 lastScanned = evidenceRef;
@@ -76,7 +77,8 @@ public sealed class EfEvidenceSearchService : IEvidenceSearchService
                     evidenceRef, row.FinalUri, row.SourceEntryId, row.Jurisdiction, row.SourceType,
                     row.AuthenticationResult, DateTime.SpecifyKind(row.RetrievedAtUtc, DateTimeKind.Utc),
                     decision.State, decision.Eligible, decision.Reason, decision.EvaluatedAt,
-                    row.ParserName, row.ParserVersion));
+                    row.ParserName, row.ParserVersion,
+                    snippets.GetValueOrDefault(evidenceRef)));
                 if (hits.Count > request.PageSize) break;
             }
 
@@ -95,6 +97,37 @@ public sealed class EfEvidenceSearchService : IEvidenceSearchService
         }
 
         return new EvidenceSearchPage(EvidenceSearchOutcome.Ok, hits, next);
+    }
+
+    private async Task<Dictionary<string, string>> LoadSnippetsAsync(
+        Guid tenantId, List<string> refs, string query, CancellationToken cancellationToken)
+    {
+        // Same verified-only join and tenant scope as the candidate query: a snippet never comes from
+        // an unverified or foreign chunk.
+        var rows = await (
+            from c in _db.TenantEvidenceChunks.AsNoTracking()
+            join v in _db.TenantEvidenceVerifications.AsNoTracking()
+                on new { c.TenantId, c.ParseRunId } equals new { v.TenantId, v.ParseRunId }
+            where c.TenantId == tenantId
+                && refs.Contains(v.ParentEvidenceRef)
+                && EF.Functions.ToTsVector("simple", c.Text).Matches(EF.Functions.PlainToTsQuery("simple", query))
+            select new { v.ParentEvidenceRef, c.Ordinal, c.Id, c.Text })
+            .ToListAsync(cancellationToken);
+
+        return rows
+            .GroupBy(x => x.ParentEvidenceRef)
+            .ToDictionary(
+                g => g.Key,
+                g => Truncate(g.OrderBy(x => x.Ordinal).ThenBy(x => x.Id).First().Text));
+    }
+
+    private static string Truncate(string text)
+    {
+        var max = EvidenceSearchLimits.MaxSnippetLength;
+        if (text.Length <= max) return text;
+        var cut = max;
+        if (char.IsHighSurrogate(text[cut - 1])) cut--;
+        return text[..cut];
     }
 
     private sealed record LatestRow(

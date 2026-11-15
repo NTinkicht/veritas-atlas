@@ -111,6 +111,7 @@ public sealed class EvidenceSearchTests
         Assert.AreEqual(VeritasAtlas.Domain.Parsing.UkLegislationParserV1.Name, page.Hits[0].ParserName);
         Assert.AreEqual(VeritasAtlas.Domain.Parsing.UkLegislationParserV1.Version, page.Hits[0].ParserVersion);
         Assert.IsNull(page.NextCursor);
+        Assert.AreEqual("Section alpha.", page.Hits[0].Snippet, "the snippet is the matched verified chunk text");
 
         var foreign = await Search(db, time, Policy).SearchAsync(TenantB, Req(), CancellationToken.None);
         Assert.AreEqual(0, foreign.Hits.Count, "another tenant sees nothing");
@@ -227,6 +228,28 @@ public sealed class EvidenceSearchTests
             (await service.SearchAsync(TenantB, Req(size: 2, cursor: first.NextCursor), CancellationToken.None)).Outcome);
         Assert.AreEqual(EvidenceSearchOutcome.InvalidRequest,
             (await service.SearchAsync(TenantA, Req(size: 2, jurisdiction: "gb-uk", cursor: first.NextCursor), CancellationToken.None)).Outcome);
+    }
+
+    [TestMethod]
+    public async Task SnippetIsTruncatedAndComesOnlyFromTheMatchingChunk()
+    {
+        if (Database() is not { } cs) return;
+        await ResetAsync(cs);
+        await using var db = new VeritasAtlasDbContext(Options(cs));
+        var filler = " " + string.Concat(Enumerable.Repeat("word ", 200));
+        await SeedAsync(db, TenantA, "r1", "alpha", verify: true, filler: filler);
+        var time = new MutableTime(At.AddMinutes(30));
+        var service = Search(db, time, Policy);
+
+        var hit = (await service.SearchAsync(TenantA, Req(q: "alpha"), CancellationToken.None)).Hits.Single();
+        Assert.IsNotNull(hit.Snippet);
+        Assert.AreEqual(EvidenceSearchLimits.MaxSnippetLength, hit.Snippet.Length);
+        Assert.IsTrue(hit.Snippet.StartsWith("Section alpha.", StringComparison.Ordinal));
+
+        var other = (await service.SearchAsync(TenantA, Req(q: "word"), CancellationToken.None)).Hits.Single();
+        Assert.AreEqual(hit.EvidenceRef, other.EvidenceRef);
+        Assert.AreEqual(hit.Snippet, other.Snippet, "same chunk, same bounded snippet");
+        Assert.AreEqual(0, (await service.SearchAsync(TenantB, Req(q: "alpha"), CancellationToken.None)).Hits.Count);
     }
 
     [TestMethod]
@@ -364,7 +387,7 @@ public sealed class EvidenceSearchTests
             {
                 "evidenceRef", "sourceUri", "sourceEntryId", "jurisdiction", "sourceType", "attestationState",
                 "retrievedAtUtc", "freshness", "freshnessEligible", "freshnessReason", "freshnessEvaluatedAt",
-                "parserName", "parserVersion",
+                "parserName", "parserVersion", "snippet",
             },
             hit.EnumerateObject().Select(p => p.Name).ToArray());
         Assert.AreEqual(System.Text.Json.JsonValueKind.Number, hit.GetProperty("freshness").ValueKind);
@@ -421,9 +444,9 @@ public sealed class EvidenceSearchTests
         }
     }
 
-    private static async Task<string> SeedAsync(VeritasAtlasDbContext db, Guid tenant, string key, string word, bool verify)
+    private static async Task<string> SeedAsync(VeritasAtlasDbContext db, Guid tenant, string key, string word, bool verify, string filler = "")
     {
-        var doc = $"<Legislation SchemaVersion=\"1\"><P1 id=\"s1\">Section {word}.</P1></Legislation>";
+        var doc = $"<Legislation SchemaVersion=\"1\"><P1 id=\"s1\">Section {word}.{filler}</P1></Legislation>";
         var source = await new EfTenantSourceRegistry(db, TimeProvider.System)
             .CreateAsync(tenant, "https://example.test/" + key, "synthetic-seeder", CancellationToken.None);
         var recorded = await new EfTenantRawRetrievalLedger(db, TimeProvider.System).RecordAsync(
