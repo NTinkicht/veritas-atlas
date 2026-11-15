@@ -62,6 +62,8 @@ type BoardProps = {
   /** Item ids with a bookmark request in flight. */
   busyIds?: readonly string[];
   bookmarkNotice?: InvestigationFailure | null;
+  /** False until the caller's bookmarks were read successfully: mutations stay disabled (fail closed). */
+  bookmarksReady?: boolean;
 };
 
 export function EvidenceBoard({
@@ -74,6 +76,7 @@ export function EvidenceBoard({
   onToggleBookmark,
   busyIds,
   bookmarkNotice,
+  bookmarksReady = true,
 }: BoardProps) {
   return (
     <section className="panel" aria-label={`Collected evidence for ${investigation.title}`}>
@@ -94,7 +97,7 @@ export function EvidenceBoard({
               {onToggleBookmark ? (
                 <BookmarkControl
                   bookmarked={bookmarkedIds?.includes(item.id) ?? false}
-                  busy={busyIds?.includes(item.id) ?? false}
+                  busy={!bookmarksReady || (busyIds?.includes(item.id) ?? false)}
                   onToggle={(next) => onToggleBookmark(item.id, next)}
                 />
               ) : null}

@@ -5,7 +5,9 @@ import {
   bookmarksPath,
   parseBookmark,
   parseBookmarks,
+  listBookmarks,
   putBookmark,
+  removeBookmark,
   classifyInvestigationFailure,
   comparisonPath,
   evidenceItemsPath,
@@ -133,5 +135,28 @@ describe("bookmark client", () => {
     const other = "44444444-4444-4444-8444-444444444444";
     vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ ...bm, evidenceItemId: other }), { status: 200 })));
     await expect(putBookmark(ID, EV)).rejects.toBeInstanceOf(MalformedInvestigationResponse);
+  });
+  it("rejects a PUT answer about a different investigation", async () => {
+    const otherInv = "55555555-5555-4555-8555-555555555555";
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ ...bm, investigationId: otherInv }), { status: 200 })));
+    await expect(putBookmark(ID, EV)).rejects.toBeInstanceOf(MalformedInvestigationResponse);
+  });
+  it("lists bookmarks with GET and rejects a malformed answer", async () => {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ items: [bm] }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(listBookmarks(ID)).resolves.toEqual([bm]);
+    expect((fetchMock.mock.calls[0] as unknown as [string, RequestInit])[0]).toContain(`/${ID}/bookmarks`);
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ items: [{ ...bm, evidenceItemId: "x" }] }), { status: 200 })));
+    await expect(listBookmarks(ID)).rejects.toBeInstanceOf(MalformedInvestigationResponse);
+  });
+  it("removes a bookmark with DELETE and surfaces a refusal", async () => {
+    const fetchMock = vi.fn(async () => new Response(null, { status: 204 }));
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(removeBookmark(ID, EV)).resolves.toBeUndefined();
+    const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    expect(init.method).toBe("DELETE");
+    expect(url).toContain(`/${EV}/bookmark`);
+    vi.stubGlobal("fetch", vi.fn(async () => new Response("{}", { status: 403 })));
+    await expect(removeBookmark(ID, EV)).rejects.toMatchObject({ status: 403 });
   });
 });

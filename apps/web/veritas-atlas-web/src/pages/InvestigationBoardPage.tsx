@@ -24,6 +24,7 @@ export function InvestigationBoardPage() {
   const [picked, setPicked] = useState<string[]>([]);
   const [comparison, setComparison] = useState<Loadable<EvidenceComparisonData> | null>(null);
   const [bookmarked, setBookmarked] = useState<string[]>([]);
+  const [bookmarksReady, setBookmarksReady] = useState(false);
   const [busy, setBusy] = useState<string[]>([]);
   const [bookmarkNotice, setBookmarkNotice] = useState<InvestigationFailure | null>(null);
   const latest = useRef(0);
@@ -47,13 +48,18 @@ export function InvestigationBoardPage() {
     setPicked([]);
     setComparison(null);
     setBookmarked([]);
+    setBookmarksReady(false);
     setBusy([]);
     setBookmarkNotice(null);
     setSelected(investigation);
     setBoard({ kind: "loading" });
     // A failed bookmark read is shown, never treated as "no bookmarks".
     listBookmarks(investigation.id).then(
-      (data) => ticket === latest.current && setBookmarked(data.map((b) => b.evidenceItemId)),
+      (data) => {
+        if (ticket !== latest.current) return;
+        setBookmarked(data.map((b) => b.evidenceItemId));
+        setBookmarksReady(true);
+      },
       (error) =>
         ticket === latest.current && setBookmarkNotice(classifyInvestigationFailure(error, navigator.onLine)),
     );
@@ -66,7 +72,7 @@ export function InvestigationBoardPage() {
   }
 
   function toggleBookmark(itemId: string, next: boolean) {
-    if (!selected) return;
+    if (!selected || !bookmarksReady) return;
     const ticket = latest.current;
     const request = next ? putBookmark(selected.id, itemId).then(() => undefined) : removeBookmark(selected.id, itemId);
     setBusy((current) => [...current, itemId]);
@@ -119,6 +125,7 @@ export function InvestigationBoardPage() {
           bookmarkedIds={bookmarked}
           onToggleBookmark={toggleBookmark}
           busyIds={busy}
+          bookmarksReady={bookmarksReady}
           bookmarkNotice={bookmarkNotice}
         />
       ) : null}

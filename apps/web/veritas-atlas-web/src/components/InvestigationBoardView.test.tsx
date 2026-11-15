@@ -114,6 +114,10 @@ describe("bookmark controls", () => {
     expect(render({ bookmarkedIds: [], onToggleBookmark: noop, busyIds: [item.id] })).toContain("disabled");
     expect(render({ bookmarkedIds: [], onToggleBookmark: noop, busyIds: [] })).not.toContain("disabled");
   });
+  it("keeps the control disabled until the initial bookmark read succeeded", () => {
+    expect(render({ bookmarkedIds: [], onToggleBookmark: noop, bookmarksReady: false })).toContain("disabled");
+    expect(render({ bookmarkedIds: [], onToggleBookmark: noop, bookmarksReady: true })).not.toContain("disabled");
+  });
   it("shows a bookmark failure as an alert without hiding the evidence", () => {
     const html = render({
       bookmarkedIds: [],
