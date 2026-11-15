@@ -38,6 +38,11 @@ public sealed class EfTenantInvestigationShareStore : ITenantInvestigationShareS
             return new ShareGrantResult(ShareGrantOutcome.NotFound, null);
         }
 
+        if (await InvestigationStateQueries.IsClosedAsync(_db, tenantId, investigationId, cancellationToken))
+        {
+            return new ShareGrantResult(ShareGrantOutcome.InvestigationClosed, null);
+        }
+
         if (string.Equals(owner, grantee, StringComparison.Ordinal))
         {
             return new ShareGrantResult(ShareGrantOutcome.SelfGrant, null);
@@ -96,6 +101,11 @@ public sealed class EfTenantInvestigationShareStore : ITenantInvestigationShareS
         if (!await IsCreatorAsync(tenantId, investigationId, owner, cancellationToken))
         {
             return ShareRevokeOutcome.NotFound;
+        }
+
+        if (await InvestigationStateQueries.IsClosedAsync(_db, tenantId, investigationId, cancellationToken))
+        {
+            return ShareRevokeOutcome.InvestigationClosed;
         }
 
         var now = ToPostgresPrecision(_timeProvider.GetUtcNow().UtcDateTime);

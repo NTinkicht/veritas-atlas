@@ -28,7 +28,8 @@ public enum BookmarkPutOutcome
 {
     Added,
     Replayed,
-    NotFound
+    NotFound,
+    InvestigationClosed
 }
 
 public sealed record BookmarkPutResult(BookmarkPutOutcome Outcome, TenantInvestigationBookmarkModel? Bookmark);
@@ -37,5 +38,6 @@ public enum BookmarkRemoveOutcome
 {
     Removed,
     NotBookmarked,
-    NotFound
+    NotFound,
+    InvestigationClosed
 }

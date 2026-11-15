@@ -69,6 +69,8 @@ public sealed class TenantInvestigationEvidenceItemsController : ControllerBase
         {
             EvidenceItemCollectOutcome.Collected => StatusCode(StatusCodes.Status201Created, ToResponse(result.Item!)),
             EvidenceItemCollectOutcome.Replayed => Ok(ToResponse(result.Item!)),
+            EvidenceItemCollectOutcome.InvestigationClosed => Error(StatusCodes.Status409Conflict, "investigation_closed",
+                "The investigation is closed; reopen it to change it."),
             EvidenceItemCollectOutcome.NoteConflict => Error(StatusCodes.Status409Conflict, "note_conflict",
                 "The evidence was already collected with a different note."),
             // Anti-oracle: another tenant's ids answer exactly like unknown ones.

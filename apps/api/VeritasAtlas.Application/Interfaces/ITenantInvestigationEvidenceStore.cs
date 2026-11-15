@@ -56,6 +56,9 @@ public enum EvidenceItemCollectOutcome
 {
     Collected,
 
+    /// <summary>The investigation is closed: no new evidence (VER-P0-10 slice 8).</summary>
+    InvestigationClosed,
+
     /// <summary>The same evidence with the same note was already collected: the original row.</summary>
     Replayed,
 

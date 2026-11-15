@@ -45,6 +45,11 @@ public sealed class EfTenantInvestigationEvidenceStore : ITenantInvestigationEvi
             return new EvidenceItemCollectResult(EvidenceItemCollectOutcome.InvestigationNotFound, null);
         }
 
+        if (await InvestigationStateQueries.IsClosedAsync(_db, tenantId, investigationId, cancellationToken))
+        {
+            return new EvidenceItemCollectResult(EvidenceItemCollectOutcome.InvestigationClosed, null);
+        }
+
         if (!await _db.TenantEvidenceVerifications.AsNoTracking()
                 .AnyAsync(x => x.TenantId == tenantId && x.Id == input.EvidenceVerificationId, cancellationToken))
         {

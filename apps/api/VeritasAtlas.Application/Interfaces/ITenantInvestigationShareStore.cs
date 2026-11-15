@@ -39,7 +39,8 @@ public enum ShareGrantOutcome
     Granted,
     Replayed,
     NotFound,
-    SelfGrant
+    SelfGrant,
+    InvestigationClosed
 }
 
 public sealed record ShareGrantResult(ShareGrantOutcome Outcome, TenantInvestigationShareModel? Share);
@@ -48,7 +49,8 @@ public enum ShareRevokeOutcome
 {
     Revoked,
     NotActive,
-    NotFound
+    NotFound,
+    InvestigationClosed
 }
 
 public static class TenantInvestigationShareLimits

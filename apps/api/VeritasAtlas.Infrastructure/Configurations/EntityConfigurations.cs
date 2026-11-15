@@ -1442,6 +1442,41 @@ public sealed class TenantInvestigationShareConfiguration : IEntityTypeConfigura
     }
 }
 
+public sealed class TenantInvestigationStateEventConfiguration : IEntityTypeConfiguration<VeritasAtlas.Infrastructure.Persistence.TenantInvestigationStateEvent>
+{
+    public void Configure(EntityTypeBuilder<VeritasAtlas.Infrastructure.Persistence.TenantInvestigationStateEvent> builder)
+    {
+        builder.ToTable("tenant_investigation_state_events", table =>
+        {
+            table.HasCheckConstraint(
+                "ck_tenant_investigation_state_events_tenant_id_not_empty",
+                "tenant_id <> '00000000-0000-0000-0000-000000000000'::uuid");
+            table.HasCheckConstraint(
+                "ck_tenant_investigation_state_events_version_positive",
+                "version >= 1");
+            table.HasCheckConstraint(
+                "ck_tenant_investigation_state_events_state",
+                "state IN ('closed', 'open')");
+            table.HasCheckConstraint(
+                "ck_tenant_investigation_state_events_actor_subject_shape",
+                "length(btrim(actor_subject)) > 0 AND actor_subject !~ '[\\x01-\\x1f\\x7f-\\x9f]'");
+        });
+
+        builder.HasKey(x => new { x.TenantId, x.InvestigationId, x.Version })
+            .HasName("pk_tenant_investigation_state_events");
+        builder.Property(x => x.TenantId).HasColumnName("tenant_id").IsRequired();
+        builder.Property(x => x.InvestigationId).HasColumnName("investigation_id").IsRequired();
+        builder.Property(x => x.Version).HasColumnName("version").IsRequired();
+        builder.Property(x => x.State).HasColumnName("state").HasMaxLength(10).IsRequired();
+        builder.Property(x => x.ActorSubject)
+            .HasColumnName("actor_subject")
+            .HasMaxLength(VeritasAtlas.Application.Interfaces.TenantInvestigationLimits.MaxSubjectLength)
+            .IsRequired();
+        builder.Property(x => x.CreatedAtUtc).HasColumnName("created_at_utc").IsRequired();
+        // No FKs (append-only parents): the insert guard trigger checks the investigation and the version chain.
+    }
+}
+
 public sealed class TenantInvestigationConfiguration : IEntityTypeConfiguration<VeritasAtlas.Infrastructure.Persistence.TenantInvestigation>
 {
     public void Configure(EntityTypeBuilder<VeritasAtlas.Infrastructure.Persistence.TenantInvestigation> builder)

@@ -43,6 +43,8 @@ public sealed class TenantInvestigationSharesController : ControllerBase
             ShareGrantOutcome.Replayed => Ok(ToResponse(result.Share!)),
             ShareGrantOutcome.SelfGrant => Error(StatusCodes.Status400BadRequest, "self_share",
                 "An investigation cannot be shared with its creator."),
+            ShareGrantOutcome.InvestigationClosed => Error(StatusCodes.Status409Conflict, "investigation_closed",
+                "The investigation is closed; reopen it to change it."),
             _ => NotFoundError()
         };
     }
@@ -58,7 +60,13 @@ public sealed class TenantInvestigationSharesController : ControllerBase
         }
 
         var outcome = await _store.RevokeAsync(caller.TenantId, investigationId, caller.Subject, grantee, cancellationToken);
-        return outcome == ShareRevokeOutcome.NotFound ? NotFoundError() : NoContent();
+        return outcome switch
+        {
+            ShareRevokeOutcome.NotFound => NotFoundError(),
+            ShareRevokeOutcome.InvestigationClosed => Error(StatusCodes.Status409Conflict, "investigation_closed",
+                "The investigation is closed; reopen it to change it."),
+            _ => NoContent()
+        };
     }
 
     [HttpGet]

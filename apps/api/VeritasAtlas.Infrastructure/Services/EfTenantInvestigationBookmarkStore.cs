@@ -42,6 +42,11 @@ public sealed class EfTenantInvestigationBookmarkStore : ITenantInvestigationBoo
                 return new BookmarkPutResult(BookmarkPutOutcome.NotFound, null);
             }
 
+            if (await InvestigationStateQueries.IsClosedAsync(_db, tenantId, investigationId, cancellationToken))
+            {
+                return new BookmarkPutResult(BookmarkPutOutcome.InvestigationClosed, null);
+            }
+
             var existing = await FindAsync(tenantId, evidenceItemId, subject, cancellationToken);
             if (existing is not null)
             {
@@ -94,6 +99,11 @@ public sealed class EfTenantInvestigationBookmarkStore : ITenantInvestigationBoo
         if (!await ItemExistsAsync(tenantId, investigationId, evidenceItemId, cancellationToken))
         {
             return BookmarkRemoveOutcome.NotFound;
+        }
+
+        if (await InvestigationStateQueries.IsClosedAsync(_db, tenantId, investigationId, cancellationToken))
+        {
+            return BookmarkRemoveOutcome.InvestigationClosed;
         }
 
         var row = await _db.TenantInvestigationBookmarks.SingleOrDefaultAsync(

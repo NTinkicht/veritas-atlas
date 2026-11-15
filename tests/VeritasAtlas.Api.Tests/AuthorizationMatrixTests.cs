@@ -308,6 +308,8 @@ public sealed class AuthorizationMatrixTests
         "POST api/v1/tenant-claims/relation-graph | denied: intruder",
         "POST api/v1/tenant-claims/validate-evidence | denied: intruder",
         "POST api/v1/tenant-investigations | denied: reviewer,publisher,admin,intruder",
+        "POST api/v1/tenant-investigations/{id:guid}/close | denied: reviewer,publisher,admin,intruder",
+        "POST api/v1/tenant-investigations/{id:guid}/reopen | denied: reviewer,publisher,admin,intruder",
         "POST api/v1/tenant-investigations/{investigationId:guid}/evidence-items | denied: reviewer,publisher,admin,intruder",
         "POST api/v1/tenant-investigations/{investigationId:guid}/evidence-items/{itemId:guid}/annotations | denied: reviewer,publisher,admin,intruder",
         "POST api/v1/tenant-publication-revisions | denied: reviewer,publisher,admin,intruder",

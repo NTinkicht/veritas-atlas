@@ -44,6 +44,11 @@ public sealed class EfTenantInvestigationAnnotationStore : ITenantInvestigationA
             return new AnnotationAddResult(AnnotationAddOutcome.NotFound, null);
         }
 
+        if (await InvestigationStateQueries.IsClosedAsync(_db, tenantId, investigationId, cancellationToken))
+        {
+            return new AnnotationAddResult(AnnotationAddOutcome.InvestigationClosed, null);
+        }
+
         var existing = await FindAsync(tenantId, evidenceItemId, input, cancellationToken);
         if (existing is not null)
         {

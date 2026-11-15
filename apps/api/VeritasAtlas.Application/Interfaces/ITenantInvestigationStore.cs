@@ -17,7 +17,36 @@ public interface ITenantInvestigationStore
 
     Task<IReadOnlyList<TenantInvestigationModel>> ListAsync(
         Guid tenantId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// VER-P0-10 slice 8: appends a close (or reopen) state event. The creation record is never
+    /// touched. Optimistic: <paramref name="expectedVersion"/> must equal the current version.
+    /// The caller authorizes the actor first.
+    /// </summary>
+    Task<InvestigationTransitionResult> TransitionAsync(
+        Guid tenantId, Guid investigationId, bool close, int expectedVersion, string actorSubject,
+        CancellationToken cancellationToken);
 }
+
+public enum InvestigationTransitionOutcome
+{
+    /// <summary>A new state event was appended.</summary>
+    Transitioned,
+
+    /// <summary>The same request was already applied: the current state is returned unchanged.</summary>
+    Replayed,
+
+    NotFound,
+
+    /// <summary>The expected version is not the current one.</summary>
+    StaleVersion,
+
+    /// <summary>The investigation is already in the requested state.</summary>
+    NoChange
+}
+
+public sealed record InvestigationTransitionResult(
+    InvestigationTransitionOutcome Outcome, TenantInvestigationModel? Investigation);
 
 /// <summary>
 /// <see cref="Title"/> is stored exactly as given: it must not be blank, must
@@ -34,7 +63,15 @@ public sealed record TenantInvestigationModel(
     string CreationKey,
     string Title,
     string CreatedBySubject,
-    DateTime CreatedAtUtc);
+    DateTime CreatedAtUtc,
+    string State = TenantInvestigationStates.Open,
+    int Version = 0);
+
+public static class TenantInvestigationStates
+{
+    public const string Open = "open";
+    public const string Closed = "closed";
+}
 
 public enum InvestigationCreateOutcome
 {
