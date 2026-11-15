@@ -179,8 +179,9 @@ export function InvestigationBoardPage() {
         setList((current) =>
           current.kind === "loaded" ? { kind: "loaded", data: current.data.map((i) => (i.id === updated.id ? updated : i)) } : current,
         );
+        // Re-selecting the same investigation mid-flight bumps the ticket; still reconcile by id, never over a newer version.
+        setSelected((now) => (now && now.id === updated.id && updated.version >= now.version ? updated : now));
         if (ticket !== latest.current) return;
-        setSelected(updated);
         setTransitioning(false);
       },
       (error) => {

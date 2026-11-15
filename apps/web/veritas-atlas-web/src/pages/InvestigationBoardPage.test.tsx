@@ -171,4 +171,24 @@ describe("InvestigationBoardPage close and reopen", () => {
     resolve({ ...A, state: "closed", version: 1 });
     await screen.findByRole("button", { name: "Reopen investigation" });
   });
+  it("reconciles the open board when the same investigation is re-selected mid-flight", async () => {
+    let resolve!: (i: Investigation) => void;
+    api.transitionInvestigation.mockReturnValue(new Promise<Investigation>((r) => (resolve = r)));
+    await select();
+    fireEvent.click(screen.getByRole("button", { name: "Close investigation" }));
+    fireEvent.click(screen.getAllByRole("button", { name: "Existing" })[0]);
+    resolve({ ...A, state: "closed", version: 1 });
+    await screen.findByRole("button", { name: "Reopen investigation" });
+    expect(screen.getByText("Closed", { selector: "strong" })).toBeTruthy();
+  });
+  it("does not overwrite the board with an older version", async () => {
+    let resolve!: (i: Investigation) => void;
+    api.transitionInvestigation.mockReturnValue(new Promise<Investigation>((r) => (resolve = r)));
+    api.listInvestigations.mockResolvedValue([{ ...A, version: 5 }]);
+    await select();
+    fireEvent.click(screen.getByRole("button", { name: "Close investigation" }));
+    resolve({ ...A, state: "closed", version: 1 });
+    await waitFor(() => expect(screen.getByRole("button", { name: "Close investigation" })).toBeTruthy());
+    expect(screen.getByText("Open", { selector: "strong" })).toBeTruthy();
+  });
 });
