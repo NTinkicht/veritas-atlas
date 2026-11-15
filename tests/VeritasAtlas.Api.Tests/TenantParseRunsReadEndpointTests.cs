@@ -241,6 +241,10 @@ public sealed class TenantParseRunsReadEndpointTests
             Guid tenantId, RawRetrievalInput input, string actorSubject, CancellationToken cancellationToken) =>
             throw new NotSupportedException();
 
+        public Task<IReadOnlyList<TenantRawRetrievalModel>> ListForSourceAsync(
+            Guid tenantId, Guid sourceEntryId, int limit, CancellationToken cancellationToken) =>
+            throw new NotSupportedException();
+
         public Task<TenantRawRetrievalModel?> GetAsync(Guid tenantId, Guid id, CancellationToken cancellationToken)
         {
             Interlocked.Increment(ref _calls);

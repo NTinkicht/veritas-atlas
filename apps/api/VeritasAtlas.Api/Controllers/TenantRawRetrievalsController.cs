@@ -24,6 +24,44 @@ public sealed class TenantRawRetrievalsController : ControllerBase
         _ledger = ledger;
     }
 
+    /// <summary>Server-side ceiling on one list response; the newest rows win.</summary>
+    public const int MaxListed = 100;
+
+    /// <summary>
+    /// VER-P0-06 (#278): lists the raw retrievals recorded for one source (metadata only, newest first,
+    /// at most <see cref="MaxListed"/>) so an admin can discover retrieval IDs. Same fail-closed gate as
+    /// <see cref="Get"/>. A missing, empty, unknown or another tenant's <c>sourceId</c> answers an empty
+    /// list or 400 for a missing one, never an existence signal.
+    /// </summary>
+    [HttpGet]
+    public async Task<IActionResult> List([FromQuery] Guid sourceId, CancellationToken cancellationToken)
+    {
+        if (TenantClaim.GetTenantId(User) is not { } tenantId)
+            return Error(StatusCodes.Status403Forbidden, "tenant_required",
+                "The access token carries no valid organization tenant.");
+
+        var actor = User.FindFirstValue(ClaimTypes.Name);
+        if (string.IsNullOrWhiteSpace(actor)
+            || actor.Length > TenantAuditEventLimits.MaxSubjectLength
+            || actor.Any(char.IsControl))
+            return Error(StatusCodes.Status403Forbidden, "actor_required",
+                "The access token carries no usable subject name.");
+
+        if (!TenantAdminRole.IsSatisfiedBy(User))
+            return Error(StatusCodes.Status403Forbidden, "admin_required",
+                "Only a tenant admin may read raw retrievals.");
+
+        if (sourceId == Guid.Empty)
+            return Error(StatusCodes.Status400BadRequest, "source_id_required",
+                "A non-empty sourceId query parameter is required.");
+
+        var rows = await _ledger.ListForSourceAsync(tenantId, sourceId, MaxListed, cancellationToken);
+        return Ok(rows
+            .Select(r => new RawRetrievalResponse(
+                r.Id, r.SourceEntryId, r.FinalUri, r.ContentSha256, r.ByteLength, r.RetrievedAtUtc, r.CreatedAtUtc))
+            .ToList());
+    }
+
     [HttpGet("{id:guid}")]
     public async Task<IActionResult> Get(Guid id, CancellationToken cancellationToken)
     {
