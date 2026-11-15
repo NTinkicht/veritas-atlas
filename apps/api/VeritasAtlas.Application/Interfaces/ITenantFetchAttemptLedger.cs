@@ -19,6 +19,13 @@ public interface ITenantFetchAttemptLedger
 
     Task<IReadOnlyList<TenantFetchAttemptModel>> ListForSourceAsync(
         Guid tenantId, Guid sourceEntryId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// VER-P0-06 (#280): the newest <paramref name="limit"/> attempts for one source, newest first
+    /// (attempt time, then creation time, then id descending), for a bounded admin read.
+    /// </summary>
+    Task<IReadOnlyList<TenantFetchAttemptModel>> ListRecentForSourceAsync(
+        Guid tenantId, Guid sourceEntryId, int limit, CancellationToken cancellationToken);
 }
 
 public enum FetchAttemptOutcome

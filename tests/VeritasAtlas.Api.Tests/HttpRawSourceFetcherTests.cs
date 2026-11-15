@@ -94,6 +94,8 @@ public sealed class HttpRawSourceFetcherTests
         }
         public Task<IReadOnlyList<TenantFetchAttemptModel>> ListForSourceAsync(Guid t, Guid s, CancellationToken c) =>
             Task.FromResult<IReadOnlyList<TenantFetchAttemptModel>>(Items.ToList());
+        public Task<IReadOnlyList<TenantFetchAttemptModel>> ListRecentForSourceAsync(Guid t, Guid s, int l, CancellationToken c) =>
+            Task.FromResult<IReadOnlyList<TenantFetchAttemptModel>>(Items.Take(l).ToList());
     }
 
     private sealed class FakeRaw : ITenantRawRetrievalLedger
