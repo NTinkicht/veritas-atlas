@@ -115,10 +115,17 @@ public sealed class EfTenantRawRetrievalLedger : ITenantRawRetrievalLedger
     {
         RequireTenant(tenantId);
         ArgumentOutOfRangeException.ThrowIfLessThan(limit, 1);
+        // Project the metadata columns only: RawBytes may be up to 16 MiB per row and must not be loaded for a list.
         var rows = await _db.TenantRawRetrievals.AsNoTracking()
             .Where(x => x.TenantId == tenantId && x.SourceEntryId == sourceEntryId)
             .OrderByDescending(x => x.RetrievedAtUtc).ThenBy(x => x.Id)
             .Take(limit)
+            .Select(x => new TenantRawRetrieval
+            {
+                Id = x.Id, SourceEntryId = x.SourceEntryId, IdempotencyKey = x.IdempotencyKey, FinalUri = x.FinalUri,
+                ContentSha256 = x.ContentSha256, ByteLength = x.ByteLength,
+                RetrievedAtUtc = x.RetrievedAtUtc, CreatedAtUtc = x.CreatedAtUtc
+            })
             .ToListAsync(cancellationToken);
         return rows.Select(ToModel).ToList();
     }

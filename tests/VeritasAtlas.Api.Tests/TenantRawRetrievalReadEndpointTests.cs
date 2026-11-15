@@ -270,6 +270,64 @@ public sealed class TenantRawRetrievalReadEndpointTests
         Assert.AreEqual("[]", await unknown.Content.ReadAsStringAsync());
     }
 
+    [TestMethod]
+    public async Task ListQueryNeverSelectsTheRawBytesColumn()
+    {
+        var cs = Database();
+        if (cs is null) return;
+        await using (var reset = new VeritasAtlasDbContext(Options(cs)))
+        {
+            await reset.Database.EnsureDeletedAsync();
+            await reset.Database.MigrateAsync();
+        }
+
+        var commands = new List<string>();
+        var options = new DbContextOptionsBuilder<VeritasAtlasDbContext>().UseNpgsql(cs)
+            .AddInterceptors(new CommandCapture(commands)).Options;
+        await using var db = new VeritasAtlasDbContext(options);
+        var source = (await new EfTenantSourceRegistry(db, TimeProvider.System)
+            .CreateAsync(TenantA, "https://example.test/proj", "synthetic-seeder", CancellationToken.None))!.Id;
+        var ledger = new EfTenantRawRetrievalLedger(db, TimeProvider.System);
+        await ledger.RecordAsync(TenantA,
+            new RawRetrievalInput(source, "proj-key", Uri, At, Encoding.UTF8.GetBytes(Doc)),
+            "synthetic-seeder", CancellationToken.None);
+
+        commands.Clear();
+        var listed = await ledger.ListForSourceAsync(TenantA, source, 100, CancellationToken.None);
+        Assert.AreEqual(1, listed.Count);
+        Assert.AreEqual(Encoding.UTF8.GetByteCount(Doc), listed[0].ByteLength);
+        Assert.IsTrue(commands.Count > 0);
+        // Positive control: the single-row read still selects the column, so the check can detect it.
+        commands.Clear();
+        await ledger.GetAsync(TenantA, listed[0].Id, CancellationToken.None);
+        Assert.IsTrue(commands.Any(c => c.Contains("RawBytes", StringComparison.OrdinalIgnoreCase)
+            || c.Contains("raw_bytes", StringComparison.OrdinalIgnoreCase)), "control query must select the bytes");
+        commands.Clear();
+        await ledger.ListForSourceAsync(TenantA, source, 100, CancellationToken.None);
+        Assert.IsFalse(commands.Any(c => c.Contains("RawBytes", StringComparison.OrdinalIgnoreCase)
+            || c.Contains("raw_bytes", StringComparison.OrdinalIgnoreCase)), string.Join("\n", commands));
+    }
+
+    private sealed class CommandCapture(List<string> sink) : Microsoft.EntityFrameworkCore.Diagnostics.DbCommandInterceptor
+    {
+        public override Microsoft.EntityFrameworkCore.Diagnostics.InterceptionResult<System.Data.Common.DbDataReader> ReaderExecuting(
+            System.Data.Common.DbCommand command, Microsoft.EntityFrameworkCore.Diagnostics.CommandEventData eventData,
+            Microsoft.EntityFrameworkCore.Diagnostics.InterceptionResult<System.Data.Common.DbDataReader> result)
+        {
+            sink.Add(command.CommandText);
+            return result;
+        }
+
+        public override ValueTask<Microsoft.EntityFrameworkCore.Diagnostics.InterceptionResult<System.Data.Common.DbDataReader>> ReaderExecutingAsync(
+            System.Data.Common.DbCommand command, Microsoft.EntityFrameworkCore.Diagnostics.CommandEventData eventData,
+            Microsoft.EntityFrameworkCore.Diagnostics.InterceptionResult<System.Data.Common.DbDataReader> result,
+            CancellationToken cancellationToken = default)
+        {
+            sink.Add(command.CommandText);
+            return ValueTask.FromResult(result);
+        }
+    }
+
     private static Task<HttpResponseMessage> Get(HttpClient client, string path, string bearer)
     {
         var request = new HttpRequestMessage(HttpMethod.Get, path);
