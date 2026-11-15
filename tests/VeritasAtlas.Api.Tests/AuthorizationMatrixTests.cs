@@ -312,6 +312,7 @@ public sealed class AuthorizationMatrixTests
         "POST api/v1/tenant-publication-revisions/{id:guid}/transitions | denied: admin,intruder",
         "POST api/v1/tenant-raw-retrievals/{id:guid}/parses | denied: operator,analyst,reviewer,publisher,intruder",
         "GET api/v1/tenant-raw-retrievals/{id:guid}/parses | denied: operator,analyst,reviewer,publisher,intruder",
+        "GET api/v1/tenant-raw-retrievals/{id:guid}/attestations | denied: operator,analyst,reviewer,publisher,intruder",
         "GET api/v1/tenant-raw-retrievals/{id:guid}/parses/{parseRunId:guid}/verification | denied: operator,analyst,reviewer,publisher,intruder",
         "POST api/v1/tenant-raw-retrievals/{id:guid}/parses/{parseRunId:guid}/verification | denied: operator,analyst,reviewer,publisher,intruder",
         "POST api/v1/tenant-sources | denied: operator,analyst,reviewer,publisher,intruder",
