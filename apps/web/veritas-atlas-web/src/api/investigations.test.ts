@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 import {
   MalformedInvestigationResponse,
   classifyInvestigationFailure,
+  comparisonPath,
   evidenceItemsPath,
+  parseEvidenceComparison,
   parseEvidenceItems,
   parseInvestigations,
 } from "./investigations";
@@ -48,5 +50,51 @@ describe("investigation failure classification", () => {
   it("maps network failure to offline and malformed to malformed", () => {
     expect(classifyInvestigationFailure(new Error("x"), false).kind).toBe("offline");
     expect(classifyInvestigationFailure(new MalformedInvestigationResponse("d")).kind).toBe("malformed");
+  });
+});
+
+describe("evidence comparison client", () => {
+  const L = "33333333-3333-4333-8333-333333333333";
+  const R = "44444444-4444-4444-8444-444444444444";
+  const side = (itemId: string, extra: Record<string, unknown> = {}) => ({
+    itemId,
+    evidenceVerificationId: EV,
+    note: null,
+    parentEvidenceRef: "ev1:aaa",
+    rawRetrievalId: ID,
+    attestationId: ID,
+    parseRunId: ID,
+    verifiedAtUtc: "2026-11-02T09:00:00Z",
+    ...extra,
+  });
+  const body = (over: Record<string, unknown> = {}) => ({
+    left: side(L),
+    right: side(R, { parentEvidenceRef: "ev1:bbb" }),
+    sameEvidenceRef: false,
+    sameRawRetrieval: true,
+    sameAttestation: true,
+    sameParseRun: true,
+    ...over,
+  });
+  it("parses a consistent comparison", () => {
+    const c = parseEvidenceComparison(body());
+    expect(c.left.itemId).toBe(L);
+    expect(c.sameEvidenceRef).toBe(false);
+  });
+  it("rejects a response whose flags contradict the compared items", () => {
+    expect(() => parseEvidenceComparison(body({ sameEvidenceRef: true }))).toThrow(MalformedInvestigationResponse);
+    expect(() => parseEvidenceComparison(body({ sameParseRun: false }))).toThrow(MalformedInvestigationResponse);
+  });
+  it("rejects missing sides, non-boolean flags and bad ids", () => {
+    expect(() => parseEvidenceComparison({})).toThrow(MalformedInvestigationResponse);
+    expect(() => parseEvidenceComparison(body({ sameParseRun: "true" }))).toThrow(MalformedInvestigationResponse);
+    expect(() => parseEvidenceComparison(body({ left: side("x") }))).toThrow(MalformedInvestigationResponse);
+    expect(() => parseEvidenceComparison(null)).toThrow(MalformedInvestigationResponse);
+  });
+  it("builds only GUID, two-distinct-item paths", () => {
+    expect(comparisonPath(ID, L, R)).toBe(`/api/v1/tenant-investigations/${ID}/evidence-items/comparison?left=${L}&right=${R}`);
+    expect(() => comparisonPath(ID, L, L)).toThrow(MalformedInvestigationResponse);
+    expect(() => comparisonPath(ID, L, "a&b=c")).toThrow(MalformedInvestigationResponse);
+    expect(() => comparisonPath("../x", L, R)).toThrow(MalformedInvestigationResponse);
   });
 });

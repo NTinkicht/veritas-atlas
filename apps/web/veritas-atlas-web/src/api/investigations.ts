@@ -44,15 +44,15 @@ function items(raw: unknown): Record<string, unknown>[] {
   });
 }
 
-function text(record: Record<string, unknown>, key: string, index: number): string {
+function text(record: Record<string, unknown>, key: string, index: number, label: string = "item"): string {
   const value = record[key];
-  if (typeof value !== "string" || value.length === 0) throw new MalformedInvestigationResponse(`item ${index} ${key}`);
+  if (typeof value !== "string" || value.length === 0) throw new MalformedInvestigationResponse(`${label} ${index} ${key}`);
   return value;
 }
 
-function guid(record: Record<string, unknown>, key: string, index: number): string {
-  const value = text(record, key, index);
-  if (!GUID.test(value)) throw new MalformedInvestigationResponse(`item ${index} ${key}`);
+function guid(record: Record<string, unknown>, key: string, index: number, label: string = "item"): string {
+  const value = text(record, key, index, label);
+  if (!GUID.test(value)) throw new MalformedInvestigationResponse(`${label} ${index} ${key}`);
   return value;
 }
 
@@ -105,4 +105,87 @@ export async function listInvestigations(): Promise<Investigation[]> {
 
 export async function listEvidenceItems(investigationId: string): Promise<CollectedEvidenceItem[]> {
   return parseEvidenceItems(await apiGet<unknown>(evidenceItemsPath(investigationId)));
+}
+
+export type ComparedEvidence = {
+  itemId: string;
+  evidenceVerificationId: string;
+  note: string | null;
+  parentEvidenceRef: string;
+  rawRetrievalId: string;
+  attestationId: string;
+  parseRunId: string;
+  verifiedAtUtc: string;
+};
+
+export type EvidenceComparison = {
+  left: ComparedEvidence;
+  right: ComparedEvidence;
+  sameEvidenceRef: boolean;
+  sameRawRetrieval: boolean;
+  sameAttestation: boolean;
+  sameParseRun: boolean;
+};
+
+export function comparisonPath(investigationId: string, leftItemId: string, rightItemId: string): string {
+  if (!GUID.test(leftItemId) || !GUID.test(rightItemId)) throw new MalformedInvestigationResponse("item id is not a GUID");
+  if (leftItemId.toLowerCase() === rightItemId.toLowerCase()) throw new MalformedInvestigationResponse("items must differ");
+  return `${evidenceItemsPath(investigationId)}/comparison?left=${leftItemId}&right=${rightItemId}`;
+}
+
+function side(raw: unknown, name: string): ComparedEvidence {
+  if (typeof raw !== "object" || raw === null) throw new MalformedInvestigationResponse(`${name} missing`);
+  const r = raw as Record<string, unknown>;
+  const note = r.note;
+  if (note !== null && note !== undefined && typeof note !== "string") throw new MalformedInvestigationResponse(`${name} note`);
+  const at = `${name}`;
+  return {
+    itemId: guid(r, "itemId", 0, at),
+    evidenceVerificationId: guid(r, "evidenceVerificationId", 0, at),
+    note: typeof note === "string" && note.length > 0 ? note : null,
+    parentEvidenceRef: text(r, "parentEvidenceRef", 0, at),
+    rawRetrievalId: guid(r, "rawRetrievalId", 0, at),
+    attestationId: guid(r, "attestationId", 0, at),
+    parseRunId: guid(r, "parseRunId", 0, at),
+    verifiedAtUtc: text(r, "verifiedAtUtc", 0, at),
+  };
+}
+
+function flag(record: Record<string, unknown>, key: string): boolean {
+  const value = record[key];
+  if (typeof value !== "boolean") throw new MalformedInvestigationResponse(key);
+  return value;
+}
+
+export function parseEvidenceComparison(raw: unknown): EvidenceComparison {
+  if (typeof raw !== "object" || raw === null) throw new MalformedInvestigationResponse("not an object");
+  const r = raw as Record<string, unknown>;
+  const left = side(r.left, "left");
+  const right = side(r.right, "right");
+  const comparison = {
+    left,
+    right,
+    sameEvidenceRef: flag(r, "sameEvidenceRef"),
+    sameRawRetrieval: flag(r, "sameRawRetrieval"),
+    sameAttestation: flag(r, "sameAttestation"),
+    sameParseRun: flag(r, "sameParseRun"),
+  };
+  // Fail closed on a response whose flags contradict its own sides.
+  if (
+    comparison.sameEvidenceRef !== (left.parentEvidenceRef === right.parentEvidenceRef) ||
+    comparison.sameRawRetrieval !== (left.rawRetrievalId === right.rawRetrievalId) ||
+    comparison.sameAttestation !== (left.attestationId === right.attestationId) ||
+    comparison.sameParseRun !== (left.parseRunId === right.parseRunId)
+  ) {
+    throw new MalformedInvestigationResponse("comparison flags contradict the compared items");
+  }
+  return comparison;
+}
+
+export async function compareEvidenceItems(
+  investigationId: string,
+  leftItemId: string,
+  rightItemId: string,
+): Promise<EvidenceComparison> {
+  return parseEvidenceComparison(await apiGet<unknown>(comparisonPath(investigationId, leftItemId, rightItemId)));
 }
