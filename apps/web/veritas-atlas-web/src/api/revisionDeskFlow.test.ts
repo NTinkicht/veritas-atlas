@@ -69,14 +69,32 @@ describe("runCreateDraftFlow", () => {
   const classify = (e: unknown) => ({ kind: "forbidden" as const, message: String((e as Error).message) });
   it("reports the created revision only after the server returned it", async () => {
     const onCreated = vi.fn(); const onRefused = vi.fn();
-    await runCreateDraftFlow({ digest: "a".repeat(64), policyPermitsPublicDisplay: false, create: async () => made, classify, onCreated, onRefused });
+    await runCreateDraftFlow({ isCurrent: () => true, digest: "a".repeat(64), policyPermitsPublicDisplay: false, create: async () => made, classify, onCreated, onRefused });
     expect(onCreated).toHaveBeenCalledWith(made);
     expect(onRefused).not.toHaveBeenCalled();
   });
   it("surfaces a refusal and never reports success", async () => {
     const onCreated = vi.fn(); const onRefused = vi.fn();
-    await runCreateDraftFlow({ digest: "a".repeat(64), policyPermitsPublicDisplay: true, create: async () => { throw new Error("denied"); }, classify, onCreated, onRefused });
+    await runCreateDraftFlow({ isCurrent: () => true, digest: "a".repeat(64), policyPermitsPublicDisplay: true, create: async () => { throw new Error("denied"); }, classify, onCreated, onRefused });
     expect(onCreated).not.toHaveBeenCalled();
     expect(onRefused).toHaveBeenCalledWith({ kind: "forbidden", message: "denied" });
+  });
+  it("ignores a late success or refusal once another revision was selected", async () => {
+    for (const outcome of ["ok", "fail"]) {
+      let selection = 1;
+      let release!: () => void;
+      const gate = new Promise<void>((r) => { release = r; });
+      const onCreated = vi.fn(); const onRefused = vi.fn();
+      const pending = runCreateDraftFlow({
+        isCurrent: () => selection === 1, digest: "a".repeat(64), policyPermitsPublicDisplay: false,
+        create: async () => { await gate; if (outcome === "fail") throw new Error("denied"); return made; },
+        classify, onCreated, onRefused,
+      });
+      selection = 2;
+      release();
+      await pending;
+      expect(onCreated).not.toHaveBeenCalled();
+      expect(onRefused).not.toHaveBeenCalled();
+    }
   });
 });

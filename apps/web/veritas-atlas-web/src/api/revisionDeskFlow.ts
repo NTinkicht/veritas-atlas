@@ -48,6 +48,8 @@ export function reconcileQueueItem(
 }
 
 export type CreateDraftFlow = {
+  /** True only while the selection the create started on is still on screen. */
+  isCurrent: () => boolean;
   digest: string;
   policyPermitsPublicDisplay: boolean;
   create: (digest: string, policyPermitsPublicDisplay: boolean) => Promise<PublicationRevision>;
@@ -56,11 +58,14 @@ export type CreateDraftFlow = {
   onRefused: (failure: RevisionFailure) => void;
 };
 
-/** Creates a draft and reports success only after the server returned a valid revision; any refusal is surfaced, never swallowed. */
+/** Creates a draft and reports success only after the server returned a valid revision; any refusal is surfaced, never swallowed. A completion that arrives after the operator selected another revision changes nothing on screen. */
 export async function runCreateDraftFlow(flow: CreateDraftFlow): Promise<void> {
   try {
-    flow.onCreated(await flow.create(flow.digest, flow.policyPermitsPublicDisplay));
+    const revision = await flow.create(flow.digest, flow.policyPermitsPublicDisplay);
+    if (!flow.isCurrent()) return;
+    flow.onCreated(revision);
   } catch (error) {
+    if (!flow.isCurrent()) return;
     flow.onRefused(flow.classify(error));
   }
 }

@@ -111,20 +111,25 @@ export function PublicationRevisionDeskPage() {
 
   async function create(digest: string, policyPermitsPublicDisplay: boolean) {
     if (busy) return;
+    const startedOn = latest.current;
     setBusy(true);
     setNotice(null);
     setActionFailure(null);
     try {
       await runCreateDraftFlow({
         digest, policyPermitsPublicDisplay,
-        create: createDraft,
+        isCurrent: () => latest.current === startedOn,
+        create: async (d, p) => {
+          const created = await createDraft(d, p);
+          void loadQueue(queueStateRef.current, null);
+          return created;
+        },
         classify: (error) => classifyRevisionFailure(error, navigator.onLine),
         onCreated: (revision) => {
           latest.current += 1;
           setIdText(revision.id);
           setView({ kind: "loaded", data: revision });
           setNotice(`Draft created by the server. Now ${revision.state}.`);
-          void loadQueue(queueStateRef.current, null);
         },
         onRefused: (failure) => {
           latest.current += 1;
