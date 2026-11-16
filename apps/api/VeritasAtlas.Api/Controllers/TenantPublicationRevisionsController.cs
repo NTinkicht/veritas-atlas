@@ -66,7 +66,8 @@ public sealed partial class TenantPublicationRevisionsController : ControllerBas
         LifecycleState? wanted = null;
         if (state is not null)
         {
-            if (!Enum.TryParse<LifecycleState>(state, ignoreCase: false, out var parsed) || !Enum.IsDefined(parsed))
+            if (!Enum.TryParse<LifecycleState>(state, ignoreCase: false, out var parsed) || !Enum.IsDefined(parsed)
+                || !string.Equals(parsed.ToString(), state, StringComparison.Ordinal))
             {
                 return BadRequest(new TenantSourceError("invalid_list_query", "state must be an exact lifecycle state name."));
             }

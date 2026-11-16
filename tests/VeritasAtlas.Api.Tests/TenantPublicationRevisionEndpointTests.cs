@@ -266,7 +266,7 @@ public sealed class TenantPublicationRevisionEndpointTests
         using var factory = new ApiFactory(store: store);
         using var client = factory.CreateClient();
         var reviewer = Sign("synthetic-reviewer", ["reviewer"], [TenantA.ToString("D")]);
-        foreach (var query in new[] { "?state=draft", "?state=7", "?state=Bogus", "?limit=0", "?limit=101", "?limit=-1" })
+        foreach (var query in new[] { "?state=draft", "?state=7", "?state=Bogus", "?state=1", "?state=Submitted,ChangesRequested", "?state=Submitted%2CApproved", "?state=%201", "?limit=0", "?limit=101", "?limit=-1" })
         {
             var response = await Send(client, HttpMethod.Get, Base + query, reviewer, null);
             Assert.AreEqual(HttpStatusCode.BadRequest, response.StatusCode, query);
