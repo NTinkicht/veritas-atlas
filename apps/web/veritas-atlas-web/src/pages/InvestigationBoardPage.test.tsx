@@ -13,6 +13,7 @@ const api = vi.hoisted(() => ({
   transitionInvestigation: vi.fn(),
   listEvidenceItems: vi.fn(),
   listBookmarks: vi.fn(),
+  listShares: vi.fn(),
 }));
 vi.mock("../api/investigations", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../api/investigations")>()),
@@ -41,6 +42,7 @@ beforeEach(() => {
   api.listInvestigations.mockResolvedValue([A]);
   api.listEvidenceItems.mockResolvedValue([]);
   api.listBookmarks.mockResolvedValue([]);
+  api.listShares.mockResolvedValue([]);
 });
 afterEach(cleanup);
 
