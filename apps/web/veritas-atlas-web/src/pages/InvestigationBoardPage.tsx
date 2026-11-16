@@ -21,6 +21,7 @@ import {
   type Investigation,
 } from "../api/investigations";
 import { AppSurface } from "../components/AppSurface";
+import { InvestigationSharesPanel } from "../components/InvestigationSharesPanel";
 import { CreateInvestigationForm, EvidenceBoard, InvestigationStateControl, EvidenceComparison, InvestigationList, type AnnotationsState, type Loadable } from "../components/InvestigationBoardView";
 
 export function InvestigationBoardPage() {
@@ -268,6 +269,7 @@ export function InvestigationBoardPage() {
           signInHref={signInHref}
         />
       ) : null}
+      {selected ? <InvestigationSharesPanel investigation={selected} signInHref={signInHref} /> : null}
       {selected ? (
         <EvidenceBoard
           investigation={selected}

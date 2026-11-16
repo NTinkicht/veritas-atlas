@@ -1,5 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  SHARE_MAX_GRANTEE_LENGTH,
+  grantShare,
+  isValidGrantee,
+  listShares,
+  parseShares,
+  revokeShare,
+  sharePath,
+  sharesPath,
   MalformedInvestigationResponse,
   addAnnotation,
   draftAfterSave,
@@ -345,5 +353,49 @@ describe("transitionInvestigation", () => {
     vi.stubGlobal("fetch", fetchMock);
     await expect(transitionInvestigation({ ...inv, id: "nope" }, true)).rejects.toBeInstanceOf(MalformedInvestigationResponse);
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("share client", () => {
+  const SH = { investigationId: ID, granteeSubject: "reviewer-1", grantedBySubject: "analyst-1", grantedAtUtc: "2026-11-02T09:00:00Z" };
+  it("builds guarded, encoded paths", () => {
+    expect(sharesPath(ID)).toBe(`/api/v1/tenant-investigations/${ID}/shares`);
+    expect(sharePath(ID, "a b/c")).toBe(`/api/v1/tenant-investigations/${ID}/shares/a%20b%2Fc`);
+    expect(() => sharesPath("../x")).toThrow(MalformedInvestigationResponse);
+    expect(() => sharePath(ID, " bad")).toThrow(MalformedInvestigationResponse);
+  });
+  it("mirrors the server grantee rule", () => {
+    expect(isValidGrantee("reviewer-1")).toBe(true);
+    for (const bad of ["", " ", " x", "x ", "a\nb", "a\u0000b", "x".repeat(SHARE_MAX_GRANTEE_LENGTH + 1)]) expect(isValidGrantee(bad)).toBe(false);
+    expect(isValidGrantee("x".repeat(SHARE_MAX_GRANTEE_LENGTH))).toBe(true);
+  });
+  it("rejects a malformed list whole", () => {
+    expect(parseShares({ items: [SH] })).toHaveLength(1);
+    expect(() => parseShares({ items: [{ ...SH, investigationId: "nope" }] })).toThrow(MalformedInvestigationResponse);
+    expect(() => parseShares({})).toThrow(MalformedInvestigationResponse);
+  });
+  describe("over fetch", () => {
+    beforeEach(() => vi.stubGlobal("localStorage", { getItem: () => null, setItem: () => undefined, removeItem: () => undefined }));
+    afterEach(() => vi.unstubAllGlobals());
+    const stub = (status: number, body?: unknown) =>
+      vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(body === undefined ? null : JSON.stringify(body), { status })));
+    it("refuses a list about another investigation", async () => {
+      stub(200, { items: [{ ...SH, investigationId: "99999999-9999-4999-8999-999999999999" }] });
+      await expect(listShares(ID)).rejects.toThrow(MalformedInvestigationResponse);
+    });
+    it("refuses a grant answered for another grantee and sends no request for an invalid one", async () => {
+      stub(201, { ...SH, granteeSubject: "someone-else" });
+      await expect(grantShare(ID, "reviewer-1")).rejects.toThrow(MalformedInvestigationResponse);
+      const f = vi.fn();
+      vi.stubGlobal("fetch", f);
+      await expect(grantShare(ID, " bad")).rejects.toThrow(MalformedInvestigationResponse);
+      expect(f).not.toHaveBeenCalled();
+    });
+    it("returns the stored row on a matching grant and surfaces a revoke refusal", async () => {
+      stub(201, SH);
+      await expect(grantShare(ID, "reviewer-1")).resolves.toEqual(SH);
+      stub(404, { code: "tenant_investigation_not_found", message: "x" });
+      await expect(revokeShare(ID, "reviewer-1")).rejects.toMatchObject({ status: 404 });
+    });
   });
 });

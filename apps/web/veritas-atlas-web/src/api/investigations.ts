@@ -389,3 +389,67 @@ export async function transitionInvestigation(investigation: Investigation, clos
   }
   return updated;
 }
+
+export type InvestigationShare = { investigationId: string; granteeSubject: string; grantedBySubject: string; grantedAtUtc: string };
+
+/** Mirrors TenantInvestigationShareLimits.MaxGranteeLength on the server. */
+export const SHARE_MAX_GRANTEE_LENGTH = 163;
+
+/** Client-side mirror of the server grantee rule so an invalid subject never reaches the network. */
+export function isValidGrantee(value: string): boolean {
+  if (value.length === 0 || value.length > SHARE_MAX_GRANTEE_LENGTH) return false;
+  if (value.trim().length === 0 || value !== value.trim()) return false;
+  // eslint-disable-next-line no-control-regex
+  return !/[\u0000-\u001f\u007f-\u009f]/.test(value);
+}
+
+export function sharesPath(investigationId: string): string {
+  if (!GUID.test(investigationId)) throw new MalformedInvestigationResponse("investigation id is not a GUID");
+  return `${INVESTIGATIONS_PATH}/${investigationId}/shares`;
+}
+
+export function sharePath(investigationId: string, grantee: string): string {
+  if (!isValidGrantee(grantee)) throw new MalformedInvestigationResponse("grantee is not valid");
+  return `${sharesPath(investigationId)}/${encodeURIComponent(grantee)}`;
+}
+
+function toShare(r: Record<string, unknown>, index: number): InvestigationShare {
+  return {
+    investigationId: guid(r, "investigationId", index, "share"),
+    granteeSubject: text(r, "granteeSubject", index, "share"),
+    grantedBySubject: text(r, "grantedBySubject", index, "share"),
+    grantedAtUtc: text(r, "grantedAtUtc", index, "share"),
+  };
+}
+
+export function parseShares(raw: unknown): InvestigationShare[] {
+  return items(raw).map(toShare);
+}
+
+export function parseShare(raw: unknown): InvestigationShare {
+  if (typeof raw !== "object" || raw === null) throw new MalformedInvestigationResponse("share is not an object");
+  return toShare(raw as Record<string, unknown>, 0);
+}
+
+export async function listShares(investigationId: string): Promise<InvestigationShare[]> {
+  const list = parseShares(await apiGet<unknown>(sharesPath(investigationId)));
+  // Fail closed on a list that mentions some other investigation.
+  if (!list.every((s) => s.investigationId.toLowerCase() === investigationId.toLowerCase())) {
+    throw new MalformedInvestigationResponse("share does not match the requested investigation");
+  }
+  return list;
+}
+
+/** Idempotent on the server: granting an active share replays the stored row. */
+export async function grantShare(investigationId: string, grantee: string): Promise<InvestigationShare> {
+  const path = sharePath(investigationId, grantee);
+  const share = parseShare(await apiPut<unknown>(path));
+  if (share.investigationId.toLowerCase() !== investigationId.toLowerCase() || share.granteeSubject !== grantee) {
+    throw new MalformedInvestigationResponse("share does not match the request");
+  }
+  return share;
+}
+
+export async function revokeShare(investigationId: string, grantee: string): Promise<void> {
+  await apiDelete(sharePath(investigationId, grantee));
+}
