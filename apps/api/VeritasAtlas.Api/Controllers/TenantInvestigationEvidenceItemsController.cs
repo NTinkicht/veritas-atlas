@@ -20,10 +20,13 @@ public sealed class TenantInvestigationEvidenceItemsController : ControllerBase
     private static readonly string[] ReaderRoles = ["operator", "analyst", "reviewer", "publisher", "admin"];
 
     private readonly ITenantInvestigationEvidenceStore _store;
+    private readonly ITenantInvestigationShareStore _shares;
 
-    public TenantInvestigationEvidenceItemsController(ITenantInvestigationEvidenceStore store)
+    public TenantInvestigationEvidenceItemsController(
+        ITenantInvestigationEvidenceStore store, ITenantInvestigationShareStore shares)
     {
         _store = store;
+        _shares = shares;
     }
 
     [HttpPost]
@@ -34,15 +37,7 @@ public sealed class TenantInvestigationEvidenceItemsController : ControllerBase
     {
         if (TenantClaim.GetTenantId(User) is not { } tenantId) return TenantRequired();
 
-        var actor = User.FindFirstValue(ClaimTypes.Name);
-        if (string.IsNullOrWhiteSpace(actor)
-            || actor.Length > TenantInvestigationLimits.MaxSubjectLength
-            || actor.Length > TenantAuditEventLimits.MaxSubjectLength
-            || actor.Any(char.IsControl))
-        {
-            return Error(StatusCodes.Status403Forbidden, "actor_required",
-                "The access token carries no usable subject name.");
-        }
+        if (ActorOrNull() is not { } actor) return ActorRequired();
 
         if (!HasExactlyOneRoleIn(User, AuthorRoles))
         {
@@ -62,6 +57,9 @@ public sealed class TenantInvestigationEvidenceItemsController : ControllerBase
                 $"note must be omitted or 1-{TenantInvestigationEvidenceLimits.MaxNoteLength} characters, without leading or trailing whitespace or control characters.");
         }
 
+        // Only the investigation's creator or an active grantee may collect (anti-oracle: identical 404).
+        if (!await _shares.IsAuthorizedAsync(tenantId, investigationId, actor, cancellationToken)) return NotFoundError();
+
         var result = await _store.CollectAsync(
             tenantId, investigationId, new EvidenceItemInput(verificationId, request.Note, actor), cancellationToken);
 
@@ -74,8 +72,7 @@ public sealed class TenantInvestigationEvidenceItemsController : ControllerBase
             EvidenceItemCollectOutcome.NoteConflict => Error(StatusCodes.Status409Conflict, "note_conflict",
                 "The evidence was already collected with a different note."),
             // Anti-oracle: another tenant's ids answer exactly like unknown ones.
-            _ => Error(StatusCodes.Status404NotFound, "tenant_investigation_or_evidence_not_found",
-                "The investigation or evidence was not found.")
+            _ => NotFoundError()
         };
     }
 
@@ -89,10 +86,12 @@ public sealed class TenantInvestigationEvidenceItemsController : ControllerBase
                 "The caller's role may not read collected evidence.");
         }
 
+        if (ActorOrNull() is not { } actor) return ActorRequired();
+        if (!await _shares.IsAuthorizedAsync(tenantId, investigationId, actor, cancellationToken)) return NotFoundError();
+
         var items = await _store.ListAsync(tenantId, investigationId, cancellationToken);
         return items is null
-            ? Error(StatusCodes.Status404NotFound, "tenant_investigation_or_evidence_not_found",
-                "The investigation or evidence was not found.")
+            ? NotFoundError()
             : Ok(new TenantInvestigationEvidenceItemListResponse(items.Select(ToResponse).ToList()));
     }
 
@@ -118,12 +117,32 @@ public sealed class TenantInvestigationEvidenceItemsController : ControllerBase
                 "left and right must be two different collected evidence item ids.");
         }
 
+        if (ActorOrNull() is not { } actor) return ActorRequired();
+        if (!await _shares.IsAuthorizedAsync(tenantId, investigationId, actor, cancellationToken)) return NotFoundError();
+
         var comparison = await _store.CompareAsync(tenantId, investigationId, leftId, rightId, cancellationToken);
         return comparison is null
-            ? Error(StatusCodes.Status404NotFound, "tenant_investigation_or_evidence_not_found",
-                "The investigation or evidence was not found.")
+            ? NotFoundError()
             : Ok(comparison);
     }
+
+    private string? ActorOrNull()
+    {
+        var actor = User.FindFirstValue(ClaimTypes.Name);
+        return string.IsNullOrWhiteSpace(actor)
+               || actor.Length > TenantInvestigationLimits.MaxSubjectLength
+               || actor.Length > TenantAuditEventLimits.MaxSubjectLength
+               || actor.Any(char.IsControl)
+            ? null
+            : actor;
+    }
+
+    private ObjectResult ActorRequired() =>
+        Error(StatusCodes.Status403Forbidden, "actor_required", "The access token carries no usable subject name.");
+
+    private ObjectResult NotFoundError() =>
+        Error(StatusCodes.Status404NotFound, "tenant_investigation_or_evidence_not_found",
+            "The investigation or evidence was not found.");
 
     /// <summary>Fail closed: the distinct role claims name exactly one role, and it is allowed.</summary>
     private static bool HasExactlyOneRoleIn(ClaimsPrincipal user, string[] allowed)
