@@ -20,10 +20,13 @@ public sealed class TenantInvestigationBookmarksController : ControllerBase
     private static readonly string[] ReaderRoles = ["operator", "analyst", "reviewer", "publisher", "admin"];
 
     private readonly ITenantInvestigationBookmarkStore _store;
+    private readonly ITenantInvestigationShareStore _shares;
 
-    public TenantInvestigationBookmarksController(ITenantInvestigationBookmarkStore store)
+    public TenantInvestigationBookmarksController(
+        ITenantInvestigationBookmarkStore store, ITenantInvestigationShareStore shares)
     {
         _store = store;
+        _shares = shares;
     }
 
     [HttpPut("evidence-items/{itemId:guid}/bookmark")]
@@ -31,6 +34,12 @@ public sealed class TenantInvestigationBookmarksController : ControllerBase
     {
         if (Authorize(AuthorRoles, "author_required", "Only an operator or analyst may bookmark evidence.")
             is not { } caller) return Refusal!;
+
+        // Only the investigation's creator or an active grantee (anti-oracle: identical 404).
+        if (!await _shares.IsAuthorizedAsync(caller.TenantId, investigationId, caller.Subject, cancellationToken))
+        {
+            return NotFoundError();
+        }
 
         var result = await _store.PutAsync(caller.TenantId, investigationId, itemId, caller.Subject, cancellationToken);
         return result.Outcome switch
@@ -49,6 +58,12 @@ public sealed class TenantInvestigationBookmarksController : ControllerBase
         if (Authorize(AuthorRoles, "author_required", "Only an operator or analyst may remove a bookmark.")
             is not { } caller) return Refusal!;
 
+        // Only the investigation's creator or an active grantee (anti-oracle: identical 404).
+        if (!await _shares.IsAuthorizedAsync(caller.TenantId, investigationId, caller.Subject, cancellationToken))
+        {
+            return NotFoundError();
+        }
+
         var outcome = await _store.RemoveAsync(caller.TenantId, investigationId, itemId, caller.Subject, cancellationToken);
         return outcome switch
         {
@@ -64,6 +79,12 @@ public sealed class TenantInvestigationBookmarksController : ControllerBase
     {
         if (Authorize(ReaderRoles, "role_not_permitted", "The caller's role may not read bookmarks.")
             is not { } caller) return Refusal!;
+
+        // Only the investigation's creator or an active grantee (anti-oracle: identical 404).
+        if (!await _shares.IsAuthorizedAsync(caller.TenantId, investigationId, caller.Subject, cancellationToken))
+        {
+            return NotFoundError();
+        }
 
         var items = await _store.ListAsync(caller.TenantId, investigationId, caller.Subject, cancellationToken);
         return items is null
