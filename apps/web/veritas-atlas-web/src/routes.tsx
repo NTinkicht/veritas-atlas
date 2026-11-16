@@ -112,6 +112,7 @@ import { InvestigationBoardPage } from "./pages/InvestigationBoardPage";
 import { ClaimConfidencePage } from "./pages/ClaimConfidencePage";
 import { AnswerReportPage } from "./pages/AnswerReportPage";
 import { StatementClassificationPage } from "./pages/StatementClassificationPage";
+import { ClaimCandidatesPage } from "./pages/ClaimCandidatesPage";
 import { CitationInspectorPage } from "./pages/CitationInspectorPage";
 import { ClaimRelationGraphPage } from "./pages/ClaimRelationGraphPage";
 import { PublicationRevisionDeskPage } from "./pages/PublicationRevisionDeskPage";
@@ -134,6 +135,7 @@ const allRoutes: RouteObject[] = [
   { path: "/claim-confidence", element: protect(<ClaimConfidencePage />) },
   { path: "/answer-report", element: protect(<AnswerReportPage />) },
   { path: "/statement-classification", element: protect(<StatementClassificationPage />) },
+  { path: "/claim-candidates", element: protect(<ClaimCandidatesPage />) },
   { path: "/citation-inspector", element: protect(<CitationInspectorPage />) },
   { path: "/claim-relations", element: protect(<ClaimRelationGraphPage />) },
   { path: "/workflow-audit", element: protect(<WorkflowAuditPage />) },
