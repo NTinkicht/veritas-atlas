@@ -372,6 +372,13 @@ public sealed class PublicVisibilityWritePathTests
             return Task.FromResult<TenantPublicationRevisionModel?>(null);
         }
 
+        public Task<IReadOnlyList<TenantPublicationRevisionModel>> ListAsync(
+            Guid tenantId, LifecycleState? state, Guid? afterId, int limit, CancellationToken cancellationToken)
+        {
+            Interlocked.Increment(ref _calls);
+            return Task.FromResult<IReadOnlyList<TenantPublicationRevisionModel>>([]);
+        }
+
         public Task<PublicationTransitionResult> TransitionAsync(
             Guid tenantId, Guid revisionId, string actorId, LifecycleRole actorRole, LifecycleAction action,
             long expectedVersion, string operationId, CancellationToken cancellationToken)
