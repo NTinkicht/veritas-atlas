@@ -20,10 +20,13 @@ public sealed class TenantInvestigationAnnotationsController : ControllerBase
     private static readonly string[] ReaderRoles = ["operator", "analyst", "reviewer", "publisher", "admin"];
 
     private readonly ITenantInvestigationAnnotationStore _store;
+    private readonly ITenantInvestigationShareStore _shares;
 
-    public TenantInvestigationAnnotationsController(ITenantInvestigationAnnotationStore store)
+    public TenantInvestigationAnnotationsController(
+        ITenantInvestigationAnnotationStore store, ITenantInvestigationShareStore shares)
     {
         _store = store;
+        _shares = shares;
     }
 
     [HttpPost]
@@ -54,6 +57,9 @@ public sealed class TenantInvestigationAnnotationsController : ControllerBase
                 $"text must be 1-{TenantInvestigationAnnotationLimits.MaxTextLength} characters, without leading or trailing whitespace or control characters other than newlines.");
         }
 
+        // Only the investigation's creator or an active grantee (anti-oracle: identical 404).
+        if (!await _shares.IsAuthorizedAsync(tenantId, investigationId, actor, cancellationToken)) return NotFoundError();
+
         var result = await _store.AddAsync(
             tenantId, investigationId, itemId, new AnnotationInput(request!.Text!, actor), cancellationToken);
 
@@ -78,6 +84,9 @@ public sealed class TenantInvestigationAnnotationsController : ControllerBase
                 "The caller's role may not read annotations.");
         }
 
+        if (ActorOrNull() is not { } actor) return ActorRequired();
+        if (!await _shares.IsAuthorizedAsync(tenantId, investigationId, actor, cancellationToken)) return NotFoundError();
+
         var items = await _store.ListAsync(tenantId, investigationId, itemId, cancellationToken);
         return items is null
             ? NotFoundError()
@@ -94,6 +103,20 @@ public sealed class TenantInvestigationAnnotationsController : ControllerBase
         return roles.Count == 1
             && allowed.Contains(roles[0], StringComparer.OrdinalIgnoreCase);
     }
+
+    private string? ActorOrNull()
+    {
+        var actor = User.FindFirstValue(ClaimTypes.Name);
+        return string.IsNullOrWhiteSpace(actor)
+               || actor.Length > TenantInvestigationLimits.MaxSubjectLength
+               || actor.Length > TenantAuditEventLimits.MaxSubjectLength
+               || actor.Any(char.IsControl)
+            ? null
+            : actor;
+    }
+
+    private ObjectResult ActorRequired() =>
+        Error(StatusCodes.Status403Forbidden, "actor_required", "The access token carries no usable subject name.");
 
     private ObjectResult NotFoundError() =>
         Error(StatusCodes.Status404NotFound, "tenant_investigation_or_item_not_found",

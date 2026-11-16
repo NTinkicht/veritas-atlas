@@ -138,7 +138,7 @@ public sealed class TenantInvestigationStateTests
             await Send(client, HttpMethod.Post, Items(inv), owner, new { evidenceVerificationId = v1 }),
             await Send(client, HttpMethod.Post, Notes(inv, item), owner, new { text = "second note" }),
             await Send(client, HttpMethod.Post, Notes(inv, item), owner, new { text = "first note" }),
-            await Send(client, HttpMethod.Put, Mark(inv, item), Token("synthetic-other", "operator", TenantA)),
+            await Send(client, HttpMethod.Put, Mark(inv, item), Token("synthetic-bob", "operator", TenantA)),
             await Send(client, HttpMethod.Delete, Mark(inv, item), owner),
             await Send(client, HttpMethod.Put, Share(inv, "synthetic-carol"), owner),
             await Send(client, HttpMethod.Delete, Share(inv, "synthetic-bob"), owner),
