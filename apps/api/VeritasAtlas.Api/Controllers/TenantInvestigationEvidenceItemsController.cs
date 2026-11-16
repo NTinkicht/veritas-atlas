@@ -37,15 +37,7 @@ public sealed class TenantInvestigationEvidenceItemsController : ControllerBase
     {
         if (TenantClaim.GetTenantId(User) is not { } tenantId) return TenantRequired();
 
-        var actor = User.FindFirstValue(ClaimTypes.Name);
-        if (string.IsNullOrWhiteSpace(actor)
-            || actor.Length > TenantInvestigationLimits.MaxSubjectLength
-            || actor.Length > TenantAuditEventLimits.MaxSubjectLength
-            || actor.Any(char.IsControl))
-        {
-            return Error(StatusCodes.Status403Forbidden, "actor_required",
-                "The access token carries no usable subject name.");
-        }
+        if (ActorOrNull() is not { } actor) return ActorRequired();
 
         if (!HasExactlyOneRoleIn(User, AuthorRoles))
         {
