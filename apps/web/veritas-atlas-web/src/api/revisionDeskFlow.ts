@@ -31,3 +31,18 @@ export async function runTransitionFlow(flow: TransitionFlow): Promise<void> {
     flow.onRefused(flow.classify(error));
   }
 }
+
+/**
+ * Reconciles the review queue with a revision the server just returned: the matching row is
+ * replaced in place (so it never shows a stale state/version); when a state filter is active
+ * and the revision no longer matches it, the row is dropped. Unknown ids leave the list as is.
+ */
+export function reconcileQueueItem(
+  items: PublicationRevision[],
+  revision: PublicationRevision,
+  filter: PublicationRevision["state"] | null,
+): PublicationRevision[] {
+  if (!items.some((i) => i.id === revision.id)) return items;
+  if (filter !== null && revision.state !== filter) return items.filter((i) => i.id !== revision.id);
+  return items.map((i) => (i.id === revision.id ? revision : i));
+}

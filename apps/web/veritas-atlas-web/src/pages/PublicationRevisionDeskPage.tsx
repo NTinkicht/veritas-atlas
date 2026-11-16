@@ -11,7 +11,7 @@ import {
   type RevisionFailure,
   type RevisionState,
 } from "../api/publicationRevisions";
-import { runTransitionFlow } from "../api/revisionDeskFlow";
+import { reconcileQueueItem, runTransitionFlow } from "../api/revisionDeskFlow";
 import { AppSurface } from "../components/AppSurface";
 import { RevisionQueue, type QueueView } from "../components/PublicationRevisionQueue";
 import { RevisionPanel, type Loadable } from "../components/PublicationRevisionView";
@@ -27,6 +27,8 @@ export function PublicationRevisionDeskPage() {
   const [queueState, setQueueState] = useState<RevisionState | null>(null);
   const [queue, setQueue] = useState<QueueView>({ items: [], nextAfterId: null, loading: false, failure: null, loaded: false });
   const queueTicket = useRef(0);
+  const queueStateRef = useRef<RevisionState | null>(null);
+  queueStateRef.current = queueState;
   const signInHref = `/login?returnTo=${encodeURIComponent(`${location.pathname}${location.search}`)}`;
 
   async function load(id: string, keepNotice = false) {
@@ -37,6 +39,7 @@ export function PublicationRevisionDeskPage() {
     try {
       const data = await getRevision(id);
       if (ticket === latest.current) setView({ kind: "loaded", data });
+      setQueue((q) => ({ ...q, items: reconcileQueueItem(q.items, data, queueStateRef.current) }));
     } catch (error) {
       if (ticket === latest.current) setView({ kind: "error", failure: classifyRevisionFailure(error, navigator.onLine) });
     }
