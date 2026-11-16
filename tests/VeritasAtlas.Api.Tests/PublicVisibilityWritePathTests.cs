@@ -140,6 +140,56 @@ public sealed class PublicVisibilityWritePathTests
     }
 
     [TestMethod]
+    public async Task ARequestWithoutDisclosuresKeepsTheLegacyDigestSoPreDeployOperationsStillReplay()
+    {
+        var connection = Database();
+        if (connection is null) return;
+        await ResetAsync(connection);
+        using var factory = new ApiFactory(connection);
+        using var client = factory.CreateClient();
+        var tenant = TenantA.ToString("D");
+        var author = Sign("synthetic-author", ["operator"], [tenant]);
+        var reviewer = Sign("synthetic-reviewer", ["reviewer"], [tenant]);
+        var publisher = Sign("synthetic-publisher", ["publisher"], [tenant]);
+        var id = await CreateAsync(client, author, permits: true);
+        await Step(client, author, id, "Submit", 0, "l1");
+        await Step(client, reviewer, id, "Approve", 1, "l2");
+
+        var legacyBody = Facts(0, "legacy-op", citations: [Citation(contradiction: null, uncertainty: null)]);
+        Assert.AreEqual(HttpStatusCode.OK, (await Put(client, publisher, id, legacyBody)).StatusCode);
+
+        // The digest the pre-disclosure code computed: seven citation properties, no disclosure keys at all.
+        var legacy = JsonSerializer.Serialize(new
+        {
+            Restricted = false, Superseded = false, ExpiresAt = (DateTime?)null, FreshnessRequired = true,
+            EvidenceCurrency = "Current", HistoricalLabelPresent = false,
+            Citations = new[]
+            {
+                new
+                {
+                    CitationLabel = "[1]", Title = "Audited report", Quote = "A quoted line.", SourceName = "Registry",
+                    AsOf = (DateTimeOffset?)DateTimeOffset.Parse("2026-01-01T00:00:00Z"), EffectiveDate = (DateTimeOffset?)null,
+                    FreshnessLabel = "current",
+                },
+            },
+        }, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        var expected = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(Encoding.UTF8.GetBytes(legacy))).ToLowerInvariant();
+        await using (var db = NewContext(connection))
+        {
+            var stored = await db.TenantPublicationVisibilityChanges.AsNoTracking().SingleAsync(x => x.RevisionId == id && x.OperationId == "legacy-op");
+            Assert.AreEqual(expected, stored.RequestDigest);
+        }
+
+        var replay = await Put(client, publisher, id, legacyBody);
+        Assert.AreEqual(HttpStatusCode.OK, replay.StatusCode);
+        Assert.IsTrue((await replay.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("replayed").GetBoolean());
+
+        // Positive control: adding a disclosure under the same operation id is a different request and conflicts.
+        var changed = await Put(client, publisher, id, Facts(0, "legacy-op", citations: [Citation(uncertainty: null)]));
+        Assert.AreEqual(HttpStatusCode.Conflict, changed.StatusCode);
+    }
+
+    [TestMethod]
     public async Task FactsAreSetAuditedVersionCheckedIdempotentAndResetWhenLeavingThePublicationLine()
     {
         var connection = Database();
