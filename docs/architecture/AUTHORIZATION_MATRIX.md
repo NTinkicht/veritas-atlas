@@ -63,6 +63,7 @@ Source of truth is the test; this table is generated from it.
 | `POST tenant-answers/serve-check` | intruder |
 | `POST tenant-claims/confidence` | intruder |
 | `POST tenant-claims/relation-graph` | intruder |
+| `POST tenant-evidence/statement-classification` | intruder |
 | `POST tenant-investigations` | reviewer, publisher, admin, intruder |
 | `POST tenant-investigations/{id:guid}/close` | reviewer, publisher, admin, intruder |
 | `POST tenant-investigations/{id:guid}/reopen` | reviewer, publisher, admin, intruder |
