@@ -16,6 +16,13 @@ public interface ITenantPublicationRevisionStore
 
     Task<TenantPublicationRevisionModel?> GetAsync(Guid tenantId, Guid revisionId, CancellationToken cancellationToken);
 
+    /// <summary>
+    /// Lists the tenant's revisions ordered by id, optionally only those in <paramref name="state"/>, keyset-paged after
+    /// <paramref name="afterId"/>. Another tenant's revisions never appear.
+    /// </summary>
+    Task<IReadOnlyList<TenantPublicationRevisionModel>> ListAsync(
+        Guid tenantId, LifecycleState? state, Guid? afterId, int limit, CancellationToken cancellationToken);
+
     Task<PublicationTransitionResult> TransitionAsync(
         Guid tenantId, Guid revisionId, string actorId, LifecycleRole actorRole, LifecycleAction action,
         long expectedVersion, string operationId, CancellationToken cancellationToken);

@@ -54,6 +54,7 @@ Source of truth is the test; this table is generated from it.
 | `GET tenant-investigations/{investigationId:guid}/evidence-items/comparison` | intruder |
 | `GET tenant-investigations/{investigationId:guid}/evidence-items/{itemId:guid}/annotations` | intruder |
 | `GET tenant-investigations/{investigationId:guid}/shares` | reviewer, publisher, admin, intruder |
+| `GET tenant-publication-revisions` | admin, intruder |
 | `GET tenant-publication-revisions/{id:guid}` | admin, intruder |
 | `GET tenant-raw-retrievals` | operator, analyst, reviewer, publisher, intruder |
 | `GET tenant-raw-retrievals/{id:guid}` | operator, analyst, reviewer, publisher, intruder |

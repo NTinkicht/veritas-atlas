@@ -21,6 +21,8 @@ public sealed partial class TenantPublicationRevisionsController : ControllerBas
     public const int MaxRequestBytes = 4 * 1024;
     public const int MaxVisibilityRequestBytes = 256 * 1024;
     private const int MaxOperationIdLength = 200;
+    public const int DefaultListLimit = 50;
+    public const int MaxListLimit = 100;
 
     private readonly ITenantPublicationRevisionStore _store;
 
@@ -53,6 +55,37 @@ public sealed partial class TenantPublicationRevisionsController : ControllerBas
 
         var created = await _store.CreateDraftAsync(tenantId, actor, digest, permits, cancellationToken);
         return Created($"/api/v1/tenant-publication-revisions/{created.Id}", ToResponse(created));
+    }
+
+    /// <summary>Queue discovery for reviewers and publishers: the caller's own tenant only, optional exact state filter, keyset paged by id.</summary>
+    [HttpGet]
+    public async Task<IActionResult> List(
+        [FromQuery] string? state, [FromQuery] int? limit, [FromQuery] Guid? afterId, CancellationToken cancellationToken)
+    {
+        if (Authorize() is { } refusal) return refusal;
+        LifecycleState? wanted = null;
+        if (state is not null)
+        {
+            if (!Enum.TryParse<LifecycleState>(state, ignoreCase: false, out var parsed) || !Enum.IsDefined(parsed)
+                || !string.Equals(parsed.ToString(), state, StringComparison.Ordinal))
+            {
+                return BadRequest(new TenantSourceError("invalid_list_query", "state must be an exact lifecycle state name."));
+            }
+
+            wanted = parsed;
+        }
+
+        var take = limit ?? DefaultListLimit;
+        if (take < 1 || take > MaxListLimit)
+        {
+            return BadRequest(new TenantSourceError("invalid_list_query", $"limit must be between 1 and {MaxListLimit}."));
+        }
+
+        var (tenantId, _, _) = Caller();
+        var items = await _store.ListAsync(tenantId, wanted, afterId, take, cancellationToken);
+        return Ok(new RevisionListResponse(
+            items.Select(ToResponse).ToList(),
+            items.Count == take ? items[^1].Id : null));
     }
 
     [HttpGet("{id:guid}")]
@@ -214,6 +247,8 @@ public sealed record TransitionRequest(string? Action, long? ExpectedVersion, st
 public sealed record RevisionResponse(
     Guid Id, string AuthorId, string ContentDigest, string? ApprovedDigest, bool PolicyPermitsPublicDisplay,
     string State, long Version, long FactsVersion = 0);
+
+public sealed record RevisionListResponse(IReadOnlyList<RevisionResponse> Items, Guid? NextAfterId);
 
 public sealed record TransitionResponse(bool Replayed, RevisionResponse Revision);
 

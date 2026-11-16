@@ -53,6 +53,27 @@ public sealed class EfTenantPublicationRevisionStore : ITenantPublicationRevisio
         return row is null ? null : ToModel(row);
     }
 
+    public async Task<IReadOnlyList<TenantPublicationRevisionModel>> ListAsync(
+        Guid tenantId, LifecycleState? state, Guid? afterId, int limit, CancellationToken cancellationToken)
+    {
+        RequireTenant(tenantId);
+        ArgumentOutOfRangeException.ThrowIfLessThan(limit, 1);
+        var query = _db.TenantPublicationRevisions.AsNoTracking().Where(x => x.TenantId == tenantId);
+        if (state is { } wanted)
+        {
+            var name = wanted.ToString();
+            query = query.Where(x => x.State == name);
+        }
+
+        if (afterId is { } after)
+        {
+            query = query.Where(x => x.Id.CompareTo(after) > 0);
+        }
+
+        var rows = await query.OrderBy(x => x.Id).Take(limit).ToListAsync(cancellationToken);
+        return rows.Select(ToModel).ToList();
+    }
+
     public async Task<PublicationTransitionResult> TransitionAsync(
         Guid tenantId, Guid revisionId, string actorId, LifecycleRole actorRole, LifecycleAction action,
         long expectedVersion, string operationId, CancellationToken cancellationToken)

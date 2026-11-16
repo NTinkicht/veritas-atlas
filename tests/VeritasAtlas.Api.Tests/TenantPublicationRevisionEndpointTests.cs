@@ -58,6 +58,7 @@ public sealed class TenantPublicationRevisionEndpointTests
             {
                 (HttpMethod.Post, Base, new { contentDigest = Digest, policyPermitsPublicDisplay = true }),
                 (HttpMethod.Get, $"{Base}/{id}", null),
+                (HttpMethod.Get, Base, null),
                 (HttpMethod.Put, $"{Base}/{id}/visibility", new { expectedFactsVersion = 0, operationId = "op-v" }),
                 (HttpMethod.Post, $"{Base}/{id}/transitions",
                     new { action = "Submit", expectedVersion = 0, operationId = "op-1" }),
@@ -258,6 +259,77 @@ public sealed class TenantPublicationRevisionEndpointTests
         Assert.AreEqual(0, state.GetProperty("version").GetInt64());
     }
 
+    [TestMethod]
+    public async Task ListRejectsBadQueriesBeforeTheStoreAndNeverReachesItForUnknownLimits()
+    {
+        var store = new CountingStore();
+        using var factory = new ApiFactory(store: store);
+        using var client = factory.CreateClient();
+        var reviewer = Sign("synthetic-reviewer", ["reviewer"], [TenantA.ToString("D")]);
+        foreach (var query in new[] { "?state=draft", "?state=7", "?state=Bogus", "?state=1", "?state=Submitted,ChangesRequested", "?state=Submitted%2CApproved", "?state=%201", "?limit=0", "?limit=101", "?limit=-1" })
+        {
+            var response = await Send(client, HttpMethod.Get, Base + query, reviewer, null);
+            Assert.AreEqual(HttpStatusCode.BadRequest, response.StatusCode, query);
+        }
+
+        Assert.AreEqual(0, store.Calls);
+        var ok = await Send(client, HttpMethod.Get, Base + "?state=Submitted&limit=100", reviewer, null);
+        Assert.AreEqual(HttpStatusCode.OK, ok.StatusCode);
+        Assert.AreEqual(1, store.Calls);
+    }
+
+    [TestMethod]
+    public async Task ListIsTenantIsolatedFilteredByStateAndPaged()
+    {
+        var connection = Database();
+        if (connection is null) return;
+        await ResetAsync(connection);
+        using var factory = new ApiFactory(connection);
+        using var client = factory.CreateClient();
+        var authorA = Sign("synthetic-author", ["operator"], [TenantA.ToString("D")]);
+        var reviewerA = Sign("synthetic-reviewer", ["reviewer"], [TenantA.ToString("D")]);
+        var reviewerB = Sign("synthetic-reviewer", ["reviewer"], [TenantB.ToString("D")]);
+        var authorB = Sign("synthetic-author", ["operator"], [TenantB.ToString("D")]);
+
+        var ids = new List<Guid>();
+        for (var i = 0; i < 3; i++)
+        {
+            var created = await Send(client, HttpMethod.Post, Base, authorA,
+                new { contentDigest = Digest, policyPermitsPublicDisplay = true });
+            ids.Add((await created.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid());
+        }
+
+        var foreign = await Send(client, HttpMethod.Post, Base, authorB,
+            new { contentDigest = Digest, policyPermitsPublicDisplay = true });
+        var foreignId = (await foreign.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
+        Assert.AreEqual(HttpStatusCode.OK, (await Transition(client, authorA, ids[0], "Submit", 0, "o-list-1")).StatusCode);
+
+        var all = await (await Send(client, HttpMethod.Get, Base, reviewerA, null)).Content.ReadFromJsonAsync<JsonElement>();
+        var allIds = all.GetProperty("items").EnumerateArray().Select(x => x.GetProperty("id").GetGuid()).ToList();
+        CollectionAssert.AreEqual(ids.OrderBy(x => x).ToList(), allIds);
+        Assert.IsFalse(allIds.Contains(foreignId), "Another tenant's revision must never be listed.");
+        Assert.AreEqual(JsonValueKind.Null, all.GetProperty("nextAfterId").ValueKind);
+
+        var submitted = await (await Send(client, HttpMethod.Get, Base + "?state=Submitted", reviewerA, null))
+            .Content.ReadFromJsonAsync<JsonElement>();
+        var only = submitted.GetProperty("items").EnumerateArray().ToList();
+        Assert.AreEqual(1, only.Count);
+        Assert.AreEqual(ids[0], only[0].GetProperty("id").GetGuid());
+
+        var page1 = await (await Send(client, HttpMethod.Get, Base + "?limit=2", reviewerA, null))
+            .Content.ReadFromJsonAsync<JsonElement>();
+        var first = page1.GetProperty("items").EnumerateArray().Select(x => x.GetProperty("id").GetGuid()).ToList();
+        Assert.AreEqual(2, first.Count);
+        var next = page1.GetProperty("nextAfterId").GetGuid();
+        var page2 = await (await Send(client, HttpMethod.Get, Base + $"?limit=2&afterId={next}", reviewerA, null))
+            .Content.ReadFromJsonAsync<JsonElement>();
+        var second = page2.GetProperty("items").EnumerateArray().Select(x => x.GetProperty("id").GetGuid()).ToList();
+        CollectionAssert.AreEqual(ids.OrderBy(x => x).ToList(), first.Concat(second).ToList());
+
+        var other = await (await Send(client, HttpMethod.Get, Base, reviewerB, null)).Content.ReadFromJsonAsync<JsonElement>();
+        Assert.AreEqual(foreignId, other.GetProperty("items").EnumerateArray().Single().GetProperty("id").GetGuid());
+    }
+
     private static Task<HttpResponseMessage> Transition(
         HttpClient client, string bearer, Guid id, string action, long expected, string operationId) =>
         Send(client, HttpMethod.Post, $"{Base}/{id}/transitions", bearer,
@@ -337,6 +409,13 @@ public sealed class TenantPublicationRevisionEndpointTests
         {
             Interlocked.Increment(ref _calls);
             return Task.FromResult<TenantPublicationRevisionModel?>(null);
+        }
+
+        public Task<IReadOnlyList<TenantPublicationRevisionModel>> ListAsync(
+            Guid tenantId, LifecycleState? state, Guid? afterId, int limit, CancellationToken cancellationToken)
+        {
+            Interlocked.Increment(ref _calls);
+            return Task.FromResult<IReadOnlyList<TenantPublicationRevisionModel>>([]);
         }
 
         public Task<PublicationTransitionResult> TransitionAsync(
