@@ -46,3 +46,21 @@ export function reconcileQueueItem(
   if (filter !== null && revision.state !== filter) return items.filter((i) => i.id !== revision.id);
   return items.map((i) => (i.id === revision.id ? revision : i));
 }
+
+export type CreateDraftFlow = {
+  digest: string;
+  policyPermitsPublicDisplay: boolean;
+  create: (digest: string, policyPermitsPublicDisplay: boolean) => Promise<PublicationRevision>;
+  classify: (error: unknown) => RevisionFailure;
+  onCreated: (revision: PublicationRevision) => void;
+  onRefused: (failure: RevisionFailure) => void;
+};
+
+/** Creates a draft and reports success only after the server returned a valid revision; any refusal is surfaced, never swallowed. */
+export async function runCreateDraftFlow(flow: CreateDraftFlow): Promise<void> {
+  try {
+    flow.onCreated(await flow.create(flow.digest, flow.policyPermitsPublicDisplay));
+  } catch (error) {
+    flow.onRefused(flow.classify(error));
+  }
+}

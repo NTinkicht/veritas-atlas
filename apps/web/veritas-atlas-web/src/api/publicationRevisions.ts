@@ -87,6 +87,16 @@ export function parseRevision(raw: unknown): PublicationRevision {
   };
 }
 
+export function isContentDigest(value: string): boolean {
+  return DIGEST.test(value);
+}
+
+export function buildDraftBody(contentDigest: string, policyPermitsPublicDisplay: boolean) {
+  if (!DIGEST.test(contentDigest)) throw new MalformedRevisionResponse("contentDigest must be 64 lowercase hex characters");
+  if (typeof policyPermitsPublicDisplay !== "boolean") throw new MalformedRevisionResponse("policyPermitsPublicDisplay");
+  return { contentDigest, policyPermitsPublicDisplay };
+}
+
 export function parseTransitionResponse(raw: unknown): { replayed: boolean; revision: PublicationRevision } {
   if (typeof raw !== "object" || raw === null) throw new MalformedRevisionResponse("not an object");
   const r = raw as Record<string, unknown>;
@@ -115,6 +125,12 @@ export function classifyRevisionFailure(error: unknown, online: boolean = true):
 
 export async function getRevision(id: string): Promise<PublicationRevision> {
   return parseRevision(await apiGet<unknown>(revisionPath(id)));
+}
+
+/** POST /api/v1/tenant-publication-revisions: the server only lets an analyst author a draft. */
+export async function createDraft(contentDigest: string, policyPermitsPublicDisplay: boolean): Promise<PublicationRevision> {
+  const body = buildDraftBody(contentDigest, policyPermitsPublicDisplay);
+  return parseRevision(await apiPost<unknown, typeof body>(REVISIONS_PATH, body));
 }
 
 export async function transitionRevision(

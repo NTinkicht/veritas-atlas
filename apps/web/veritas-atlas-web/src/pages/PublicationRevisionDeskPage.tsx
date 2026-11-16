@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useLocation } from "react-router-dom";
 import {
   classifyRevisionFailure,
+  createDraft,
   getRevision,
   isRevisionId,
   listRevisions,
@@ -11,8 +12,9 @@ import {
   type RevisionFailure,
   type RevisionState,
 } from "../api/publicationRevisions";
-import { reconcileQueueItem, runTransitionFlow } from "../api/revisionDeskFlow";
+import { reconcileQueueItem, runCreateDraftFlow, runTransitionFlow } from "../api/revisionDeskFlow";
 import { AppSurface } from "../components/AppSurface";
+import { PublicationDraftForm } from "../components/PublicationDraftForm";
 import { RevisionQueue, type QueueView } from "../components/PublicationRevisionQueue";
 import { RevisionPanel, type Loadable } from "../components/PublicationRevisionView";
 
@@ -107,6 +109,33 @@ export function PublicationRevisionDeskPage() {
     }
   }
 
+  async function create(digest: string, policyPermitsPublicDisplay: boolean) {
+    if (busy) return;
+    setBusy(true);
+    setNotice(null);
+    setActionFailure(null);
+    try {
+      await runCreateDraftFlow({
+        digest, policyPermitsPublicDisplay,
+        create: createDraft,
+        classify: (error) => classifyRevisionFailure(error, navigator.onLine),
+        onCreated: (revision) => {
+          latest.current += 1;
+          setIdText(revision.id);
+          setView({ kind: "loaded", data: revision });
+          setNotice(`Draft created by the server. Now ${revision.state}.`);
+          void loadQueue(queueStateRef.current, null);
+        },
+        onRefused: (failure) => {
+          latest.current += 1;
+          setView({ kind: "error", failure });
+        },
+      });
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <AppSurface title="Publication revisions" subtitle="Open a publication revision and move it through review and publication. The server decides every action.">
       <RevisionQueue
@@ -117,6 +146,7 @@ export function PublicationRevisionDeskPage() {
         onLoadMore={() => void loadQueue(queueState, queue.nextAfterId)}
         signInHref={signInHref}
       />
+      <PublicationDraftForm busy={busy} onCreate={(d, p) => void create(d, p)} />
       <form onSubmit={submit}>
         <label>
           Revision id{" "}
