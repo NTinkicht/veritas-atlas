@@ -106,6 +106,20 @@ describe("InvestigationSharesPanel", () => {
     expect(screen.queryByText("This investigation is not shared with anyone.")).toBeNull();
   });
 
+  it("reloads the shares after a failed read and enables sharing once it succeeds", async () => {
+    api.listShares.mockRejectedValueOnce({ status: 503 });
+    api.listShares.mockResolvedValueOnce([share(A, "reviewer-1")]);
+    setup();
+    expect((await screen.findByRole("alert")).textContent).toContain("HTTP 503");
+    type("reviewer-2");
+    expect(shareButton().disabled).toBe(true);
+    fireEvent.click(screen.getByRole("button", { name: "Reload shares" }));
+    expect(await screen.findByText("reviewer-1")).toBeTruthy();
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(shareButton().disabled).toBe(false);
+    expect(api.listShares).toHaveBeenCalledTimes(2);
+  });
+
   it("ignores a late read for the previously selected investigation", async () => {
     let resolveA: (v: InvestigationShare[]) => void = () => undefined;
     api.listShares.mockImplementationOnce(() => new Promise((r) => (resolveA = r)));

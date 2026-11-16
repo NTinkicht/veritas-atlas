@@ -30,6 +30,7 @@ function SharesPanelBody({ investigation, signInHref }: Props) {
   const [grantee, setGrantee] = useState("");
   const [busy, setBusy] = useState<string[]>([]);
   const [notice, setNotice] = useState<InvestigationFailure | null>(null);
+  const [reloads, setReloads] = useState(0);
   const latest = useRef(0);
   const id = investigation.id;
   const closed = investigation.state === "closed";
@@ -40,7 +41,12 @@ function SharesPanelBody({ investigation, signInHref }: Props) {
       (data) => ticket === latest.current && setShares(data),
       (error) => ticket === latest.current && setLoadFailure(classifyInvestigationFailure(error, navigator.onLine)),
     );
-  }, [id]);
+  }, [id, reloads]);
+
+  function retry() {
+    setLoadFailure(null);
+    setReloads((n) => n + 1);
+  }
 
   function grant() {
     const submitted = grantee;
@@ -88,7 +94,10 @@ function SharesPanelBody({ investigation, signInHref }: Props) {
     <section aria-label="Investigation sharing">
       <h3>Shared with</h3>
       {loadFailure ? (
-        <FailureNotice failure={loadFailure} signInHref={signInHref} />
+        <>
+          <FailureNotice failure={loadFailure} signInHref={signInHref} />
+          <button type="button" onClick={retry}>Reload shares</button>
+        </>
       ) : shares === null ? (
         <p className="muted" role="status">Loading shares...</p>
       ) : shares.length === 0 ? (
