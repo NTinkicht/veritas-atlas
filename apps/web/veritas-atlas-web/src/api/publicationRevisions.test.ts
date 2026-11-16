@@ -4,6 +4,9 @@ import {
   buildTransitionBody,
   classifyRevisionFailure,
   isRevisionId,
+  listPath,
+  listRevisions,
+  parseRevisionPage,
   parseRevision,
   parseTransitionResponse,
   revisionPath,
@@ -81,5 +84,34 @@ describe("failure classification", () => {
     expect(classifyRevisionFailure({ status: 500 }).kind).toBe("server");
     expect(classifyRevisionFailure(new MalformedRevisionResponse("x")).kind).toBe("malformed");
     expect(classifyRevisionFailure(new TypeError("fail"), false).message).toContain("offline");
+  });
+});
+
+describe("revision queue client", () => {
+  const NEXT = "22222222-2222-4222-8222-222222222222";
+  it("builds a bounded list path with an encoded state and afterId", () => {
+    expect(listPath(null, null)).toBe("/api/v1/tenant-publication-revisions?limit=25");
+    expect(listPath("Submitted", NEXT)).toBe(`/api/v1/tenant-publication-revisions?state=Submitted&limit=25&afterId=${NEXT}`);
+  });
+  it("refuses an unknown state filter and a non-GUID cursor", () => {
+    expect(() => listPath("Live" as never, null)).toThrow(MalformedRevisionResponse);
+    expect(() => listPath(null, "1; drop")).toThrow(MalformedRevisionResponse);
+  });
+  it("parses a page and a terminal page", () => {
+    expect(parseRevisionPage({ items: [rev], nextAfterId: NEXT })).toEqual({ items: [rev], nextAfterId: NEXT });
+    expect(parseRevisionPage({ items: [], nextAfterId: null }).nextAfterId).toBeNull();
+  });
+  it("rejects a page whole when items, an item or the cursor is malformed", () => {
+    for (const bad of [null, {}, { items: "x" }, { items: [{ ...rev, state: "Live" }], nextAfterId: null }, { items: [rev], nextAfterId: "x" }, { items: [rev], nextAfterId: 5 }]) {
+      expect(() => parseRevisionPage(bad)).toThrow(MalformedRevisionResponse);
+    }
+  });
+  it("lists through the authenticated API and fails closed on a refusal", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ items: [rev], nextAfterId: null }) });
+    vi.stubGlobal("fetch", fetchMock);
+    expect((await listRevisions("Draft", null)).items).toHaveLength(1);
+    expect(fetchMock.mock.calls[0][0]).toContain("state=Draft");
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, status: 403, json: async () => ({ message: "no" }) }));
+    await expect(listRevisions(null, null)).rejects.toMatchObject({ status: 403 });
   });
 });
