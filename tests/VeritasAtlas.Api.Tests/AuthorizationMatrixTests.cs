@@ -306,6 +306,7 @@ public sealed class AuthorizationMatrixTests
         "POST api/v1/tenant-answers/serve-check | denied: intruder",
         "POST api/v1/tenant-claims/confidence | denied: intruder",
         "POST api/v1/tenant-claims/relation-graph | denied: intruder",
+        "POST api/v1/tenant-evidence/statement-classification | denied: intruder",
         "POST api/v1/tenant-claims/validate-evidence | denied: intruder",
         "POST api/v1/tenant-investigations | denied: reviewer,publisher,admin,intruder",
         "POST api/v1/tenant-investigations/{id:guid}/close | denied: reviewer,publisher,admin,intruder",

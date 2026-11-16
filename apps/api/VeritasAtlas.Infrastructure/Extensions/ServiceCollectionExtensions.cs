@@ -100,6 +100,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IEvidenceSearchService, EfEvidenceSearchService>();
         services.AddSingleton<IClaimExtractor, ClaimExtractionV1>();
         services.AddScoped<IClaimCandidateService, EfClaimCandidateService>();
+        services.AddScoped<IStatementClassificationService, EfStatementClassificationService>();
         services.AddScoped<IClaimEvidenceValidationService, EfClaimEvidenceValidationService>();
         services.AddScoped<ITenantAuditEventStore, EfTenantAuditEventStore>();
 
