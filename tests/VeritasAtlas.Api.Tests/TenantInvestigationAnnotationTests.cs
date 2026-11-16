@@ -35,7 +35,7 @@ public sealed class TenantInvestigationAnnotationTests
     public async Task RefusedCallersAndInvalidInputNeverReachTheStore()
     {
         var store = new CountingStore();
-        using var factory = new ApiFactory(store: store);
+        using var factory = new ApiFactory(store: store, shares: new FixedShares(true));
         using var client = factory.CreateClient();
         var path = Path(Guid.NewGuid(), Guid.NewGuid());
         var a = TenantA.ToString("D");
@@ -95,6 +95,87 @@ public sealed class TenantInvestigationAnnotationTests
     }
 
     [TestMethod]
+    public async Task UnauthorizedInvestigationCallersNeverReachTheAnnotationStore()
+    {
+        var store = new CountingStore();
+        var path = Path(Guid.NewGuid(), Guid.NewGuid());
+        var a = TenantA.ToString("D");
+        var analyst = TenantInvestigationEvidenceItemTests.Sign("synthetic-stranger", ["analyst"], [a]);
+        var reviewer = TenantInvestigationEvidenceItemTests.Sign("synthetic-stranger", ["reviewer"], [a]);
+
+        using (var denied = new ApiFactory(store: store, shares: new FixedShares(false)))
+        using (var client = denied.CreateClient())
+        {
+            using var post = await TenantInvestigationEvidenceItemTests.Send(client, HttpMethod.Post, path, analyst, new { text = "x" });
+            using var list = await TenantInvestigationEvidenceItemTests.Send(client, HttpMethod.Get, path, reviewer);
+            Assert.AreEqual(HttpStatusCode.NotFound, post.StatusCode);
+            Assert.AreEqual(HttpStatusCode.NotFound, list.StatusCode);
+            Assert.AreEqual(await post.Content.ReadAsStringAsync(), await list.Content.ReadAsStringAsync());
+            StringAssert.Contains(await post.Content.ReadAsStringAsync(), "tenant_investigation_or_item_not_found");
+            Assert.AreEqual(0, store.Calls, "an unauthorized caller must never reach the annotation store");
+        }
+
+        // Positive control and actor requirement for readers.
+        using var allowed = new ApiFactory(store: store, shares: new FixedShares(true));
+        using var allowedClient = allowed.CreateClient();
+        using var created = await TenantInvestigationEvidenceItemTests.Send(allowedClient, HttpMethod.Post, path, analyst, new { text = "x" });
+        Assert.AreEqual(HttpStatusCode.Created, created.StatusCode);
+        using var noActor = await TenantInvestigationEvidenceItemTests.Send(
+            allowedClient, HttpMethod.Get, path, TenantInvestigationEvidenceItemTests.Sign(null, ["reviewer"], [a]));
+        Assert.AreEqual(HttpStatusCode.Forbidden, noActor.StatusCode);
+        StringAssert.Contains(await noActor.Content.ReadAsStringAsync(), "actor_required");
+        Assert.AreEqual(1, store.Calls);
+    }
+
+    [TestMethod]
+    public async Task OnlyCreatorAndActiveGranteesCanAnnotateOrReadOverRealPostgres()
+    {
+        if (Database() is not { } cs) return;
+        await TenantInvestigationEvidenceItemTests.ResetAsync(cs);
+        using var factory = new ApiFactory(cs);
+        using var client = factory.CreateClient();
+        await using var db = new VeritasAtlasDbContext(TenantInvestigationEvidenceItemTests.Options(cs));
+        var verification = await TenantInvestigationEvidenceItemTests.SeedVerifiedAsync(db, TenantA, "a");
+        var a = TenantA.ToString("D");
+        var owner = TenantInvestigationEvidenceItemTests.Sign("synthetic-owner", ["analyst"], [a]);
+        var stranger = TenantInvestigationEvidenceItemTests.Sign("synthetic-stranger", ["analyst"], [a]);
+        var strangerReviewer = TenantInvestigationEvidenceItemTests.Sign("synthetic-stranger-reviewer", ["reviewer"], [a]);
+        var inv = await TenantInvestigationEvidenceItemTests.CreateInvestigationAsync(client, owner);
+        var item = (await new EfTenantInvestigationEvidenceStore(db, TimeProvider.System).CollectAsync(
+            TenantA, inv, new EvidenceItemInput(verification, null, "synthetic"), CancellationToken.None)).Item!.Id;
+
+        async Task<string> Probe(string bearer, HttpMethod method)
+        {
+            using var response = await TenantInvestigationEvidenceItemTests.Send(
+                client, method, Path(inv, item), bearer, method == HttpMethod.Post ? new { text = "probe" } : null);
+            return $"{(int)response.StatusCode}";
+        }
+
+        using var owned = await TenantInvestigationEvidenceItemTests.Send(client, HttpMethod.Post, Path(inv, item), owner, new { text = "owner note" });
+        Assert.AreEqual(HttpStatusCode.Created, owned.StatusCode);
+
+        // Without a grant the answer is exactly an unknown investigation's, and nothing is written or leaked.
+        using var unknown = await TenantInvestigationEvidenceItemTests.Send(client, HttpMethod.Get, Path(Guid.NewGuid(), item), strangerReviewer);
+        using var refused = await TenantInvestigationEvidenceItemTests.Send(client, HttpMethod.Get, Path(inv, item), strangerReviewer);
+        Assert.AreEqual(HttpStatusCode.NotFound, refused.StatusCode);
+        Assert.AreEqual(await unknown.Content.ReadAsStringAsync(), await refused.Content.ReadAsStringAsync());
+        Assert.AreEqual("404", await Probe(stranger, HttpMethod.Post));
+        Assert.AreEqual(1, await db.TenantInvestigationAnnotations.AsNoTracking().CountAsync(), "a refused annotation wrote nothing");
+
+        await GrantAsync(client, inv, owner, "synthetic-stranger");
+        await GrantAsync(client, inv, owner, "synthetic-stranger-reviewer");
+        Assert.AreEqual("201", await Probe(stranger, HttpMethod.Post));
+        Assert.AreEqual("200", await Probe(strangerReviewer, HttpMethod.Get));
+
+        using var revoke = await TenantInvestigationEvidenceItemTests.Send(
+            client, HttpMethod.Delete, $"/api/v1/tenant-investigations/{inv}/shares/synthetic-stranger", owner);
+        Assert.AreEqual(HttpStatusCode.NoContent, revoke.StatusCode);
+        Assert.AreEqual("404", await Probe(stranger, HttpMethod.Post));
+        Assert.AreEqual("404", await Probe(stranger, HttpMethod.Get));
+        Assert.AreEqual("200", await Probe(owner, HttpMethod.Get));
+    }
+
+    [TestMethod]
     public async Task AddReplayAuditOrderingAndCrossTenantDenialOverRealPostgres()
     {
         if (Database() is not { } cs) return;
@@ -123,6 +204,9 @@ public sealed class TenantInvestigationAnnotationTests
             client, HttpMethod.Post, Path(invA, itemA), analystA, new { text = "Verify the as-of date" });
         Assert.AreEqual(HttpStatusCode.OK, replay.StatusCode);
         Assert.AreEqual(first, await replay.Content.ReadFromJsonAsync<Annotation>());
+
+        await GrantAsync(client, invA, analystA, "synthetic-operator-a");
+        await GrantAsync(client, invA, analystA, "synthetic-reviewer-a");
 
         // Same text by another author is a distinct annotation; different text is distinct too.
         using var other = await TenantInvestigationEvidenceItemTests.Send(
@@ -281,6 +365,13 @@ public sealed class TenantInvestigationAnnotationTests
             store.AddAsync(Guid.Empty, invA, item, new AnnotationInput("ok", "synthetic"), CancellationToken.None));
     }
 
+    private static async Task GrantAsync(HttpClient client, Guid investigation, string owner, string grantee)
+    {
+        using var grant = await TenantInvestigationEvidenceItemTests.Send(
+            client, HttpMethod.Put, $"/api/v1/tenant-investigations/{investigation}/shares/{grantee}", owner);
+        Assert.AreEqual(HttpStatusCode.Created, grant.StatusCode);
+    }
+
     private sealed record Annotation(
         Guid Id, Guid InvestigationId, Guid EvidenceItemId, string Text, string AuthorSubject, DateTime CreatedAtUtc);
 
@@ -326,7 +417,27 @@ public sealed class TenantInvestigationAnnotationTests
         }
     }
 
-    private sealed class ApiFactory(string? connectionString = null, ITenantInvestigationAnnotationStore? store = null)
+    /// <summary>Share store double answering every authorization question the same way.</summary>
+    private sealed class FixedShares(bool authorized) : ITenantInvestigationShareStore
+    {
+        public Task<bool> IsAuthorizedAsync(Guid tenantId, Guid investigationId, string subject, CancellationToken cancellationToken) =>
+            Task.FromResult(authorized);
+
+        public Task<ShareGrantResult> GrantAsync(Guid tenantId, Guid investigationId, string owner, string grantee, CancellationToken cancellationToken) =>
+            throw new NotSupportedException();
+
+        public Task<ShareRevokeOutcome> RevokeAsync(Guid tenantId, Guid investigationId, string owner, string grantee, CancellationToken cancellationToken) =>
+            throw new NotSupportedException();
+
+        public Task<IReadOnlyList<TenantInvestigationShareModel>?> ListActiveAsync(Guid tenantId, Guid investigationId, string owner, CancellationToken cancellationToken) =>
+            throw new NotSupportedException();
+
+        public Task<IReadOnlySet<Guid>> ListActiveGrantedInvestigationIdsAsync(Guid tenantId, string subject, CancellationToken cancellationToken) =>
+            throw new NotSupportedException();
+    }
+
+    private sealed class ApiFactory(
+        string? connectionString = null, ITenantInvestigationAnnotationStore? store = null, ITenantInvestigationShareStore? shares = null)
         : WebApplicationFactory<Program>
     {
         protected override void ConfigureWebHost(IWebHostBuilder builder)
@@ -342,6 +453,7 @@ public sealed class TenantInvestigationAnnotationTests
             {
                 services.AddSingleton<IAccessTokenRevocationStore>(new InMemoryAccessTokenRevocationStore());
                 if (store is not null) services.AddSingleton(store);
+                if (shares is not null) services.AddSingleton(shares);
             });
         }
     }
