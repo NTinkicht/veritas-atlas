@@ -8,7 +8,7 @@ const ok = {
     id: "11111111-1111-4111-8111-111111111111",
     freshnessLabel: "CURRENT",
     citations: [
-      { citationLabel: "S1", title: "<script>alert(1)</script>", quote: "<img src=x onerror=1>", sourceName: "Src", asOf: "2026-11-01T00:00:00Z", effectiveDate: null, freshnessLabel: "CURRENT" },
+      { citationLabel: "S1", title: "<script>alert(1)</script>", quote: "<img src=x onerror=1>", sourceName: "Src", asOf: "2026-11-01T00:00:00Z", effectiveDate: null, freshnessLabel: "CURRENT", contradictionDisclosure: null, uncertaintyLimit: null },
     ],
   },
 };
@@ -22,6 +22,17 @@ describe("PublicReaderView", () => {
     expect(html).toContain("&lt;script&gt;");
     expect(html).not.toContain("<script>");
     expect(html).not.toContain("<img");
+  });
+
+  it("renders disclosures as escaped text only when present", () => {
+    const none = renderToStaticMarkup(<PublicReaderView state={ok} />);
+    expect(none).not.toContain("Contradiction disclosure");
+    expect(none).not.toContain("Uncertainty limit");
+    const c = { ...ok.publication.citations[0], contradictionDisclosure: "Conflicts <b>with</b> 2025", uncertaintyLimit: "Single source" };
+    const html = renderToStaticMarkup(<PublicReaderView state={{ kind: "ok", publication: { ...ok.publication, citations: [c] } }} />);
+    expect(html).toContain("Contradiction disclosure: Conflicts &lt;b&gt;with&lt;/b&gt; 2025");
+    expect(html).toContain("Uncertainty limit: Single source");
+    expect(html).not.toContain("<b>");
   });
 
   it("keeps the source-local calendar date for non-UTC offsets", () => {

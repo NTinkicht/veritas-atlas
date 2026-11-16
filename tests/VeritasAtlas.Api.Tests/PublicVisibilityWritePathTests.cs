@@ -35,8 +35,10 @@ public sealed class PublicVisibilityWritePathTests
     private static readonly string Digest = new('a', 64);
     private const string Base = "/api/v1/tenant-publication-revisions";
 
-    private static object Citation(string label = "[1]") => new
+    private static object Citation(string label = "[1]", string? contradiction = "Conflicts with the 2025 notice.",
+        string? uncertainty = "Single-source reading.") => new
     {
+        contradictionDisclosure = contradiction, uncertaintyLimit = uncertainty,
         citationLabel = label, title = "Audited report", quote = "A quoted line.", sourceName = "Registry",
         asOf = "2026-01-01T00:00:00Z", effectiveDate = (string?)null, freshnessLabel = "current",
     };
@@ -117,6 +119,22 @@ public sealed class PublicVisibilityWritePathTests
         Assert.AreEqual(VisibilityDenials.InvalidFacts,
             PublicVisibilityRules.Validate(Facts(false, Enumerable.Repeat(Good(), 51).ToArray()), true, LifecycleState.Approved));
         Assert.IsNull(PublicVisibilityRules.Validate(Facts(false, Good() with { Quote = "line1\nline2" }), true, LifecycleState.Approved));
+        var limit = PublicVisibilityRules.MaxDisclosure;
+        Assert.IsNull(PublicVisibilityRules.Validate(Facts(false, Good() with
+        {
+            ContradictionDisclosure = new string('c', limit), UncertaintyLimit = "line1\nline2",
+        }), true, LifecycleState.Approved));
+        foreach (var bad in new[]
+        {
+            Good() with { ContradictionDisclosure = new string('c', limit + 1) },
+            Good() with { UncertaintyLimit = new string('u', limit + 1) },
+            Good() with { ContradictionDisclosure = "" }, Good() with { UncertaintyLimit = "  " },
+            Good() with { ContradictionDisclosure = "a\u0007b" },
+        })
+        {
+            Assert.AreEqual(VisibilityDenials.InvalidFacts,
+                PublicVisibilityRules.Validate(Facts(false, bad), true, LifecycleState.Approved));
+        }
         Assert.AreEqual(VisibilityDenials.InvalidFacts, PublicVisibilityRules.Validate(
             Facts(false, Good()) with { EvidenceCurrency = (EvidenceCurrency)99 }, true, LifecycleState.Approved));
     }
@@ -151,6 +169,20 @@ public sealed class PublicVisibilityWritePathTests
 
         // Approved: a stale facts version is a conflict, a valid write applies and bumps only the facts version.
         Assert.AreEqual(HttpStatusCode.Conflict, (await Put(client, publisher, id, Facts(5, "v-stale"))).StatusCode);
+        // Disclosure text is validated like every other public field (negative cases, then the positive control below).
+        foreach (var badCitation in new[]
+        {
+            Citation(contradiction: new string('c', 501)), Citation(uncertainty: new string('u', 501)),
+            Citation(contradiction: "   "), Citation(uncertainty: "bad\u0007limit"),
+        })
+        {
+            var rejected = await Put(client, publisher, id, Facts(0, "v-bad", citations: [badCitation]));
+            Assert.AreEqual(HttpStatusCode.BadRequest, rejected.StatusCode);
+            Assert.AreEqual(VisibilityDenials.InvalidFacts,
+                (await rejected.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("code").GetString());
+        }
+
+        Assert.AreEqual(0L, await FactsVersionAsync(connection, id), "Rejected disclosures must not change the facts.");
         var applied = await Put(client, publisher, id, Facts(0, "v-1"));
         Assert.AreEqual(HttpStatusCode.OK, applied.StatusCode);
         var body = await applied.Content.ReadFromJsonAsync<JsonElement>();
@@ -181,7 +213,10 @@ public sealed class PublicVisibilityWritePathTests
         {
             Assert.AreEqual(HttpStatusCode.OK, anonymous.StatusCode);
             var view = await anonymous.Content.ReadFromJsonAsync<JsonElement>();
-            Assert.AreEqual("[1]", view.GetProperty("citations")[0].GetProperty("citationLabel").GetString());
+            var shown = view.GetProperty("citations")[0];
+            Assert.AreEqual("[1]", shown.GetProperty("citationLabel").GetString());
+            Assert.AreEqual("Conflicts with the 2025 notice.", shown.GetProperty("contradictionDisclosure").GetString());
+            Assert.AreEqual("Single-source reading.", shown.GetProperty("uncertaintyLimit").GetString());
         }
 
         // A Published revision may be re-scoped; superseding it hides it immediately from the anonymous reader.
