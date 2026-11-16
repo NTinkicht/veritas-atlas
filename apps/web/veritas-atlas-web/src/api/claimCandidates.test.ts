@@ -32,6 +32,10 @@ describe("parseCandidatesResponse", () => {
     expect(r.claims).toHaveLength(1);
     expect(r.claims[0].status).toBe("unconfirmed");
   });
+  it("accepts more than 500 candidates (the server caps per chunk, not per evidence item)", () => {
+    const claims = Array.from({ length: 501 }, (_, i) => item({ claimKey: `k${i}` }));
+    expect(parseCandidatesResponse(body({ claims }), "ev1:abc").claims).toHaveLength(501);
+  });
   it("accepts an empty candidate list", () => {
     expect(parseCandidatesResponse(body({ claims: [] }), "ev1:abc").claims).toEqual([]);
   });
@@ -45,7 +49,6 @@ describe("parseCandidatesResponse", () => {
     ["foreign evidenceRef", body({ evidenceRef: "ev1:other" })],
     ["claims not an array", body({ claims: null })],
     ["freshness missing", body({ freshness: null })],
-    ["too many claims", body({ claims: Array.from({ length: 501 }, () => item()) })],
   ])("rejects the whole response: %s", (_name, raw) => {
     expect(() => parseCandidatesResponse(raw, "ev1:abc")).toThrow(MalformedCandidatesResponse);
   });

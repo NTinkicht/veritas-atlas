@@ -3,11 +3,11 @@ import { apiGet } from "./http";
 // VER-P0-17: client for claim candidates (VER-P0-11, GET /api/v1/tenant-evidence/claim-candidates).
 // The server alone reads the verified evidence and extracts candidates; this client never extracts, judges or
 // repairs. A candidate is an exact quotation with its chunk span: always unconfirmed and never answerable.
+// The server caps candidates per chunk, not per evidence item, so no total cap is imposed here.
 // No seeded fallback; a malformed response is rejected whole.
 
 export const CLAIM_CANDIDATES_PATH = "/api/v1/tenant-evidence/claim-candidates";
 export const MAX_REF_LENGTH = 512;
-export const MAX_CANDIDATES = 500;
 
 export type CandidateFreshness = { state: string; eligible: boolean; reason: string | null; evaluatedAt: string | null };
 export type ClaimCandidate = {
@@ -73,7 +73,7 @@ export function parseCandidatesResponse(raw: unknown, expectedRef: string): Clai
     reason: nullableStr(f.reason, "freshness reason"),
     evaluatedAt: nullableStr(f.evaluatedAt, "freshness evaluatedAt"),
   };
-  if (!Array.isArray(r.claims) || r.claims.length > MAX_CANDIDATES) throw new MalformedCandidatesResponse("claims");
+  if (!Array.isArray(r.claims)) throw new MalformedCandidatesResponse("claims");
   const claims = r.claims.map((item: unknown): ClaimCandidate => {
     if (typeof item !== "object" || item === null) throw new MalformedCandidatesResponse("claim");
     const c = item as Record<string, unknown>;
