@@ -79,6 +79,8 @@ public sealed class TenantInvestigationBookmarksController : ControllerBase
     {
         if (Authorize(ReaderRoles, "role_not_permitted", "The caller's role may not read bookmarks.")
             is not { } caller) return Refusal!;
+        // Authorize() enforces the usable-actor rules (403 actor_required) before any share lookup;
+        // see BookmarkListRefusesUnusableActorsBeforeAnyShareLookup.
 
         // Only the investigation's creator or an active grantee (anti-oracle: identical 404).
         if (!await _shares.IsAuthorizedAsync(caller.TenantId, investigationId, caller.Subject, cancellationToken))

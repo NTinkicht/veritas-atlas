@@ -96,6 +96,30 @@ public sealed class TenantInvestigationBookmarkTests
     }
 
     [TestMethod]
+    public async Task BookmarkListRefusesUnusableActorsBeforeAnyShareLookup()
+    {
+        var store = new CountingStore();
+        var inv = Guid.NewGuid();
+        using var factory = new ApiFactory(store: store, shares: new FixedShares(true));
+        using var client = factory.CreateClient();
+
+        // Positive control: a usable subject passes the actor gate and reaches the store.
+        using var ok = await TenantInvestigationEvidenceItemTests.Send(client, HttpMethod.Get, Listing(inv), Token("synthetic-reader", "reviewer", TenantA));
+        Assert.AreNotEqual(HttpStatusCode.Forbidden, ok.StatusCode);
+        Assert.AreEqual(1, store.Calls);
+
+        foreach (var subject in new string?[] { null, " ", new string('a', 500), "bad\u0007actor" })
+        {
+            using var response = await TenantInvestigationEvidenceItemTests.Send(client, HttpMethod.Get, Listing(inv),
+                TenantInvestigationEvidenceItemTests.Sign(subject, ["reviewer"], [TenantA.ToString("D")]));
+            Assert.AreEqual(HttpStatusCode.Forbidden, response.StatusCode);
+            StringAssert.Contains(await response.Content.ReadAsStringAsync(), "actor_required");
+        }
+
+        Assert.AreEqual(1, store.Calls, "unusable actors must be refused before the store is reached");
+    }
+
+    [TestMethod]
     public async Task UnauthorizedInvestigationCallersNeverReachTheBookmarkStore()
     {
         var store = new CountingStore();
