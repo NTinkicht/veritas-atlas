@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { PublicationRevision } from "./publicationRevisions";
-import { runTransitionFlow, type TransitionFlow } from "./revisionDeskFlow";
+import { reconcileQueueItem, runTransitionFlow, type TransitionFlow } from "./revisionDeskFlow";
 
 // SYNTHETIC fixtures only.
 const revision: PublicationRevision = {
@@ -44,5 +44,22 @@ describe("runTransitionFlow", () => {
     await runTransitionFlow(flow);
     expect(onRefused).not.toHaveBeenCalled();
     expect(reload).not.toHaveBeenCalled();
+  });
+});
+
+describe("reconcileQueueItem", () => {
+  const stale = { ...revision, state: "Submitted" as const, version: 2 };
+  const other = { ...revision, id: "22222222-2222-4222-8222-222222222222" };
+  it("replaces the stale row in place with the server's new state and version", () => {
+    const out = reconcileQueueItem([other, stale], revision, null);
+    expect(out).toEqual([other, revision]);
+  });
+  it("drops the row when it no longer matches the active state filter, keeps it when it does", () => {
+    expect(reconcileQueueItem([other, stale], revision, "Submitted")).toEqual([other]);
+    expect(reconcileQueueItem([other, stale], revision, "Approved")).toEqual([other, revision]);
+  });
+  it("leaves the queue untouched for a revision that is not listed", () => {
+    const list = [other];
+    expect(reconcileQueueItem(list, revision, null)).toBe(list);
   });
 });

@@ -126,3 +126,36 @@ export async function transitionRevision(
   const body = buildTransitionBody(action, expectedVersion, operationId);
   return parseTransitionResponse(await apiPost<unknown, typeof body>(transitionPath(id), body));
 }
+
+export const QUEUE_PAGE_SIZE = 25;
+
+export type RevisionPage = { items: PublicationRevision[]; nextAfterId: string | null };
+
+export function listPath(state: RevisionState | null, afterId: string | null): string {
+  const params = new URLSearchParams();
+  if (state !== null) {
+    if (!(REVISION_STATES as readonly string[]).includes(state)) throw new MalformedRevisionResponse("unknown state filter");
+    params.set("state", state);
+  }
+  params.set("limit", String(QUEUE_PAGE_SIZE));
+  if (afterId !== null) {
+    if (!GUID.test(afterId)) throw new MalformedRevisionResponse("afterId is not a GUID");
+    params.set("afterId", afterId);
+  }
+  return `${REVISIONS_PATH}?${params.toString()}`;
+}
+
+export function parseRevisionPage(raw: unknown): RevisionPage {
+  if (typeof raw !== "object" || raw === null) throw new MalformedRevisionResponse("not an object");
+  const r = raw as Record<string, unknown>;
+  if (!Array.isArray(r.items)) throw new MalformedRevisionResponse("items");
+  const next = r.nextAfterId;
+  if (next !== null && next !== undefined && (typeof next !== "string" || !GUID.test(next))) {
+    throw new MalformedRevisionResponse("nextAfterId");
+  }
+  return { items: r.items.map(parseRevision), nextAfterId: typeof next === "string" ? next : null };
+}
+
+export async function listRevisions(state: RevisionState | null, afterId: string | null): Promise<RevisionPage> {
+  return parseRevisionPage(await apiGet<unknown>(listPath(state, afterId)));
+}
