@@ -19,7 +19,9 @@ export type PublicCitation = {
   uncertaintyLimit: string | null;
 };
 
-export type PublicPublication = { id: string; freshnessLabel: string; citations: PublicCitation[] };
+export const INDEPENDENTLY_REVIEWED = "independently-reviewed";
+
+export type PublicPublication = { id: string; freshnessLabel: string; humanReviewLabel: typeof INDEPENDENTLY_REVIEWED; citations: PublicCitation[] };
 
 // "hidden" is the single outcome for every non-visible cause (404 / malformed id); "error" is any other failure.
 export type PublicPublicationResult =
@@ -58,13 +60,15 @@ export function parsePublicPublication(raw: unknown): PublicPublication | null {
   if (typeof raw !== "object" || raw === null) return null;
   const p = raw as Record<string, unknown>;
   if (!isString(p.id) || !GUID.test(p.id) || !isString(p.freshnessLabel) || !Array.isArray(p.citations)) return null;
+  // Fail closed: a payload without the exact human-review label is not presented as a reviewed publication.
+  if (p.humanReviewLabel !== INDEPENDENTLY_REVIEWED) return null;
   const citations: PublicCitation[] = [];
   for (const item of p.citations) {
     const c = parseCitation(item);
     if (!c) return null;
     citations.push(c);
   }
-  return { id: p.id, freshnessLabel: p.freshnessLabel, citations };
+  return { id: p.id, freshnessLabel: p.freshnessLabel, humanReviewLabel: INDEPENDENTLY_REVIEWED, citations };
 }
 
 export async function getPublicPublication(id: string): Promise<PublicPublicationResult> {

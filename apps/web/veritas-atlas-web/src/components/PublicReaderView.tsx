@@ -4,6 +4,7 @@ import type { PublicPublicationResult } from "../api/publicPublication";
 // (React escapes it); there is deliberately no navigation, link or control that points at staff areas.
 
 export const HIDDEN_MESSAGE = "This publication is not available.";
+export const REVIEW_STATEMENT = "Independently reviewed by a human editor before publication.";
 export const ERROR_MESSAGE = "This publication could not be loaded. Please try again later.";
 
 // Keep the source-local calendar date: take it from the ISO string, never via a UTC conversion.
@@ -19,6 +20,7 @@ export function PublicReaderView({ state }: { state: PublicReaderState }) {
   return (
     <article aria-label="Public publication">
       <p>Freshness: {publication.freshnessLabel}</p>
+      <p>{REVIEW_STATEMENT}</p>
       {publication.citations.map((c, i) => (
         <section key={i} aria-label={c.citationLabel}>
           <h2>{c.title}</h2>
