@@ -37,6 +37,7 @@ public sealed class PublicPublicationReaderEndpointTests
     private const string Citations =
         "[{\"citationLabel\":\"[1]\",\"title\":\"Synthetic ruling\",\"quote\":\"Synthetic quote.\",\"sourceName\":\"Synthetic Gazette\"," +
         "\"asOf\":\"2026-01-01T00:00:00+00:00\",\"effectiveDate\":null,\"freshnessLabel\":\"as of 2026-01-01\"," +
+        "\"contradictionDisclosure\":\"Conflicts with the 2025 notice.\",\"uncertaintyLimit\":\"Single-source reading.\"," +
         "\"tenantId\":\"a1111111-1111-4111-8111-111111111111\",\"storageKey\":\"s3://secret\",\"reviewerId\":\"synthetic-reviewer\"}]";
 
     private sealed record Facts(
@@ -71,13 +72,15 @@ public sealed class PublicPublicationReaderEndpointTests
         Assert.AreEqual("current", json.GetProperty("freshnessLabel").GetString());
         var citation = json.GetProperty("citations").EnumerateArray().Single();
         CollectionAssert.AreEquivalent(
-            new[] { "citationLabel", "title", "quote", "sourceName", "asOf", "effectiveDate", "freshnessLabel" },
+            new[] { "citationLabel", "title", "quote", "sourceName", "asOf", "effectiveDate", "freshnessLabel", "contradictionDisclosure", "uncertaintyLimit" },
             citation.EnumerateObject().Select(p => p.Name).ToArray());
         Assert.AreEqual("[1]", citation.GetProperty("citationLabel").GetString());
         Assert.AreEqual("Synthetic ruling", citation.GetProperty("title").GetString());
         Assert.AreEqual("Synthetic quote.", citation.GetProperty("quote").GetString());
         Assert.AreEqual("Synthetic Gazette", citation.GetProperty("sourceName").GetString());
         Assert.AreEqual("as of 2026-01-01", citation.GetProperty("freshnessLabel").GetString());
+        Assert.AreEqual("Conflicts with the 2025 notice.", citation.GetProperty("contradictionDisclosure").GetString());
+        Assert.AreEqual("Single-source reading.", citation.GetProperty("uncertaintyLimit").GetString());
         Assert.AreEqual(JsonValueKind.Null, citation.GetProperty("effectiveDate").ValueKind);
         Assert.AreEqual(new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero), citation.GetProperty("asOf").GetDateTimeOffset());
         var raw = await response.Content.ReadAsStringAsync();

@@ -225,7 +225,8 @@ public sealed class EfTenantPublicationRevisionStore : ITenantPublicationRevisio
         var digest = Sha256Hex(JsonSerializer.Serialize(new
         {
             facts.Restricted, facts.Superseded, ExpiresAt = facts.ExpiresAt?.UtcDateTime, facts.FreshnessRequired,
-            EvidenceCurrency = facts.EvidenceCurrency.ToString(), facts.HistoricalLabelPresent, facts.Citations
+            EvidenceCurrency = facts.EvidenceCurrency.ToString(), facts.HistoricalLabelPresent,
+            Citations = facts.Citations.Select(DigestShape).ToList()
         }, FactsJson));
 
         // An operation id is only replayable by the same actor, role and exact facts that committed it.
@@ -309,6 +310,22 @@ public sealed class EfTenantPublicationRevisionStore : ITenantPublicationRevisio
 
     private static VisibilityChangeResult VisibilityDenied(string code, TenantPublicationRevision row) =>
         new(VisibilityOutcome.Denied, code, ToModel(row));
+
+    /// <summary>
+    /// Digest shape of one citation. The two disclosure fields were added after operations were already committed, so they
+    /// are left out when null: a retry of a pre-existing operation keeps its original digest and replays instead of conflicting.
+    /// </summary>
+    private static Dictionary<string, object?> DigestShape(PublicCitationProjection c)
+    {
+        var shape = new Dictionary<string, object?>
+        {
+            ["citationLabel"] = c.CitationLabel, ["title"] = c.Title, ["quote"] = c.Quote, ["sourceName"] = c.SourceName,
+            ["asOf"] = c.AsOf, ["effectiveDate"] = c.EffectiveDate, ["freshnessLabel"] = c.FreshnessLabel,
+        };
+        if (c.ContradictionDisclosure is not null) shape["contradictionDisclosure"] = c.ContradictionDisclosure;
+        if (c.UncertaintyLimit is not null) shape["uncertaintyLimit"] = c.UncertaintyLimit;
+        return shape;
+    }
 
     private static string Sha256Hex(string text) =>
         Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(text))).ToLowerInvariant();
