@@ -1,12 +1,13 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { ERROR_MESSAGE, HIDDEN_MESSAGE, PublicReaderView } from "./PublicReaderView";
+import { ERROR_MESSAGE, HIDDEN_MESSAGE, PublicReaderView, REVIEW_STATEMENT } from "./PublicReaderView";
 
 const ok = {
   kind: "ok" as const,
   publication: {
     id: "11111111-1111-4111-8111-111111111111",
     freshnessLabel: "CURRENT",
+    humanReviewLabel: "independently-reviewed" as const,
     citations: [
       { citationLabel: "S1", title: "<script>alert(1)</script>", quote: "<img src=x onerror=1>", sourceName: "Src", asOf: "2026-11-01T00:00:00Z", effectiveDate: null, freshnessLabel: "CURRENT", contradictionDisclosure: null, uncertaintyLimit: null },
     ],
@@ -14,6 +15,11 @@ const ok = {
 };
 
 describe("PublicReaderView", () => {
+  it("states that a human reviewed the publication", () => {
+    expect(renderToStaticMarkup(<PublicReaderView state={ok} />)).toContain(REVIEW_STATEMENT);
+    expect(renderToStaticMarkup(<PublicReaderView state={{ kind: "hidden" }} />)).not.toContain(REVIEW_STATEMENT);
+  });
+
   it("renders citation, dates and freshness with escaped text", () => {
     const html = renderToStaticMarkup(<PublicReaderView state={ok} />);
     expect(html).toContain("S1");

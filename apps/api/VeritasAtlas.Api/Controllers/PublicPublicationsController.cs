@@ -15,6 +15,10 @@ namespace VeritasAtlas.Api.Controllers;
 [Route("api/v1/public/publications")]
 public sealed class PublicPublicationsController : ControllerBase
 {
+    // Derived, never stored: only a PUBLISHED revision is returned and publishing requires independent approval.
+    // Carries no reviewer identity.
+    public const string IndependentlyReviewedLabel = "independently-reviewed";
+
     private readonly IPublicPublicationReader _reader;
 
     public PublicPublicationsController(IPublicPublicationReader reader)
@@ -37,10 +41,10 @@ public sealed class PublicPublicationsController : ControllerBase
             return NotFound(new PublicNotFound(PublicReaderDecision.AnonymousHiddenOutcome));
         }
 
-        return Ok(new PublicPublicationResponse(view.Id, view.FreshnessLabel, view.Citations));
+        return Ok(new PublicPublicationResponse(view.Id, view.FreshnessLabel, IndependentlyReviewedLabel, view.Citations));
     }
 
     public sealed record PublicNotFound(string Error);
 
-    public sealed record PublicPublicationResponse(Guid Id, string FreshnessLabel, IReadOnlyList<PublicCitationProjection> Citations);
+    public sealed record PublicPublicationResponse(Guid Id, string FreshnessLabel, string HumanReviewLabel, IReadOnlyList<PublicCitationProjection> Citations);
 }

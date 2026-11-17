@@ -5,6 +5,7 @@ const ID = "11111111-1111-4111-8111-111111111111";
 const body = {
   id: ID,
   freshnessLabel: "CURRENT",
+  humanReviewLabel: "independently-reviewed",
   citations: [
     { citationLabel: "S1", title: "T", quote: "Q", sourceName: "N", asOf: "2026-11-01T00:00:00Z", effectiveDate: null, freshnessLabel: "CURRENT" },
   ],
@@ -46,7 +47,7 @@ describe("getPublicPublication", () => {
     expect((await getPublicPublication(ID)).kind).toBe("error");
     vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("down")));
     expect((await getPublicPublication(ID)).kind).toBe("error");
-    vi.stubGlobal("fetch", respond(200, { id: ID, freshnessLabel: "CURRENT", citations: [{ title: 1 }] }));
+    vi.stubGlobal("fetch", respond(200, { id: ID, freshnessLabel: "CURRENT", humanReviewLabel: "independently-reviewed", citations: [{ title: 1 }] }));
     expect((await getPublicPublication(ID)).kind).toBe("error");
   });
 });
@@ -71,5 +72,14 @@ describe("parsePublicPublication", () => {
     expect(parsePublicPublication({ ...body, id: "nope" })).toBeNull();
     expect(parsePublicPublication({ ...body, citations: "x" })).toBeNull();
     expect(parsePublicPublication({ ...body, citations: [{ ...body.citations[0], asOf: "garbage" }] })).toBeNull();
+  });
+});
+
+describe("parsePublicPublication human review label", () => {
+  it("accepts the exact label and fails closed when missing or different", () => {
+    expect(parsePublicPublication(body)?.humanReviewLabel).toBe("independently-reviewed");
+    expect(parsePublicPublication({ ...body, humanReviewLabel: undefined })).toBeNull();
+    expect(parsePublicPublication({ ...body, humanReviewLabel: "unreviewed" })).toBeNull();
+    expect(parsePublicPublication({ ...body, humanReviewLabel: true })).toBeNull();
   });
 });
