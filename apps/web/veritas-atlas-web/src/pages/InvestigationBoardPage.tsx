@@ -21,6 +21,7 @@ import {
   type Investigation,
 } from "../api/investigations";
 import { AppSurface } from "../components/AppSurface";
+import { CollectEvidenceForm } from "../components/CollectEvidenceForm";
 import { InvestigationSharesPanel } from "../components/InvestigationSharesPanel";
 import { CreateInvestigationForm, EvidenceBoard, InvestigationStateControl, EvidenceComparison, InvestigationList, type AnnotationsState, type Loadable } from "../components/InvestigationBoardView";
 
@@ -249,6 +250,14 @@ export function InvestigationBoardPage() {
     );
   }
 
+  function collected(investigationId: string, item: CollectedEvidenceItem) {
+    // Ignore an answer for an investigation that is no longer open; a replayed row is never shown twice.
+    if (selected?.id !== investigationId) return;
+    setBoard((current) =>
+      current.kind === "loaded" ? { kind: "loaded", data: [...current.data.filter((i) => i.id !== item.id), item] } : current,
+    );
+  }
+
   return (
     <AppSurface title="Investigations" subtitle="Investigations visible to you and the verified evidence collected into them.">
       <CreateInvestigationForm
@@ -270,6 +279,9 @@ export function InvestigationBoardPage() {
         />
       ) : null}
       {selected ? <InvestigationSharesPanel investigation={selected} signInHref={signInHref} /> : null}
+      {selected ? (
+        <CollectEvidenceForm investigation={selected} signInHref={signInHref} onCollected={(item) => collected(selected.id, item)} />
+      ) : null}
       {selected ? (
         <EvidenceBoard
           investigation={selected}

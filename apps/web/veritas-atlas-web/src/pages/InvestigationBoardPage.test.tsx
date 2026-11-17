@@ -14,6 +14,7 @@ const api = vi.hoisted(() => ({
   listEvidenceItems: vi.fn(),
   listBookmarks: vi.fn(),
   listShares: vi.fn(),
+  collectEvidence: vi.fn(),
 }));
 vi.mock("../api/investigations", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../api/investigations")>()),
@@ -192,5 +193,34 @@ describe("InvestigationBoardPage close and reopen", () => {
     resolve({ ...A, state: "closed", version: 1 });
     await waitFor(() => expect(screen.getByRole("button", { name: "Close investigation" })).toBeTruthy());
     expect(screen.getByText("Open", { selector: "strong" })).toBeTruthy();
+  });
+});
+
+describe("InvestigationBoardPage collect evidence", () => {
+  const EVID = "55555555-5555-4555-8555-555555555555";
+  const collected = { id: "66666666-6666-4666-8666-666666666666", evidenceVerificationId: EVID, note: null, collectedBySubject: "analyst-1", createdAtUtc: "2026-11-02T09:00:00Z" };
+  const collect = async () => {
+    setup();
+    fireEvent.click(await screen.findByRole("button", { name: "Existing" }));
+    await screen.findByLabelText("Verified evidence id");
+    fireEvent.change(screen.getByLabelText("Verified evidence id"), { target: { value: EVID } });
+    fireEvent.click(screen.getByRole("button", { name: "Collect evidence" }));
+  };
+  it("shows the server item on the board once, even when the same row is returned again", async () => {
+    api.collectEvidence.mockResolvedValue(collected);
+    await collect();
+    await waitFor(() => expect(screen.getAllByText(EVID, { exact: false })).toHaveLength(1));
+    expect(api.collectEvidence).toHaveBeenCalledWith(A.id, EVID, "");
+    fireEvent.change(screen.getByLabelText("Verified evidence id"), { target: { value: EVID } });
+    fireEvent.click(screen.getByRole("button", { name: "Collect evidence" }));
+    await waitFor(() => expect(api.collectEvidence).toHaveBeenCalledTimes(2));
+    expect(screen.getAllByText(EVID, { exact: false })).toHaveLength(1);
+  });
+  it("leaves the board unchanged on a refusal", async () => {
+    api.collectEvidence.mockRejectedValue({ status: 404 });
+    await collect();
+    await screen.findByRole("alert");
+    expect(screen.queryByText(EVID, { exact: false })).toBeNull();
+    expect(screen.getByText("No evidence has been collected into this investigation yet.")).toBeTruthy();
   });
 });

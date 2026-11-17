@@ -453,3 +453,48 @@ export async function grantShare(investigationId: string, grantee: string): Prom
 export async function revokeShare(investigationId: string, grantee: string): Promise<void> {
   await apiDelete(sharePath(investigationId, grantee));
 }
+
+/** Mirrors TenantInvestigationEvidenceLimits.MaxNoteLength on the server. */
+export const EVIDENCE_NOTE_MAX_LENGTH = 500;
+
+/** Client-side mirror of the server verification-id rule: a GUID that is not all zeros. */
+export function isValidVerificationId(value: string): boolean {
+  return GUID.test(value) && !/^[0-]+$/.test(value.replace(/-/g, ""));
+}
+
+/** An omitted note is valid; a present one follows the server rule (1-500 chars, no edge whitespace or control characters). */
+export function isValidEvidenceNote(value: string): boolean {
+  if (value.length === 0) return true;
+  if (value.length > EVIDENCE_NOTE_MAX_LENGTH || value.trim().length === 0 || value !== value.trim()) return false;
+  // eslint-disable-next-line no-control-regex
+  return !/[\u0000-\u001f\u007f-\u009f]/.test(value);
+}
+
+/**
+ * Collects one verified evidence record into an investigation. The server decides everything
+ * (author role, share authorization, closed investigation, unknown or foreign verification id) and
+ * is idempotent per verification id. The returned item must be about the requested verification id;
+ * anything else is rejected whole so the board never shows an item that was not asked for.
+ */
+export async function collectEvidence(
+  investigationId: string,
+  evidenceVerificationId: string,
+  note: string,
+): Promise<CollectedEvidenceItem> {
+  if (!isValidVerificationId(evidenceVerificationId)) throw new MalformedInvestigationResponse("verification id is not valid");
+  if (!isValidEvidenceNote(note)) throw new MalformedInvestigationResponse("note is not valid");
+  const raw = await apiPost<unknown, { evidenceVerificationId: string; note?: string }>(
+    evidenceItemsPath(investigationId),
+    note.length > 0 ? { evidenceVerificationId, note } : { evidenceVerificationId },
+  );
+  if (typeof raw !== "object" || raw === null) throw new MalformedInvestigationResponse("item is not an object");
+  const record = raw as Record<string, unknown>;
+  const [item] = parseEvidenceItems({ items: [record] });
+  if (
+    guid(record, "investigationId", 0).toLowerCase() !== investigationId.toLowerCase() ||
+    item.evidenceVerificationId.toLowerCase() !== evidenceVerificationId.toLowerCase()
+  ) {
+    throw new MalformedInvestigationResponse("item does not match the request");
+  }
+  return item;
+}

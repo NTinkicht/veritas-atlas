@@ -33,6 +33,9 @@ import {
   transitionInvestigation,
   mergeCreated,
   isValidInvestigationTitle,
+  collectEvidence,
+  isValidEvidenceNote,
+  isValidVerificationId,
 } from "./investigations";
 
 // SYNTHETIC fixtures only.
@@ -397,5 +400,59 @@ describe("share client", () => {
       stub(404, { code: "tenant_investigation_not_found", message: "x" });
       await expect(revokeShare(ID, "reviewer-1")).rejects.toMatchObject({ status: 404 });
     });
+  });
+});
+
+describe("collectEvidence", () => {
+  beforeEach(() => vi.stubGlobal("localStorage", { getItem: () => null, setItem: () => undefined, removeItem: () => undefined }));
+  afterEach(() => vi.unstubAllGlobals());
+  const ITEM = "33333333-3333-4333-8333-333333333333";
+  const row = { id: ITEM, investigationId: ID, evidenceVerificationId: EV, note: "why", collectedBySubject: "analyst-1", createdAtUtc: "2026-11-02T09:00:00Z" };
+  const reply = (body: unknown, status = 201) => vi.fn(async () => new Response(JSON.stringify(body), { status }));
+  it("posts the verification id and note to the evidence-items path (positive control)", async () => {
+    const fetchMock = reply(row);
+    vi.stubGlobal("fetch", fetchMock);
+    const result = await collectEvidence(ID, EV, "why");
+    expect(result).toEqual({ id: ITEM, evidenceVerificationId: EV, note: "why", collectedBySubject: "analyst-1", createdAtUtc: row.createdAtUtc });
+    const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toContain(`/api/v1/tenant-investigations/${ID}/evidence-items`);
+    expect(init.method).toBe("POST");
+    expect(JSON.parse(init.body as string)).toEqual({ evidenceVerificationId: EV, note: "why" });
+  });
+  it("omits an empty note", async () => {
+    const fetchMock = reply({ ...row, note: null });
+    vi.stubGlobal("fetch", fetchMock);
+    await collectEvidence(ID, EV, "");
+    expect(JSON.parse((fetchMock.mock.calls[0] as unknown as [string, RequestInit])[1].body as string)).toEqual({ evidenceVerificationId: EV });
+  });
+  it("never reaches the network for an invalid id or note", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(collectEvidence(ID, "nope", "")).rejects.toBeInstanceOf(MalformedInvestigationResponse);
+    await expect(collectEvidence(ID, "00000000-0000-0000-0000-000000000000", "")).rejects.toBeInstanceOf(MalformedInvestigationResponse);
+    await expect(collectEvidence(ID, EV, " padded")).rejects.toBeInstanceOf(MalformedInvestigationResponse);
+    await expect(collectEvidence("nope", EV, "")).rejects.toBeInstanceOf(MalformedInvestigationResponse);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+  it("rejects an answer about another investigation or another verification id", async () => {
+    vi.stubGlobal("fetch", reply({ ...row, investigationId: "44444444-4444-4444-8444-444444444444" }));
+    await expect(collectEvidence(ID, EV, "why")).rejects.toBeInstanceOf(MalformedInvestigationResponse);
+    vi.stubGlobal("fetch", reply({ ...row, evidenceVerificationId: "44444444-4444-4444-8444-444444444444" }));
+    await expect(collectEvidence(ID, EV, "why")).rejects.toBeInstanceOf(MalformedInvestigationResponse);
+    vi.stubGlobal("fetch", reply({ ...row, id: "nope" }));
+    await expect(collectEvidence(ID, EV, "why")).rejects.toBeInstanceOf(MalformedInvestigationResponse);
+  });
+  it("surfaces a refusal status unchanged", async () => {
+    vi.stubGlobal("fetch", reply({}, 409));
+    await expect(collectEvidence(ID, EV, "")).rejects.toMatchObject({ status: 409 });
+  });
+  it("mirrors the server validators", () => {
+    expect(isValidVerificationId(EV)).toBe(true);
+    expect(isValidVerificationId("00000000-0000-0000-0000-000000000000")).toBe(false);
+    expect(isValidEvidenceNote("")).toBe(true);
+    expect(isValidEvidenceNote("a".repeat(500))).toBe(true);
+    expect(isValidEvidenceNote("a".repeat(501))).toBe(false);
+    expect(isValidEvidenceNote("trailing ")).toBe(false);
+    expect(isValidEvidenceNote("tab\there")).toBe(false);
   });
 });
