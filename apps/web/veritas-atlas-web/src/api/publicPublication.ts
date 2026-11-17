@@ -18,7 +18,11 @@ export type PublicCitation = {
   contradictionDisclosure: string | null;
   uncertaintyLimit: string | null;
   sourceUri: string | null;
+  confidence: ConfidenceBand | null;
 };
+
+export const CONFIDENCE_BANDS = ["Insufficient", "Low", "Medium", "High"] as const;
+export type ConfidenceBand = (typeof CONFIDENCE_BANDS)[number];
 
 export const INDEPENDENTLY_REVIEWED = "independently-reviewed";
 
@@ -57,6 +61,9 @@ function parseCitation(raw: unknown): PublicCitation | null {
   if (!isStringOrNull(contradictionDisclosure) || !isStringOrNull(uncertaintyLimit)) return null;
   const sourceUri = c.sourceUri ?? null;
   if (sourceUri !== null && !isSafeSourceUri(sourceUri)) return null;
+  // Only a known band is ever shown; anything else fails the whole payload closed rather than inventing a label.
+  const confidence = c.confidence ?? null;
+  if (confidence !== null && !CONFIDENCE_BANDS.includes(confidence as ConfidenceBand)) return null;
   return {
     citationLabel: c.citationLabel,
     title: c.title,
@@ -68,6 +75,7 @@ function parseCitation(raw: unknown): PublicCitation | null {
     contradictionDisclosure,
     uncertaintyLimit,
     sourceUri,
+    confidence: confidence as ConfidenceBand | null,
   };
 }
 

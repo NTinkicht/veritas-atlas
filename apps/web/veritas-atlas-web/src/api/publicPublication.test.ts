@@ -84,6 +84,21 @@ describe("parsePublicPublication human review label", () => {
   });
 });
 
+describe("parsePublicPublication confidence", () => {
+  const withBand = (confidence: unknown) => ({ ...body, citations: [{ ...body.citations[0], confidence }] });
+
+  it("keeps a known band, reads absent as null and fails closed on anything else", () => {
+    for (const band of ["Insufficient", "Low", "Medium", "High"]) {
+      expect(parsePublicPublication(withBand(band))?.citations[0].confidence).toBe(band);
+    }
+    expect(parsePublicPublication(body)?.citations[0].confidence).toBeNull();
+    expect(parsePublicPublication(withBand(null))?.citations[0].confidence).toBeNull();
+    for (const bad of ["high", "HIGH", "Certain", "3", "", 3, true, {}, ["High"]]) {
+      expect(parsePublicPublication(withBand(bad)), String(bad)).toBeNull();
+    }
+  });
+});
+
 describe("parsePublicPublication source link", () => {
   const withUri = (sourceUri: unknown) => ({ ...body, citations: [{ ...body.citations[0], sourceUri }] });
 
