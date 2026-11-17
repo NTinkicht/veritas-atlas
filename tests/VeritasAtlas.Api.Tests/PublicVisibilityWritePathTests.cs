@@ -36,9 +36,9 @@ public sealed class PublicVisibilityWritePathTests
     private const string Base = "/api/v1/tenant-publication-revisions";
 
     private static object Citation(string label = "[1]", string? contradiction = "Conflicts with the 2025 notice.",
-        string? uncertainty = "Single-source reading.") => new
+        string? uncertainty = "Single-source reading.", string? sourceUri = null) => new
     {
-        contradictionDisclosure = contradiction, uncertaintyLimit = uncertainty,
+        contradictionDisclosure = contradiction, uncertaintyLimit = uncertainty, sourceUri,
         citationLabel = label, title = "Audited report", quote = "A quoted line.", sourceName = "Registry",
         asOf = "2026-01-01T00:00:00Z", effectiveDate = (string?)null, freshnessLabel = "current",
     };
@@ -135,6 +135,19 @@ public sealed class PublicVisibilityWritePathTests
             Assert.AreEqual(VisibilityDenials.InvalidFacts,
                 PublicVisibilityRules.Validate(Facts(false, bad), true, LifecycleState.Approved));
         }
+        Assert.IsNull(PublicVisibilityRules.Validate(
+            Facts(false, Good() with { SourceUri = "https://gazette.example.org/a?b=1#c" }), true, LifecycleState.Approved));
+        foreach (var badUri in new[]
+        {
+            "", " ", "javascript:alert(1)", "http://gazette.example.org/a", "data:text/html,x", "//gazette.example.org/a",
+            "/relative/path", "https://user:pw@gazette.example.org/a", "https://gazette.example.org/a b",
+            "https://gazette.example.org/a\u0007", "ftp://gazette.example.org/a",
+            "https://gazette.example.org/" + new string('p', PublicVisibilityRules.MaxSourceUri),
+        })
+        {
+            Assert.AreEqual(VisibilityDenials.InvalidFacts,
+                PublicVisibilityRules.Validate(Facts(false, Good() with { SourceUri = badUri }), true, LifecycleState.Approved), badUri);
+        }
         Assert.AreEqual(VisibilityDenials.InvalidFacts, PublicVisibilityRules.Validate(
             Facts(false, Good()) with { EvidenceCurrency = (EvidenceCurrency)99 }, true, LifecycleState.Approved));
     }
@@ -187,6 +200,14 @@ public sealed class PublicVisibilityWritePathTests
         // Positive control: adding a disclosure under the same operation id is a different request and conflicts.
         var changed = await Put(client, publisher, id, Facts(0, "legacy-op", citations: [Citation(uncertainty: null)]));
         Assert.AreEqual(HttpStatusCode.Conflict, changed.StatusCode);
+
+        // A source link is part of the request digest too, and an unsafe one is refused before the store is touched.
+        var linked = await Put(client, publisher, id, Facts(0, "legacy-op", citations: [Citation(contradiction: null, uncertainty: null, sourceUri: "https://registry.example.org/r/1")]));
+        Assert.AreEqual(HttpStatusCode.Conflict, linked.StatusCode);
+        var unsafeLink = await Put(client, publisher, id, Facts(1, "link-op", citations: [Citation(sourceUri: "javascript:alert(1)")]));
+        Assert.AreEqual(HttpStatusCode.BadRequest, unsafeLink.StatusCode);
+        var safeLink = await Put(client, publisher, id, Facts(1, "link-op", citations: [Citation(sourceUri: "https://registry.example.org/r/1")]));
+        Assert.AreEqual(HttpStatusCode.OK, safeLink.StatusCode);
     }
 
     [TestMethod]

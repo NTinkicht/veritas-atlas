@@ -29,6 +29,17 @@ public static class PublicVisibilityRules
     private const int MaxQuote = 2000;
     private const int MaxSource = 200;
     public const int MaxDisclosure = 500;
+    public const int MaxSourceUri = 2048;
+
+    /// <summary>
+    /// A publisher-supplied provenance link shown to anonymous readers: an absolute https URI with a host, no embedded
+    /// credentials, no whitespace or control characters. Anything else is refused so the reader never renders a risky link.
+    /// </summary>
+    public static bool IsPublicSourceUri(string? value) =>
+        value is { Length: > 0 and <= MaxSourceUri }
+        && !value.Any(ch => char.IsControl(ch) || char.IsWhiteSpace(ch))
+        && Uri.TryCreate(value, UriKind.Absolute, out var uri)
+        && uri.Scheme == Uri.UriSchemeHttps && uri.UserInfo.Length == 0 && uri.Host.Length > 0;
 
     public static string? Validate(PublicVisibilityFactsInput facts, bool policyPermitsPublicDisplay, LifecycleState state)
     {
@@ -46,7 +57,8 @@ public static class PublicVisibilityRules
                 || !Text(c.Quote, MaxQuote, multiline: true) || !Text(c.SourceName, MaxSource, multiline: false)
                 || !Text(c.FreshnessLabel, MaxLabel, multiline: false)
                 || (c.ContradictionDisclosure is not null && !Text(c.ContradictionDisclosure, MaxDisclosure, multiline: true))
-                || (c.UncertaintyLimit is not null && !Text(c.UncertaintyLimit, MaxDisclosure, multiline: true)))
+                || (c.UncertaintyLimit is not null && !Text(c.UncertaintyLimit, MaxDisclosure, multiline: true))
+                || (c.SourceUri is not null && !IsPublicSourceUri(c.SourceUri)))
             {
                 return VisibilityDenials.InvalidFacts;
             }

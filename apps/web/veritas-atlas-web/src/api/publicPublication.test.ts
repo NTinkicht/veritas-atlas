@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { getPublicPublication, parsePublicPublication } from "./publicPublication";
+import { getPublicPublication, isSafeSourceUri, parsePublicPublication } from "./publicPublication";
 
 const ID = "11111111-1111-4111-8111-111111111111";
 const body = {
@@ -81,5 +81,26 @@ describe("parsePublicPublication human review label", () => {
     expect(parsePublicPublication({ ...body, humanReviewLabel: undefined })).toBeNull();
     expect(parsePublicPublication({ ...body, humanReviewLabel: "unreviewed" })).toBeNull();
     expect(parsePublicPublication({ ...body, humanReviewLabel: true })).toBeNull();
+  });
+});
+
+describe("parsePublicPublication source link", () => {
+  const withUri = (sourceUri: unknown) => ({ ...body, citations: [{ ...body.citations[0], sourceUri }] });
+
+  it("keeps a safe https link, reads absent as null and fails closed on anything else", () => {
+    expect(parsePublicPublication(withUri("https://gazette.example.org/n/1"))?.citations[0].sourceUri).toBe("https://gazette.example.org/n/1");
+    expect(parsePublicPublication(body)?.citations[0].sourceUri).toBeNull();
+    expect(parsePublicPublication(withUri(null))?.citations[0].sourceUri).toBeNull();
+    for (const bad of [
+      "javascript:alert(1)", "http://gazette.example.org/n", "data:text/html,x", "//gazette.example.org/n", "/relative",
+      "https://user:pw@gazette.example.org/n", "https://gazette.example.org/a b", "", 5, {}, `https://x.example/${"p".repeat(2100)}`,
+    ]) {
+      expect(parsePublicPublication(withUri(bad)), String(bad)).toBeNull();
+    }
+  });
+
+  it("exposes the same predicate for callers", () => {
+    expect(isSafeSourceUri("https://a.example/b")).toBe(true);
+    expect(isSafeSourceUri("http://a.example/b")).toBe(false);
   });
 });

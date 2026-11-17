@@ -110,7 +110,7 @@ The table mirrors `src/routeAudit.ts`. `src/routes.test.ts` fails when a route h
 | `/publication-readiness` | PublicationReadinessBoardPage | DEAD | none (placeholder shell) |
 | `/decision-log` | DecisionLogPage | DEAD | none (placeholder shell) |
 | `/ingestion` | IngestionWorkspacePage | DEAD | none (placeholder shell) |
-| `/sources` | SourcesPage | DEAD | none (placeholder shell) |
+| `/sources` | SourcesPage | REAL | /api/v1/tenant-sources |
 | `/sources/new` | CreateSourcePage | DEAD | none (placeholder shell) |
 | `/sources/:id` | SourceDetailPage | DEAD | none (placeholder shell) |
 | `/documents` | DocumentsPage | DEAD | none (placeholder shell) |
@@ -143,5 +143,6 @@ The table mirrors `src/routeAudit.ts`. `src/routes.test.ts` fails when a route h
 - `/claim-candidates` reads the exact-quotation candidates the server extracts from one verified evidence item (GET with one evidence reference) and shows each quotation with its element span and the evidence freshness; every candidate is unconfirmed and never answerable, a response with any answerable or non-unconfirmed candidate is rejected whole, server text is never echoed in errors, no seeded fallback (VER-P0-17).
 - `/claim-confidence` posts one claim's optional evidence-quality counts (blank stays omitted, never 0) and shows the server's coarse band and reasons with a statement that it is evidence quality, not truth, and verifies nothing (VER-P0-17); no seeded fallback, malformed responses are rejected whole.
 - `/claim-relations` posts 1-200 structured claims and shows per-claim status and attributed agreeing, conflicting, superseded and unresolved relations; integer enums are mapped explicitly and unknown values reject the whole response; evidence references are echoed, not verified (VER-P0-17); no seeded fallback.
+- `/sources` (#338) lists the organization's registered sources from `GET /api/v1/tenant-sources` and nothing else: read-only, no registration, fetch or edit controls, no seeded fallback; a malformed response is rejected whole and server text is never echoed. `/sources/new` and `/sources/:id` stay DEAD.
 - `/evidence-search` (#161) is the analyst search and citation inspector; it reads only `/api/v1/tenant-evidence/search` and has no seeded fallback. The search hit carries no parser name/version, so the inspector says so rather than inventing one.
 - `/case-explorer`, `/case-scoreboard`: listed REAL because they call `/api/v1/cases`; neither reads seed modules (checked by search).
