@@ -29,7 +29,8 @@ public sealed record PublicReaderDecision(bool Visible, string? InternalReason)
 public sealed record PublicCitationProjection(
     string CitationLabel, string Title, string Quote, string SourceName, DateTimeOffset? AsOf,
     DateTimeOffset? EffectiveDate, string FreshnessLabel, string? ContradictionDisclosure = null,
-    string? UncertaintyLimit = null, string? SourceUri = null);
+    string? UncertaintyLimit = null, string? SourceUri = null,
+    [property: System.Text.Json.Serialization.JsonPropertyName("confidence")] string? Certainty = null);
 
 /// <summary>Pure fail-closed public-reader visibility rules (VER-P0-16 slice 2). Approved is never public.</summary>
 public static class PublicReaderGate

@@ -36,9 +36,9 @@ public sealed class PublicVisibilityWritePathTests
     private const string Base = "/api/v1/tenant-publication-revisions";
 
     private static object Citation(string label = "[1]", string? contradiction = "Conflicts with the 2025 notice.",
-        string? uncertainty = "Single-source reading.", string? sourceUri = null) => new
+        string? uncertainty = "Single-source reading.", string? sourceUri = null, string? confidence = null) => new
     {
-        contradictionDisclosure = contradiction, uncertaintyLimit = uncertainty, sourceUri,
+        contradictionDisclosure = contradiction, uncertaintyLimit = uncertainty, sourceUri, confidence,
         citationLabel = label, title = "Audited report", quote = "A quoted line.", sourceName = "Registry",
         asOf = "2026-01-01T00:00:00Z", effectiveDate = (string?)null, freshnessLabel = "current",
     };
@@ -148,6 +148,16 @@ public sealed class PublicVisibilityWritePathTests
             Assert.AreEqual(VisibilityDenials.InvalidFacts,
                 PublicVisibilityRules.Validate(Facts(false, Good() with { SourceUri = badUri }), true, LifecycleState.Approved), badUri);
         }
+        foreach (var band in new[] { "Insufficient", "Low", "Medium", "High" })
+        {
+            Assert.IsNull(PublicVisibilityRules.Validate(
+                Facts(false, Good() with { Certainty = band }), true, LifecycleState.Approved), band);
+        }
+        foreach (var badBand in new[] { "", " ", "high", "HIGH", "Certain", "3", "High ", "Very High" })
+        {
+            Assert.AreEqual(VisibilityDenials.InvalidFacts,
+                PublicVisibilityRules.Validate(Facts(false, Good() with { Certainty = badBand }), true, LifecycleState.Approved), badBand);
+        }
         Assert.AreEqual(VisibilityDenials.InvalidFacts, PublicVisibilityRules.Validate(
             Facts(false, Good()) with { EvidenceCurrency = (EvidenceCurrency)99 }, true, LifecycleState.Approved));
     }
@@ -208,6 +218,14 @@ public sealed class PublicVisibilityWritePathTests
         Assert.AreEqual(HttpStatusCode.BadRequest, unsafeLink.StatusCode);
         var safeLink = await Put(client, publisher, id, Facts(1, "link-op", citations: [Citation(sourceUri: "https://registry.example.org/r/1")]));
         Assert.AreEqual(HttpStatusCode.OK, safeLink.StatusCode);
+
+        // The confidence band is part of the request digest and an unknown band is refused before the store is touched.
+        var bandChanged = await Put(client, publisher, id, Facts(1, "link-op", citations: [Citation(sourceUri: "https://registry.example.org/r/1", confidence: "High")]));
+        Assert.AreEqual(HttpStatusCode.Conflict, bandChanged.StatusCode);
+        var badBandRequest = await Put(client, publisher, id, Facts(2, "band-op", citations: [Citation(confidence: "Certain")]));
+        Assert.AreEqual(HttpStatusCode.BadRequest, badBandRequest.StatusCode);
+        var goodBand = await Put(client, publisher, id, Facts(2, "band-op", citations: [Citation(confidence: "Low")]));
+        Assert.AreEqual(HttpStatusCode.OK, goodBand.StatusCode);
     }
 
     [TestMethod]

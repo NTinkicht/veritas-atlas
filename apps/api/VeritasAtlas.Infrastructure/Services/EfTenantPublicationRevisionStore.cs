@@ -325,6 +325,7 @@ public sealed class EfTenantPublicationRevisionStore : ITenantPublicationRevisio
         if (c.ContradictionDisclosure is not null) shape["contradictionDisclosure"] = c.ContradictionDisclosure;
         if (c.UncertaintyLimit is not null) shape["uncertaintyLimit"] = c.UncertaintyLimit;
         if (c.SourceUri is not null) shape["sourceUri"] = c.SourceUri;
+        if (c.Certainty is not null) shape["confidence"] = c.Certainty;
         return shape;
     }
 
