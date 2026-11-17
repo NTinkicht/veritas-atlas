@@ -21,6 +21,7 @@ import {
   type Investigation,
 } from "../api/investigations";
 import { AppSurface } from "../components/AppSurface";
+import { CollectEvidenceForm } from "../components/CollectEvidenceForm";
 import { InvestigationSharesPanel } from "../components/InvestigationSharesPanel";
 import { CreateInvestigationForm, EvidenceBoard, InvestigationStateControl, EvidenceComparison, InvestigationList, type AnnotationsState, type Loadable } from "../components/InvestigationBoardView";
 
@@ -51,6 +52,8 @@ export function InvestigationBoardPage() {
   const [transitionNotice, setTransitionNotice] = useState<InvestigationFailure | null>(null);
   const latestAnnotations = useRef(0);
   const latest = useRef(0);
+  // Id of the investigation currently open; a late answer for another one is dropped, not appended.
+  const openId = useRef<string | null>(null);
   const latestComparison = useRef(0);
   const signInHref = `/login?returnTo=${encodeURIComponent(`${location.pathname}${location.search}`)}`;
 
@@ -67,6 +70,7 @@ export function InvestigationBoardPage() {
 
   function open(investigation: Investigation) {
     const ticket = ++latest.current;
+    openId.current = investigation.id;
     latestComparison.current++;
     setPicked([]);
     setComparison(null);
@@ -249,6 +253,14 @@ export function InvestigationBoardPage() {
     );
   }
 
+  function collected(investigationId: string, item: CollectedEvidenceItem) {
+    // Ignore an answer for an investigation that is no longer open; a replayed row is never shown twice.
+    if (openId.current !== investigationId) return;
+    setBoard((current) =>
+      current.kind === "loaded" ? { kind: "loaded", data: [...current.data.filter((i) => i.id !== item.id), item] } : current,
+    );
+  }
+
   return (
     <AppSurface title="Investigations" subtitle="Investigations visible to you and the verified evidence collected into them.">
       <CreateInvestigationForm
@@ -270,6 +282,9 @@ export function InvestigationBoardPage() {
         />
       ) : null}
       {selected ? <InvestigationSharesPanel investigation={selected} signInHref={signInHref} /> : null}
+      {selected ? (
+        <CollectEvidenceForm investigation={selected} ready={board.kind === "loaded"} signInHref={signInHref} onCollected={(item) => collected(selected.id, item)} />
+      ) : null}
       {selected ? (
         <EvidenceBoard
           investigation={selected}
