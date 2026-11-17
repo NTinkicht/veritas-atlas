@@ -74,7 +74,7 @@ describe("PublicPublicationPage", () => {
   it("shows only the generic unavailable message for a hidden publication", async () => {
     getPublication.mockResolvedValueOnce({ kind: "hidden" });
     setup();
-    expect((await screen.findByRole("status")).textContent).toBe(HIDDEN_MESSAGE);
+    expect(await screen.findByText(HIDDEN_MESSAGE)).toBe(screen.getByRole("status"));
     expect(screen.queryByText(REVIEW_STATEMENT)).toBeNull();
   });
 
