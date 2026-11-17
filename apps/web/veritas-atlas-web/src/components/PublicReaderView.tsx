@@ -34,6 +34,14 @@ export function PublicReaderView({ state }: { state: PublicReaderState }) {
             <strong>{c.citationLabel}</strong> · {c.sourceName}
           </p>
           <blockquote>{c.quote}</blockquote>
+          {c.sourceUri ? (
+            <p>
+              Source:{" "}
+              <a href={c.sourceUri} target="_blank" rel="noopener noreferrer nofollow">
+                {c.sourceName}
+              </a>
+            </p>
+          ) : null}
           <p>
             As of {fmt(c.asOf)} · Effective {fmt(c.effectiveDate)} · {c.freshnessLabel}
           </p>

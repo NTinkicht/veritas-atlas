@@ -17,6 +17,7 @@ export type PublicCitation = {
   freshnessLabel: string;
   contradictionDisclosure: string | null;
   uncertaintyLimit: string | null;
+  sourceUri: string | null;
 };
 
 export const INDEPENDENTLY_REVIEWED = "independently-reviewed";
@@ -34,6 +35,17 @@ const isStringOrNull = (v: unknown): v is string | null => v === null || isStrin
 const isDateOrNull = (v: unknown): v is string | null =>
   v === null || (isString(v) && !Number.isNaN(Date.parse(v)));
 
+// A provenance link is only ever an https URL without embedded credentials; anything else fails the whole payload closed.
+export function isSafeSourceUri(value: unknown): value is string {
+  if (typeof value !== "string" || value.length === 0 || value.length > 2048 || /\s/.test(value) || [...value].some((ch) => ch.charCodeAt(0) < 0x20 || ch.charCodeAt(0) === 0x7f)) return false;
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" && url.username === "" && url.password === "" && url.hostname !== "";
+  } catch {
+    return false;
+  }
+}
+
 function parseCitation(raw: unknown): PublicCitation | null {
   if (typeof raw !== "object" || raw === null) return null;
   const c = raw as Record<string, unknown>;
@@ -43,6 +55,8 @@ function parseCitation(raw: unknown): PublicCitation | null {
   const contradictionDisclosure = c.contradictionDisclosure ?? null;
   const uncertaintyLimit = c.uncertaintyLimit ?? null;
   if (!isStringOrNull(contradictionDisclosure) || !isStringOrNull(uncertaintyLimit)) return null;
+  const sourceUri = c.sourceUri ?? null;
+  if (sourceUri !== null && !isSafeSourceUri(sourceUri)) return null;
   return {
     citationLabel: c.citationLabel,
     title: c.title,
@@ -53,6 +67,7 @@ function parseCitation(raw: unknown): PublicCitation | null {
     freshnessLabel: c.freshnessLabel,
     contradictionDisclosure,
     uncertaintyLimit,
+    sourceUri,
   };
 }
 
