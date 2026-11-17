@@ -14,6 +14,7 @@ import {
 } from "../api/publicationRevisions";
 import { reconcileQueueItem, runCreateDraftFlow, runTransitionFlow } from "../api/revisionDeskFlow";
 import { AppSurface } from "../components/AppSurface";
+import { PublicationVisibilityForm } from "../components/PublicationVisibilityForm";
 import { PublicationDraftForm } from "../components/PublicationDraftForm";
 import { RevisionQueue, type QueueView } from "../components/PublicationRevisionQueue";
 import { RevisionPanel, type Loadable } from "../components/PublicationRevisionView";
@@ -160,6 +161,9 @@ export function PublicationRevisionDeskPage() {
         <button type="submit">Open</button>
       </form>
       <RevisionPanel view={view} busy={busy} notice={notice} actionFailure={actionFailure} onAction={act} signInHref={signInHref} />
+      {view.kind === "loaded" ? (
+        <PublicationVisibilityForm key={`${view.data.id}:${view.data.factsVersion}`} revision={view.data} onSaved={(id) => void load(id, true)} signInHref={signInHref} />
+      ) : null}
     </AppSurface>
   );
 }

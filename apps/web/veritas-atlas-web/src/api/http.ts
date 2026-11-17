@@ -76,6 +76,20 @@ export async function apiPut<TResponse>(url: string, auth = true): Promise<TResp
   return (await response.json()) as TResponse;
 }
 
+export async function apiPutBody<TResponse, TRequest>(url: string, body: TRequest, auth = true): Promise<TResponse> {
+  const response = await fetch(toUrl(url), {
+    method: "PUT",
+    headers: createHeaders(auth, true),
+    body: JSON.stringify(body),
+  });
+
+  if (!response.ok) {
+    throw await toApiError(response);
+  }
+
+  return (await response.json()) as TResponse;
+}
+
 export async function apiDelete(url: string, auth = true): Promise<void> {
   const response = await fetch(toUrl(url), {
     method: "DELETE",
