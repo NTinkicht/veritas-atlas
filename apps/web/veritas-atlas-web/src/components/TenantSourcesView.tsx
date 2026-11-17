@@ -7,7 +7,15 @@ export type SourcesView =
   | { kind: "error"; failure: TenantSourcesFailure }
   | { kind: "loaded"; sources: TenantSource[] };
 
-export function TenantSourcesListView({ view, signInHref }: { view: SourcesView; signInHref: string }) {
+export function TenantSourcesListView({
+  view,
+  signInHref,
+  onViewAttempts,
+}: {
+  view: SourcesView;
+  signInHref: string;
+  onViewAttempts?: (source: TenantSource) => void;
+}) {
   if (view.kind === "loading") return <p className="notice-card" role="status">Loading sources...</p>;
   if (view.kind === "error") {
     return (
@@ -26,8 +34,11 @@ export function TenantSourcesListView({ view, signInHref }: { view: SourcesView;
       <ul>
         {view.sources.map((source) => (
           <li key={source.id}>
-            <code>{source.canonicalKey}</code>
+            <code id={`source-key-${source.id}`}>{source.canonicalKey}</code>
             <span className="muted"> registered <time dateTime={source.createdAtUtc}>{source.createdAtUtc}</time></span>
+            {onViewAttempts ? (
+              <> <button type="button" aria-describedby={`source-key-${source.id}`} onClick={() => onViewAttempts(source)}>View attempts</button></>
+            ) : null}
           </li>
         ))}
       </ul>
