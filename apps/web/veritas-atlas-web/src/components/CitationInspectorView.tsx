@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import { describeCitationCode, type CitationFailure, type CitationVerdict } from "../api/citationInspector";
 
 // All API text (references, codes, dates) is rendered as React text children, never as HTML.
@@ -27,7 +28,13 @@ export function CitationResult({ view, signInHref }: { view: CitationView; signI
       <ul aria-label="Cited evidence">
         {verdict.items.map((item, i) => (
           <li key={`${i}:${item.evidenceRef}`}>
-            <strong>{item.valid ? "Valid" : "Rejected"}</strong> <code>{item.evidenceRef}</code>
+            <strong>{item.valid ? "Valid" : "Rejected"}</strong> {item.valid ? (
+              <Link to={`/evidence/${encodeURIComponent(item.evidenceRef)}`} aria-label={`View detail for ${item.evidenceRef}`}>
+                <code>{item.evidenceRef}</code>
+              </Link>
+            ) : (
+              <code>{item.evidenceRef}</code>
+            )}
             {item.code ? <> - {describeCitationCode(item.code)}</> : null}
             {item.freshness ? <> Freshness: {item.freshness}.</> : null}
             {item.evaluatedAt ? <> Evaluated at {item.evaluatedAt}.</> : null}

@@ -1,6 +1,7 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import type { CollectedEvidenceItem, EvidenceAnnotation, Investigation } from "../api/investigations";
+import { MemoryRouter } from "react-router-dom";
 import { CreateInvestigationForm, EvidenceBoard, EvidenceComparison, InvestigationList, type AnnotationsState } from "./InvestigationBoardView";
 
 // SYNTHETIC fixtures only.
@@ -63,7 +64,11 @@ describe("EvidenceComparison and compare controls", () => {
     sameParseRun: true,
   };
   const render = (view: Parameters<typeof EvidenceComparison>[0]["view"]) =>
-    renderToStaticMarkup(<EvidenceComparison view={view} signInHref="/login" />);
+    renderToStaticMarkup(
+      <MemoryRouter>
+        <EvidenceComparison view={view} signInHref="/login" />
+      </MemoryRouter>,
+    );
   it("shows both sides, honest same/different flags and escapes notes", () => {
     const html = render({ kind: "loaded", data });
     expect(html).toContain("Evidence reference: Different");
@@ -73,6 +78,11 @@ describe("EvidenceComparison and compare controls", () => {
     expect(html).toContain("No note");
     expect(html).toContain("&lt;img");
     expect(html).not.toContain("<img");
+  });
+  it("links each compared evidence reference to its detail view with an encoded href", () => {
+    const html = render({ kind: "loaded", data });
+    expect(html).toContain('href="/evidence/ev1%3Aaaa"');
+    expect(html).toContain('href="/evidence/ev1%3Abbb"');
   });
   it("shows failures and loading without any comparison data", () => {
     const err = render({ kind: "error", failure: { kind: "not-found", message: "That investigation was not found." } });

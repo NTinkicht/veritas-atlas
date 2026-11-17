@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import { formatInstant } from "../api/evidenceSearch";
 import {
   ANNOTATION_MAX_TEXT_LENGTH,
@@ -274,7 +275,11 @@ function ComparedSide({ label, side }: { label: string; side: ComparedEvidence }
       <h3>{label}</h3>
       <dl>
         <dt>Evidence reference</dt>
-        <dd>{side.parentEvidenceRef}</dd>
+        <dd>
+          <Link to={`/evidence/${encodeURIComponent(side.parentEvidenceRef)}`} aria-label={`View detail for ${side.parentEvidenceRef}`}>
+            {side.parentEvidenceRef}
+          </Link>
+        </dd>
         <dt>Raw retrieval</dt>
         <dd>{side.rawRetrievalId}</dd>
         <dt>Attestation</dt>
