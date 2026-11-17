@@ -244,6 +244,7 @@ public sealed class AuthorizationMatrixTests
         "GET api/v1/statements | denied: intruder",
         "GET api/v1/statements/{id:guid} | denied: intruder",
         "GET api/v1/tenant-evidence/claim-candidates | denied: intruder",
+        "GET api/v1/tenant-evidence/detail | denied: intruder",
         "GET api/v1/tenant-evidence/search | denied: intruder",
         "GET api/v1/tenant-fetch-attempts | denied: operator,analyst,reviewer,publisher,intruder",
         "GET api/v1/tenant-investigations | denied: intruder",
