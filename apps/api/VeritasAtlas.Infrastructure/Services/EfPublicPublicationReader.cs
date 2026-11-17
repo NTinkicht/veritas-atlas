@@ -50,7 +50,7 @@ public sealed class EfPublicPublicationReader : IPublicPublicationReader
             return null;
         }
 
-        if (citations.Count > MaxCitations || citations.Any(c => c is null || c.CitationLabel is null || c.Title is null || c.Quote is null || c.SourceName is null || c.FreshnessLabel is null || (c.SourceUri is not null && !PublicVisibilityRules.IsPublicSourceUri(c.SourceUri)))) return null;
+        if (citations.Count > MaxCitations || citations.Any(c => c is null || c.CitationLabel is null || c.Title is null || c.Quote is null || c.SourceName is null || c.FreshnessLabel is null || (c.SourceUri is not null && !PublicVisibilityRules.IsPublicSourceUri(c.SourceUri)) || (c.Certainty is not null && !PublicVisibilityRules.IsPublicConfidence(c.Certainty)))) return null;
         var label = currency == EvidenceCurrency.Current ? "current" : "historical";
         return new PublicPublicationView(row.Id, label, citations);
     }

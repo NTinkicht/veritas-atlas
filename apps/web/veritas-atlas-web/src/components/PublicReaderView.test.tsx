@@ -9,7 +9,7 @@ const ok = {
     freshnessLabel: "CURRENT",
     humanReviewLabel: "independently-reviewed" as const,
     citations: [
-      { citationLabel: "S1", title: "<script>alert(1)</script>", quote: "<img src=x onerror=1>", sourceName: "Src", asOf: "2026-11-01T00:00:00Z", effectiveDate: null, freshnessLabel: "CURRENT", contradictionDisclosure: null, uncertaintyLimit: null, sourceUri: null },
+      { citationLabel: "S1", title: "<script>alert(1)</script>", quote: "<img src=x onerror=1>", sourceName: "Src", asOf: "2026-11-01T00:00:00Z", effectiveDate: null, freshnessLabel: "CURRENT", contradictionDisclosure: null, uncertaintyLimit: null, sourceUri: null, confidence: null },
     ],
   },
 };
@@ -50,6 +50,15 @@ describe("PublicReaderView", () => {
     expect(html).not.toMatch(/login|dashboard|\/investigations|\/publication-revisions/i);
     // Positive-control counterpart: without a link there is no anchor at all.
     expect(renderToStaticMarkup(<PublicReaderView state={ok} />)).not.toContain("<a ");
+  });
+
+  it("shows the evidence confidence band with a not-a-truth-judgement note only when one is supplied", () => {
+    const withBand = { ...ok.publication.citations[0], confidence: "Medium" as const };
+    const html = renderToStaticMarkup(<PublicReaderView state={{ kind: "ok", publication: { ...ok.publication, citations: [withBand] } }} />);
+    expect(html).toContain("Evidence confidence: Medium.");
+    expect(html).toContain("not whether the claim is true");
+    // Positive-control counterpart: no band means no confidence line and no default label.
+    expect(renderToStaticMarkup(<PublicReaderView state={ok} />)).not.toContain("Evidence confidence");
   });
 
   it("keeps the source-local calendar date for non-UTC offsets", () => {

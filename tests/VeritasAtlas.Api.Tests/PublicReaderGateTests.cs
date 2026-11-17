@@ -84,7 +84,7 @@ public sealed class PublicReaderGateTests
         CollectionAssert.AreEqual(
             new[]
             {
-                "AsOf", "CitationLabel", "ContradictionDisclosure", "EffectiveDate", "FreshnessLabel", "Quote", "SourceName",
+                "AsOf", "Certainty", "CitationLabel", "ContradictionDisclosure", "EffectiveDate", "FreshnessLabel", "Quote", "SourceName",
                 "SourceUri", "Title", "UncertaintyLimit",
             }, names);
         foreach (var banned in new[] { "tenant", "id", "key", "digest", "hash", "reviewer", "author" })

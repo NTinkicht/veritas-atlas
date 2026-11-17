@@ -10,6 +10,7 @@ export const ERROR_MESSAGE = "This publication could not be loaded. Please try a
 // Keep the source-local calendar date: take it from the ISO string, never via a UTC conversion.
 const fmt = (iso: string | null) => (iso && /^\d{4}-\d{2}-\d{2}/.test(iso) ? iso.slice(0, 10) : "not stated");
 
+export const CONFIDENCE_NOTE = "This describes the quality of the available evidence, not whether the claim is true.";
 export const NON_CURRENT_NOTICE = "Not current evidence: this is historical information and must not be read as a current-state assertion.";
 
 // Fail closed: anything other than an exact CURRENT label (e.g. STALE, SUPERSEDED, UNKNOWN, unrecognised) is non-current.
@@ -48,6 +49,11 @@ export function PublicReaderView({ state }: { state: PublicReaderState }) {
           {isNonCurrent(c.freshnessLabel) ? (
             <p role="note">
               {NON_CURRENT_NOTICE} Historical as of {fmt(c.asOf)}.
+            </p>
+          ) : null}
+          {c.confidence ? (
+            <p>
+              Evidence confidence: {c.confidence}. {CONFIDENCE_NOTE}
             </p>
           ) : null}
           {c.contradictionDisclosure ? <p>Contradiction disclosure: {c.contradictionDisclosure}</p> : null}

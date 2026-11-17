@@ -41,6 +41,13 @@ public static class PublicVisibilityRules
         && Uri.TryCreate(value, UriKind.Absolute, out var uri)
         && uri.Scheme == Uri.UriSchemeHttps && uri.UserInfo.Length == 0 && uri.Host.Length > 0;
 
+    /// <summary>
+    /// A public confidence label is exactly one <see cref="ConfidenceBand"/> name (case-sensitive). Numeric text such as "3" is
+    /// rejected so no falsely precise or undefined value can reach the anonymous reader.
+    /// </summary>
+    public static bool IsPublicConfidence(string? value) =>
+        value is not null && Enum.GetNames<ConfidenceBand>().Contains(value, StringComparer.Ordinal);
+
     public static string? Validate(PublicVisibilityFactsInput facts, bool policyPermitsPublicDisplay, LifecycleState state)
     {
         ArgumentNullException.ThrowIfNull(facts);
@@ -58,7 +65,8 @@ public static class PublicVisibilityRules
                 || !Text(c.FreshnessLabel, MaxLabel, multiline: false)
                 || (c.ContradictionDisclosure is not null && !Text(c.ContradictionDisclosure, MaxDisclosure, multiline: true))
                 || (c.UncertaintyLimit is not null && !Text(c.UncertaintyLimit, MaxDisclosure, multiline: true))
-                || (c.SourceUri is not null && !IsPublicSourceUri(c.SourceUri)))
+                || (c.SourceUri is not null && !IsPublicSourceUri(c.SourceUri))
+                || (c.Certainty is not null && !IsPublicConfidence(c.Certainty)))
             {
                 return VisibilityDenials.InvalidFacts;
             }

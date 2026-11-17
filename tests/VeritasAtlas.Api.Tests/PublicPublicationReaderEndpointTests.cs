@@ -38,11 +38,15 @@ public sealed class PublicPublicationReaderEndpointTests
         "[{\"citationLabel\":\"[1]\",\"title\":\"T\",\"quote\":\"Q\",\"sourceName\":\"S\"," +
         "\"asOf\":null,\"effectiveDate\":null,\"freshnessLabel\":\"current\",\"sourceUri\":\"" + sourceUri + "\"}]";
 
+    private static string CitationsWithConfidence(string confidenceJson) =>
+        "[{\"citationLabel\":\"[1]\",\"title\":\"T\",\"quote\":\"Q\",\"sourceName\":\"S\"," +
+        "\"asOf\":null,\"effectiveDate\":null,\"freshnessLabel\":\"current\",\"confidence\":" + confidenceJson + "}]";
+
     private const string Citations =
         "[{\"citationLabel\":\"[1]\",\"title\":\"Synthetic ruling\",\"quote\":\"Synthetic quote.\",\"sourceName\":\"Synthetic Gazette\"," +
         "\"asOf\":\"2026-01-01T00:00:00+00:00\",\"effectiveDate\":null,\"freshnessLabel\":\"as of 2026-01-01\"," +
         "\"contradictionDisclosure\":\"Conflicts with the 2025 notice.\",\"uncertaintyLimit\":\"Single-source reading.\"," +
-        "\"sourceUri\":\"https://gazette.example.org/notice/1\"," +
+        "\"sourceUri\":\"https://gazette.example.org/notice/1\",\"confidence\":\"Medium\"," +
         "\"tenantId\":\"a1111111-1111-4111-8111-111111111111\",\"storageKey\":\"s3://secret\",\"reviewerId\":\"synthetic-reviewer\"}]";
 
     private sealed record Facts(
@@ -78,7 +82,7 @@ public sealed class PublicPublicationReaderEndpointTests
         Assert.AreEqual("independently-reviewed", json.GetProperty("humanReviewLabel").GetString());
         var citation = json.GetProperty("citations").EnumerateArray().Single();
         CollectionAssert.AreEquivalent(
-            new[] { "citationLabel", "title", "quote", "sourceName", "asOf", "effectiveDate", "freshnessLabel", "contradictionDisclosure", "uncertaintyLimit", "sourceUri" },
+            new[] { "citationLabel", "title", "quote", "sourceName", "asOf", "effectiveDate", "freshnessLabel", "contradictionDisclosure", "uncertaintyLimit", "sourceUri", "confidence" },
             citation.EnumerateObject().Select(p => p.Name).ToArray());
         Assert.AreEqual("[1]", citation.GetProperty("citationLabel").GetString());
         Assert.AreEqual("Synthetic ruling", citation.GetProperty("title").GetString());
@@ -88,6 +92,7 @@ public sealed class PublicPublicationReaderEndpointTests
         Assert.AreEqual("Conflicts with the 2025 notice.", citation.GetProperty("contradictionDisclosure").GetString());
         Assert.AreEqual("Single-source reading.", citation.GetProperty("uncertaintyLimit").GetString());
         Assert.AreEqual("https://gazette.example.org/notice/1", citation.GetProperty("sourceUri").GetString());
+        Assert.AreEqual("Medium", citation.GetProperty("confidence").GetString());
         Assert.AreEqual(JsonValueKind.Null, citation.GetProperty("effectiveDate").ValueKind);
         Assert.AreEqual(new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero), citation.GetProperty("asOf").GetDateTimeOffset());
         var raw = await response.Content.ReadAsStringAsync();
@@ -128,6 +133,9 @@ public sealed class PublicPublicationReaderEndpointTests
             ("non-array citations", "Published", new Facts(CitationsJson: "{\"a\":1}")),
             ("javascript source link", "Published", new Facts(CitationsJson: CitationsWith("javascript:alert(1)"))),
             ("plain-http source link", "Published", new Facts(CitationsJson: CitationsWith("http://gazette.example.org/n"))),
+            ("unknown confidence band", "Published", new Facts(CitationsJson: CitationsWithConfidence("\"Certain\""))),
+            ("lowercase confidence band", "Published", new Facts(CitationsJson: CitationsWithConfidence("\"high\""))),
+            ("numeric confidence band", "Published", new Facts(CitationsJson: CitationsWithConfidence("3"))),
             ("credentialed source link", "Published", new Facts(CitationsJson: CitationsWith("https://user:pw@gazette.example.org/n"))),
         };
         foreach (var (label, state, facts) in cases)
@@ -143,6 +151,11 @@ public sealed class PublicPublicationReaderEndpointTests
         var control = await Drive(client, connection, "Published", new Facts(CitationsJson: CitationsWith("https://gazette.example.org/n")));
         using var readable = await client.GetAsync($"{Public}/{control}");
         Assert.AreEqual(HttpStatusCode.OK, readable.StatusCode, "valid https source link control");
+
+        // Positive control: a known confidence band in the same shape is readable, so the refusals above are caused by the band.
+        var bandControl = await Drive(client, connection, "Published", new Facts(CitationsJson: CitationsWithConfidence("\"High\"")));
+        using var bandReadable = await client.GetAsync($"{Public}/{bandControl}");
+        Assert.AreEqual(HttpStatusCode.OK, bandReadable.StatusCode, "known confidence band control");
 
         // A freshly created, never-touched revision keeps the restrictive defaults and is hidden even if published.
         var defaults = await Drive(client, connection, "Published", null);
