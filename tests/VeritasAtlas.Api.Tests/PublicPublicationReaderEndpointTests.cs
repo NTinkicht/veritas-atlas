@@ -67,9 +67,10 @@ public sealed class PublicPublicationReaderEndpointTests
         Assert.AreEqual("no-store", response.Headers.CacheControl?.ToString());
         AssertHardenedHeaders(response, "visible");
         var json = await response.Content.ReadFromJsonAsync<JsonElement>();
-        CollectionAssert.AreEquivalent(new[] { "id", "freshnessLabel", "citations" },
+        CollectionAssert.AreEquivalent(new[] { "id", "freshnessLabel", "humanReviewLabel", "citations" },
             json.EnumerateObject().Select(p => p.Name).ToArray());
         Assert.AreEqual("current", json.GetProperty("freshnessLabel").GetString());
+        Assert.AreEqual("independently-reviewed", json.GetProperty("humanReviewLabel").GetString());
         var citation = json.GetProperty("citations").EnumerateArray().Single();
         CollectionAssert.AreEquivalent(
             new[] { "citationLabel", "title", "quote", "sourceName", "asOf", "effectiveDate", "freshnessLabel", "contradictionDisclosure", "uncertaintyLimit" },
