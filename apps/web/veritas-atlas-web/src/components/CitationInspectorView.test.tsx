@@ -1,10 +1,15 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
+import { MemoryRouter } from "react-router-dom";
 import { CitationResult } from "./CitationInspectorView";
 
 // SYNTHETIC fixtures only.
 const show = (view: Parameters<typeof CitationResult>[0]["view"]) =>
-  renderToStaticMarkup(<CitationResult view={view} signInHref="/login?returnTo=%2Fcitation-inspector" />);
+  renderToStaticMarkup(
+    <MemoryRouter>
+      <CitationResult view={view} signInHref="/login?returnTo=%2Fcitation-inspector" />
+    </MemoryRouter>,
+  );
 
 describe("CitationResult", () => {
   it("shows nothing before a request, so no verdict is invented", () => {
@@ -35,5 +40,21 @@ describe("CitationResult", () => {
   it("shows errors honestly with a sign-in link only when unauthenticated", () => {
     expect(show({ kind: "error", failure: { kind: "unauthenticated", message: "ended" } })).toContain("/login?returnTo=");
     expect(show({ kind: "error", failure: { kind: "server", message: "boom" } })).not.toContain("Sign in");
+  });
+  it("links only accepted citations to the evidence detail and never a rejected one", () => {
+    const html = show({
+      kind: "loaded",
+      verdict: {
+        valid: false,
+        code: "EVIDENCE_STALE",
+        items: [
+          { evidenceRef: "ev1:ok/1", valid: true, code: null, freshness: "CURRENT", evaluatedAt: null, historicalAsOf: null },
+          { evidenceRef: "ev1:bad", valid: false, code: "EVIDENCE_STALE", freshness: "STALE", evaluatedAt: null, historicalAsOf: null },
+        ],
+      },
+    });
+    expect(html).toContain('href="/evidence/ev1%3Aok%2F1"');
+    expect(html).not.toContain("/evidence/ev1%3Abad");
+    expect(html).toContain("ev1:bad");
   });
 });
