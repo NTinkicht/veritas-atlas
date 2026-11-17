@@ -1,13 +1,17 @@
 import { useEffect, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
-import { classifyTenantSourcesFailure, listTenantSources } from "../api/tenantSources";
+import { classifyFetchAttemptsFailure, listFetchAttempts } from "../api/tenantFetchAttempts";
+import { classifyTenantSourcesFailure, listTenantSources, type TenantSource } from "../api/tenantSources";
 import { AppSurface } from "../components/AppSurface";
+import { FetchAttemptsPanel, type AttemptsView } from "../components/FetchAttemptsView";
 import { TenantSourcesListView, type SourcesView } from "../components/TenantSourcesView";
 
 export function SourcesPage() {
   const location = useLocation();
   const [view, setView] = useState<SourcesView>({ kind: "loading" });
+  const [attempts, setAttempts] = useState<AttemptsView>({ kind: "idle" });
   const alive = useRef(true);
+  const latest = useRef(0);
   const signInHref = `/login?returnTo=${encodeURIComponent(`${location.pathname}${location.search}`)}`;
 
   useEffect(() => {
@@ -25,9 +29,24 @@ export function SourcesPage() {
     };
   }, []);
 
+  const viewAttempts = async (source: TenantSource) => {
+    // Only the newest request may write: a slow answer for a previously selected source is dropped.
+    const ticket = ++latest.current;
+    setAttempts({ kind: "loading", sourceKey: source.canonicalKey });
+    try {
+      const rows = await listFetchAttempts(source.id);
+      if (alive.current && ticket === latest.current) setAttempts({ kind: "loaded", sourceKey: source.canonicalKey, attempts: rows });
+    } catch (error) {
+      if (alive.current && ticket === latest.current) {
+        setAttempts({ kind: "error", sourceKey: source.canonicalKey, failure: classifyFetchAttemptsFailure(error, navigator.onLine) });
+      }
+    }
+  };
+
   return (
     <AppSurface title="Sources" subtitle="The public-record sources registered for your organization. Read-only.">
-      <TenantSourcesListView view={view} signInHref={signInHref} />
+      <TenantSourcesListView view={view} signInHref={signInHref} onViewAttempts={viewAttempts} />
+      <FetchAttemptsPanel view={attempts} signInHref={signInHref} />
     </AppSurface>
   );
 }
