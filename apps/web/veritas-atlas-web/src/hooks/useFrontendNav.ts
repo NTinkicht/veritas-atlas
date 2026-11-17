@@ -10,6 +10,7 @@ const NAV_LINKS = [
   { href: "/answer-report", label: "Source-backed Report" },
   { href: "/statement-classification", label: "Statement Classification" },
   { href: "/claim-candidates", label: "Claim Candidates" },
+  { href: "/sources", label: "Sources" },
   { href: "/citation-inspector", label: "Citation Inspector" },
   { href: "/claim-relations", label: "Claim Relations" },
   { href: "/cases", label: "Cases" },
