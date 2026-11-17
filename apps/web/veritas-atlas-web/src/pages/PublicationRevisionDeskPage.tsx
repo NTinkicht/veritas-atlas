@@ -12,8 +12,10 @@ import {
   type RevisionFailure,
   type RevisionState,
 } from "../api/publicationRevisions";
+import { setVisibility, type VisibilityInput } from "../api/publicationVisibility";
 import { reconcileQueueItem, runCreateDraftFlow, runTransitionFlow } from "../api/revisionDeskFlow";
 import { AppSurface } from "../components/AppSurface";
+import { PublicationVisibilityForm } from "../components/PublicationVisibilityForm";
 import { PublicationDraftForm } from "../components/PublicationDraftForm";
 import { RevisionQueue, type QueueView } from "../components/PublicationRevisionQueue";
 import { RevisionPanel, type Loadable } from "../components/PublicationRevisionView";
@@ -109,6 +111,15 @@ export function PublicationRevisionDeskPage() {
     }
   }
 
+  async function saveVisibility(revision: PublicationRevision, input: VisibilityInput) {
+    const startedOn = latest.current;
+    await setVisibility(revision.id, input, revision.factsVersion, crypto.randomUUID());
+    if (latest.current !== startedOn) return; // another revision was opened meanwhile: drop the late result
+    setActionFailure(null);
+    setNotice("Public visibility saved by the server.");
+    await load(revision.id, true);
+  }
+
   async function create(digest: string, policyPermitsPublicDisplay: boolean) {
     if (busy) return;
     const startedOn = latest.current;
@@ -160,6 +171,9 @@ export function PublicationRevisionDeskPage() {
         <button type="submit">Open</button>
       </form>
       <RevisionPanel view={view} busy={busy} notice={notice} actionFailure={actionFailure} onAction={act} signInHref={signInHref} />
+      {view.kind === "loaded" ? (
+        <PublicationVisibilityForm key={`${view.data.id}:${view.data.factsVersion}`} revision={view.data} onSave={saveVisibility} signInHref={signInHref} />
+      ) : null}
     </AppSurface>
   );
 }
