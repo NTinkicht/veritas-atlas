@@ -312,7 +312,7 @@ public sealed class EfTenantPublicationRevisionStore : ITenantPublicationRevisio
         new(VisibilityOutcome.Denied, code, ToModel(row));
 
     /// <summary>
-    /// Digest shape of one citation. The two disclosure fields were added after operations were already committed, so they
+    /// Digest shape of one citation. The disclosure and source-link fields were added after operations were already committed, so they
     /// are left out when null: a retry of a pre-existing operation keeps its original digest and replays instead of conflicting.
     /// </summary>
     private static Dictionary<string, object?> DigestShape(PublicCitationProjection c)
@@ -324,6 +324,7 @@ public sealed class EfTenantPublicationRevisionStore : ITenantPublicationRevisio
         };
         if (c.ContradictionDisclosure is not null) shape["contradictionDisclosure"] = c.ContradictionDisclosure;
         if (c.UncertaintyLimit is not null) shape["uncertaintyLimit"] = c.UncertaintyLimit;
+        if (c.SourceUri is not null) shape["sourceUri"] = c.SourceUri;
         return shape;
     }
 

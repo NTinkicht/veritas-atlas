@@ -9,7 +9,7 @@ const ok = {
     freshnessLabel: "CURRENT",
     humanReviewLabel: "independently-reviewed" as const,
     citations: [
-      { citationLabel: "S1", title: "<script>alert(1)</script>", quote: "<img src=x onerror=1>", sourceName: "Src", asOf: "2026-11-01T00:00:00Z", effectiveDate: null, freshnessLabel: "CURRENT", contradictionDisclosure: null, uncertaintyLimit: null },
+      { citationLabel: "S1", title: "<script>alert(1)</script>", quote: "<img src=x onerror=1>", sourceName: "Src", asOf: "2026-11-01T00:00:00Z", effectiveDate: null, freshnessLabel: "CURRENT", contradictionDisclosure: null, uncertaintyLimit: null, sourceUri: null },
     ],
   },
 };
@@ -39,6 +39,17 @@ describe("PublicReaderView", () => {
     expect(html).toContain("Contradiction disclosure: Conflicts &lt;b&gt;with&lt;/b&gt; 2025");
     expect(html).toContain("Uncertainty limit: Single source");
     expect(html).not.toContain("<b>");
+  });
+
+  it("links the source only when the citation carries a safe https provenance link", () => {
+    const withLink = { ...ok.publication.citations[0], sourceUri: "https://gazette.example.org/notice/1?a=1&b=2" };
+    const html = renderToStaticMarkup(<PublicReaderView state={{ kind: "ok", publication: { ...ok.publication, citations: [withLink] } }} />);
+    expect(html).toContain('href="https://gazette.example.org/notice/1?a=1&amp;b=2"');
+    expect(html).toContain('rel="noopener noreferrer nofollow"');
+    expect(html).toContain('target="_blank"');
+    expect(html).not.toMatch(/login|dashboard|\/investigations|\/publication-revisions/i);
+    // Positive-control counterpart: without a link there is no anchor at all.
+    expect(renderToStaticMarkup(<PublicReaderView state={ok} />)).not.toContain("<a ");
   });
 
   it("keeps the source-local calendar date for non-UTC offsets", () => {
