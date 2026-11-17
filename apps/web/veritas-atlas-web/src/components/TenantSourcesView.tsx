@@ -11,10 +11,12 @@ export function TenantSourcesListView({
   view,
   signInHref,
   onViewAttempts,
+  onViewRetrievals,
 }: {
   view: SourcesView;
   signInHref: string;
   onViewAttempts?: (source: TenantSource) => void;
+  onViewRetrievals?: (source: TenantSource) => void;
 }) {
   if (view.kind === "loading") return <p className="notice-card" role="status">Loading sources...</p>;
   if (view.kind === "error") {
@@ -38,6 +40,9 @@ export function TenantSourcesListView({
             <span className="muted"> registered <time dateTime={source.createdAtUtc}>{source.createdAtUtc}</time></span>
             {onViewAttempts ? (
               <> <button type="button" aria-describedby={`source-key-${source.id}`} onClick={() => onViewAttempts(source)}>View attempts</button></>
+            ) : null}
+            {onViewRetrievals ? (
+              <> <button type="button" aria-describedby={`source-key-${source.id}`} onClick={() => onViewRetrievals(source)}>View retrievals</button></>
             ) : null}
           </li>
         ))}
