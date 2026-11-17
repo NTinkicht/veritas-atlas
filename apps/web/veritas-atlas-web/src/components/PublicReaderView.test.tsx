@@ -1,6 +1,6 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { ERROR_MESSAGE, HIDDEN_MESSAGE, PublicReaderView, REVIEW_STATEMENT } from "./PublicReaderView";
+import { ERROR_MESSAGE, HIDDEN_MESSAGE, NON_CURRENT_NOTICE, PublicReaderView, REVIEW_STATEMENT } from "./PublicReaderView";
 
 const ok = {
   kind: "ok" as const,
@@ -55,5 +55,29 @@ describe("PublicReaderView", () => {
       expect(html).not.toMatch(/<a |<button|<form|<input|href=|login|dashboard/i);
     }
     expect(renderToStaticMarkup(<PublicReaderView state={{ kind: "error" }} />)).toContain(ERROR_MESSAGE);
+  });
+
+  it("discloses non-current citations with the historical as-of date", () => {
+    for (const label of ["STALE", "SUPERSEDED", "UNKNOWN", "bogus"]) {
+      const c = { ...ok.publication.citations[0], freshnessLabel: label };
+      const html = renderToStaticMarkup(<PublicReaderView state={{ kind: "ok", publication: { ...ok.publication, citations: [c] } }} />);
+      expect(html).toContain(NON_CURRENT_NOTICE);
+      expect(html).toContain("Historical as of 2026-11-01");
+    }
+    const undated = { ...ok.publication.citations[0], freshnessLabel: "STALE", asOf: null };
+    expect(renderToStaticMarkup(<PublicReaderView state={{ kind: "ok", publication: { ...ok.publication, citations: [undated] } }} />)).toContain("Historical as of not stated");
+  });
+
+  it("shows no non-current notice for CURRENT evidence (positive control)", () => {
+    expect(renderToStaticMarkup(<PublicReaderView state={ok} />)).not.toContain(NON_CURRENT_NOTICE);
+    const c = { ...ok.publication.citations[0], freshnessLabel: " current " };
+    expect(renderToStaticMarkup(<PublicReaderView state={{ kind: "ok", publication: { ...ok.publication, citations: [c] } }} />)).not.toContain(NON_CURRENT_NOTICE);
+  });
+
+  it("discloses a non-current publication-level label and keeps hidden/error free of notices", () => {
+    expect(renderToStaticMarkup(<PublicReaderView state={{ kind: "ok", publication: { ...ok.publication, freshnessLabel: "STALE" } }} />)).toContain(NON_CURRENT_NOTICE);
+    for (const state of [{ kind: "hidden" as const }, { kind: "error" as const }]) {
+      expect(renderToStaticMarkup(<PublicReaderView state={state} />)).not.toContain(NON_CURRENT_NOTICE);
+    }
   });
 });
