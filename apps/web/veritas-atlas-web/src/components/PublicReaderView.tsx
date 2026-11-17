@@ -29,6 +29,8 @@ export function PublicReaderView({ state }: { state: PublicReaderState }) {
           <p>
             As of {fmt(c.asOf)} · Effective {fmt(c.effectiveDate)} · {c.freshnessLabel}
           </p>
+          {c.contradictionDisclosure ? <p>Contradiction disclosure: {c.contradictionDisclosure}</p> : null}
+          {c.uncertaintyLimit ? <p>Uncertainty limit: {c.uncertaintyLimit}</p> : null}
         </section>
       ))}
     </article>
