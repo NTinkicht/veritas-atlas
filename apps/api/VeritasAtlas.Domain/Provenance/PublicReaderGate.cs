@@ -28,7 +28,8 @@ public sealed record PublicReaderDecision(bool Visible, string? InternalReason)
 /// <summary>Allow-listed public citation/evidence fields. Deliberately excludes tenant, internal ids, storage keys, digests and reviewer identity.</summary>
 public sealed record PublicCitationProjection(
     string CitationLabel, string Title, string Quote, string SourceName, DateTimeOffset? AsOf,
-    DateTimeOffset? EffectiveDate, string FreshnessLabel);
+    DateTimeOffset? EffectiveDate, string FreshnessLabel, string? ContradictionDisclosure = null,
+    string? UncertaintyLimit = null);
 
 /// <summary>Pure fail-closed public-reader visibility rules (VER-P0-16 slice 2). Approved is never public.</summary>
 public static class PublicReaderGate

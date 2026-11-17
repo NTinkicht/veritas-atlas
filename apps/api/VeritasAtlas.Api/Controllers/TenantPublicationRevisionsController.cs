@@ -174,7 +174,8 @@ public sealed partial class TenantPublicationRevisionsController : ControllerBas
         var facts = new PublicVisibilityFactsInput(
             restricted, superseded, request.ExpiresAt, freshnessRequired, currency, historical,
             citations.Select(c => new PublicCitationProjection(
-                c.CitationLabel!, c.Title!, c.Quote!, c.SourceName!, c.AsOf, c.EffectiveDate, c.FreshnessLabel!)).ToList());
+                c.CitationLabel!, c.Title!, c.Quote!, c.SourceName!, c.AsOf, c.EffectiveDate, c.FreshnessLabel!,
+                c.ContradictionDisclosure, c.UncertaintyLimit)).ToList());
         var result = await _store.SetVisibilityAsync(
             tenantId, id, actor, role, facts, expected, operationId, cancellationToken);
         return result.Outcome switch
@@ -258,4 +259,5 @@ public sealed record VisibilityRequest(
 
 public sealed record VisibilityCitationRequest(
     string? CitationLabel, string? Title, string? Quote, string? SourceName, DateTimeOffset? AsOf,
-    DateTimeOffset? EffectiveDate, string? FreshnessLabel);
+    DateTimeOffset? EffectiveDate, string? FreshnessLabel, string? ContradictionDisclosure = null,
+    string? UncertaintyLimit = null);

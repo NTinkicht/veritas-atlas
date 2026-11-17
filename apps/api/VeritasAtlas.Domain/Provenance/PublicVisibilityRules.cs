@@ -28,6 +28,7 @@ public static class PublicVisibilityRules
     private const int MaxTitle = 300;
     private const int MaxQuote = 2000;
     private const int MaxSource = 200;
+    public const int MaxDisclosure = 500;
 
     public static string? Validate(PublicVisibilityFactsInput facts, bool policyPermitsPublicDisplay, LifecycleState state)
     {
@@ -43,7 +44,9 @@ public static class PublicVisibilityRules
             if (c is null
                 || !Text(c.CitationLabel, MaxLabel, multiline: false) || !Text(c.Title, MaxTitle, multiline: false)
                 || !Text(c.Quote, MaxQuote, multiline: true) || !Text(c.SourceName, MaxSource, multiline: false)
-                || !Text(c.FreshnessLabel, MaxLabel, multiline: false))
+                || !Text(c.FreshnessLabel, MaxLabel, multiline: false)
+                || (c.ContradictionDisclosure is not null && !Text(c.ContradictionDisclosure, MaxDisclosure, multiline: true))
+                || (c.UncertaintyLimit is not null && !Text(c.UncertaintyLimit, MaxDisclosure, multiline: true)))
             {
                 return VisibilityDenials.InvalidFacts;
             }

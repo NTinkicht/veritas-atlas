@@ -51,9 +51,22 @@ describe("getPublicPublication", () => {
   });
 });
 
+describe("parsePublicPublication disclosures", () => {
+  it("keeps string disclosures and fails closed on any other type", () => {
+    const c = { ...body.citations[0], contradictionDisclosure: "Conflicts with 2025", uncertaintyLimit: "Single source" };
+    const parsed = parsePublicPublication({ ...body, citations: [c] });
+    expect(parsed?.citations[0].contradictionDisclosure).toBe("Conflicts with 2025");
+    expect(parsed?.citations[0].uncertaintyLimit).toBe("Single source");
+    expect(parsePublicPublication({ ...body, citations: [{ ...c, contradictionDisclosure: 5 }] })).toBeNull();
+    expect(parsePublicPublication({ ...body, citations: [{ ...c, uncertaintyLimit: { a: 1 } }] })).toBeNull();
+  });
+});
+
 describe("parsePublicPublication", () => {
   it("accepts the allow-listed shape and rejects bad input", () => {
     expect(parsePublicPublication(body)?.citations[0].effectiveDate).toBeNull();
+    expect(parsePublicPublication(body)?.citations[0].contradictionDisclosure).toBeNull();
+    expect(parsePublicPublication(body)?.citations[0].uncertaintyLimit).toBeNull();
     expect(parsePublicPublication(null)).toBeNull();
     expect(parsePublicPublication({ ...body, id: "nope" })).toBeNull();
     expect(parsePublicPublication({ ...body, citations: "x" })).toBeNull();

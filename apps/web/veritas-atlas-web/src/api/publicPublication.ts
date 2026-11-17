@@ -15,6 +15,8 @@ export type PublicCitation = {
   asOf: string | null;
   effectiveDate: string | null;
   freshnessLabel: string;
+  contradictionDisclosure: string | null;
+  uncertaintyLimit: string | null;
 };
 
 export type PublicPublication = { id: string; freshnessLabel: string; citations: PublicCitation[] };
@@ -26,6 +28,7 @@ export type PublicPublicationResult =
   | { kind: "error" };
 
 const isString = (v: unknown): v is string => typeof v === "string";
+const isStringOrNull = (v: unknown): v is string | null => v === null || isString(v);
 const isDateOrNull = (v: unknown): v is string | null =>
   v === null || (isString(v) && !Number.isNaN(Date.parse(v)));
 
@@ -34,6 +37,10 @@ function parseCitation(raw: unknown): PublicCitation | null {
   const c = raw as Record<string, unknown>;
   if (!isString(c.citationLabel) || !isString(c.title) || !isString(c.quote) || !isString(c.sourceName)) return null;
   if (!isString(c.freshnessLabel) || !isDateOrNull(c.asOf ?? null) || !isDateOrNull(c.effectiveDate ?? null)) return null;
+  // Absent (legacy rows) reads as null; any present non-string value fails closed.
+  const contradictionDisclosure = c.contradictionDisclosure ?? null;
+  const uncertaintyLimit = c.uncertaintyLimit ?? null;
+  if (!isStringOrNull(contradictionDisclosure) || !isStringOrNull(uncertaintyLimit)) return null;
   return {
     citationLabel: c.citationLabel,
     title: c.title,
@@ -42,6 +49,8 @@ function parseCitation(raw: unknown): PublicCitation | null {
     asOf: (c.asOf as string | null | undefined) ?? null,
     effectiveDate: (c.effectiveDate as string | null | undefined) ?? null,
     freshnessLabel: c.freshnessLabel,
+    contradictionDisclosure,
+    uncertaintyLimit,
   };
 }
 
