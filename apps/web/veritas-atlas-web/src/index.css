@@ -176,3 +176,5 @@ tbody tr:hover { background: rgba(148,163,184,.05); }
 .es-fresh-current { border-color: rgba(52,211,153,.45); color: #bbf7d0; }
 .es-fresh-caution { border-color: rgba(251,191,36,.5); color: #fde68a; }
 @media (max-width: 960px) { .es-layout { grid-template-columns: minmax(0, 1fr); } }
+.es-chunk { border-bottom: 1px solid rgba(148,163,184,.10); padding-bottom: 10px; }
+.es-chunk-text { margin: 6px 0; white-space: pre-wrap; overflow-wrap: anywhere; }

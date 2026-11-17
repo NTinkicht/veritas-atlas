@@ -25,7 +25,11 @@ const base: EvidenceHit = {
 
 const noop = () => undefined;
 const results = (view: SearchView) =>
-  renderToStaticMarkup(<EvidenceResults view={view} selectedRef={null} onSelect={noop} onMore={noop} signInHref="/login?returnTo=%2Fevidence-search" />);
+  renderToStaticMarkup(
+    <MemoryRouter>
+      <EvidenceResults view={view} selectedRef={null} onSelect={noop} onMore={noop} signInHref="/login?returnTo=%2Fevidence-search" />
+    </MemoryRouter>,
+  );
 const loaded = (hits: EvidenceHit[], nextCursor: string | null = null): SearchView => ({
   kind: "loaded",
   hits,

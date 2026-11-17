@@ -118,7 +118,7 @@ The table mirrors `src/routeAudit.ts`. `src/routes.test.ts` fails when a route h
 | `/documents/:id` | DocumentDetailPage | DEAD | none (placeholder shell) |
 | `/evidence` | EvidencePage | DEAD | none (placeholder shell) |
 | `/evidence/new` | CreateEvidencePage | DEAD | none (placeholder shell) |
-| `/evidence/:id` | EvidenceDetailPage | DEAD | none (placeholder shell) |
+| `/evidence/:id` | EvidenceDetailPage | REAL | /api/v1/tenant-evidence/detail |
 | `/statements` | StatementsPage | DEAD | none (placeholder shell) |
 | `/statements/new` | CreateStatementPage | DEAD | none (placeholder shell) |
 | `/statements/:id` | StatementDetailPage | DEAD | none (placeholder shell) |
@@ -146,4 +146,5 @@ The table mirrors `src/routeAudit.ts`. `src/routes.test.ts` fails when a route h
 - `/sources` (#338) lists the organization's registered sources from `GET /api/v1/tenant-sources` and nothing else: read-only, no registration, fetch or edit controls, no seeded fallback; a malformed response is rejected whole and server text is never echoed. `/sources/new` and `/sources/:id` stay DEAD.
 - `/sources` also offers a per-source read-only "View attempts" panel (#340) backed by `GET /api/v1/tenant-fetch-attempts?sourceId=` (admin-only on the server; a non-admin sees a fixed 403 message). No retry, fetch or edit controls; a malformed response is rejected whole and server text is never echoed.
 - `/evidence-search` (#161) is the analyst search and citation inspector; it reads only `/api/v1/tenant-evidence/search` and has no seeded fallback. The search hit carries no parser name/version, so the inspector says so rather than inventing one.
+- `/evidence/:id` (#344) is the analyst evidence detail view backed only by `GET /api/v1/tenant-evidence/detail?ref=`: provenance, server re-evaluated freshness and bounded verified chunk text (rendered as text, never HTML). Unknown, unverified and other-organization references all show one generic not-found message; a malformed response is rejected whole; no seeded fallback.
 - `/case-explorer`, `/case-scoreboard`: listed REAL because they call `/api/v1/cases`; neither reads seed modules (checked by search).

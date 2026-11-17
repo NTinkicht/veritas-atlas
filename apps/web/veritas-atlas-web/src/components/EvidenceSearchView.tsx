@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import {
   formatInstant,
   isPresentedAsCurrent,
@@ -22,7 +23,7 @@ const FRESHNESS_TEXT: Record<FreshnessLabel, string> = {
   UNKNOWN: "Unknown",
 };
 
-export function FreshnessBadge({ hit }: { hit: EvidenceHit }) {
+export function FreshnessBadge({ hit }: { hit: Pick<EvidenceHit, "freshness" | "freshnessEligible"> }) {
   const current = isPresentedAsCurrent(hit);
   const suffix = hit.freshness === "CURRENT" && !current ? " (not eligible)" : "";
   return (
@@ -92,7 +93,10 @@ export function EvidenceResults({ view, selectedRef, onSelect, onMore, signInHre
               aria-label={`Inspect citation for ${hit.evidenceRef}`}
             >
               Inspect citation
-            </button>
+            </button>{" "}
+            <Link to={`/evidence/${encodeURIComponent(hit.evidenceRef)}`} aria-label={`View detail for ${hit.evidenceRef}`}>
+              View detail
+            </Link>
           </li>
         ))}
       </ol>
