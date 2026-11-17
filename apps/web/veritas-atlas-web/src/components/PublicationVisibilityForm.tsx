@@ -1,16 +1,22 @@
 import { useState, type FormEvent } from "react";
 import { classifyRevisionFailure, type PublicationRevision, type RevisionFailure } from "../api/publicationRevisions";
-import { setVisibility, type VisibilityCitationInput } from "../api/publicationVisibility";
+import { type VisibilityInput, type VisibilityCitationInput } from "../api/publicationVisibility";
 
 // VER-P0-17: publisher sets what the anonymous public reader may see. Fails closed: starts
 // restricted, success is reported only after the server accepted the write, and the server alone
 // decides who may do it. Shown only for Approved/Published revisions (the only legal states).
 
-type Props = { revision: PublicationRevision; onSaved: (id: string) => void; signInHref: string };
+// The owner (desk page) performs the write so a late completion can be dropped when another revision
+// was opened meanwhile and the confirmation survives the reload that unmounts this form.
+type Props = {
+  revision: PublicationRevision;
+  onSave: (revision: PublicationRevision, input: VisibilityInput) => Promise<void>;
+  signInHref: string;
+};
 
 const blank = (): VisibilityCitationInput => ({ citationLabel: "", title: "", quote: "", sourceName: "", freshnessLabel: "" });
 
-export function PublicationVisibilityForm({ revision, onSaved, signInHref }: Props) {
+export function PublicationVisibilityForm({ revision, onSave, signInHref }: Props) {
   const [restricted, setRestricted] = useState(true);
   const [superseded, setSuperseded] = useState(false);
   const [freshnessRequired, setFreshnessRequired] = useState(true);
@@ -18,7 +24,6 @@ export function PublicationVisibilityForm({ revision, onSaved, signInHref }: Pro
   const [historical, setHistorical] = useState(false);
   const [citations, setCitations] = useState<VisibilityCitationInput[]>([blank()]);
   const [busy, setBusy] = useState(false);
-  const [notice, setNotice] = useState<string | null>(null);
   const [failure, setFailure] = useState<RevisionFailure | null>(null);
 
   if (revision.state !== "Approved" && revision.state !== "Published") return null;
@@ -30,17 +35,9 @@ export function PublicationVisibilityForm({ revision, onSaved, signInHref }: Pro
     event.preventDefault();
     if (busy) return;
     setBusy(true);
-    setNotice(null);
     setFailure(null);
     try {
-      await setVisibility(
-        revision.id,
-        { restricted, superseded, freshnessRequired, evidenceCurrency: currency, historicalLabelPresent: historical, citations },
-        revision.factsVersion,
-        crypto.randomUUID(),
-      );
-      setNotice("Public visibility saved by the server.");
-      onSaved(revision.id);
+      await onSave(revision, { restricted, superseded, freshnessRequired, evidenceCurrency: currency, historicalLabelPresent: historical, citations });
     } catch (error) {
       setFailure(classifyRevisionFailure(error, navigator.onLine));
     } finally {
@@ -86,7 +83,6 @@ export function PublicationVisibilityForm({ revision, onSaved, signInHref }: Pro
       ))}
       <button type="button" onClick={() => setCitations((rows) => [...rows, blank()])}>Add citation</button>{" "}
       <button type="submit" disabled={busy}>Save visibility</button>
-      {notice ? <p className="notice-card" role="status">{notice}</p> : null}
       {failure ? (
         <p className="notice-card notice-danger" role="alert">
           {failure.message}
