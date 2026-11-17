@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { PublicationRevision } from "./publicationRevisions";
-import { reconcileQueueItem, runTransitionFlow, type TransitionFlow } from "./revisionDeskFlow";
+import { reconcileQueueItem, runCreateDraftFlow, runTransitionFlow, type TransitionFlow } from "./revisionDeskFlow";
 
 // SYNTHETIC fixtures only.
 const revision: PublicationRevision = {
@@ -61,5 +61,40 @@ describe("reconcileQueueItem", () => {
   it("leaves the queue untouched for a revision that is not listed", () => {
     const list = [other];
     expect(reconcileQueueItem(list, revision, null)).toBe(list);
+  });
+});
+
+describe("runCreateDraftFlow", () => {
+  const made = { id: "11111111-1111-4111-8111-111111111111", authorId: "a", contentDigest: "a".repeat(64), approvedDigest: null, policyPermitsPublicDisplay: false, state: "Draft" as const, version: 0, factsVersion: 0 };
+  const classify = (e: unknown) => ({ kind: "forbidden" as const, message: String((e as Error).message) });
+  it("reports the created revision only after the server returned it", async () => {
+    const onCreated = vi.fn(); const onRefused = vi.fn();
+    await runCreateDraftFlow({ isCurrent: () => true, digest: "a".repeat(64), policyPermitsPublicDisplay: false, create: async () => made, classify, onCreated, onRefused });
+    expect(onCreated).toHaveBeenCalledWith(made);
+    expect(onRefused).not.toHaveBeenCalled();
+  });
+  it("surfaces a refusal and never reports success", async () => {
+    const onCreated = vi.fn(); const onRefused = vi.fn();
+    await runCreateDraftFlow({ isCurrent: () => true, digest: "a".repeat(64), policyPermitsPublicDisplay: true, create: async () => { throw new Error("denied"); }, classify, onCreated, onRefused });
+    expect(onCreated).not.toHaveBeenCalled();
+    expect(onRefused).toHaveBeenCalledWith({ kind: "forbidden", message: "denied" });
+  });
+  it("ignores a late success or refusal once another revision was selected", async () => {
+    for (const outcome of ["ok", "fail"]) {
+      let selection = 1;
+      let release!: () => void;
+      const gate = new Promise<void>((r) => { release = r; });
+      const onCreated = vi.fn(); const onRefused = vi.fn();
+      const pending = runCreateDraftFlow({
+        isCurrent: () => selection === 1, digest: "a".repeat(64), policyPermitsPublicDisplay: false,
+        create: async () => { await gate; if (outcome === "fail") throw new Error("denied"); return made; },
+        classify, onCreated, onRefused,
+      });
+      selection = 2;
+      release();
+      await pending;
+      expect(onCreated).not.toHaveBeenCalled();
+      expect(onRefused).not.toHaveBeenCalled();
+    }
   });
 });

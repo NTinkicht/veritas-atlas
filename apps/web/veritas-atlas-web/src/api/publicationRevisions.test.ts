@@ -1,7 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   MalformedRevisionResponse,
+  buildDraftBody,
   buildTransitionBody,
+  createDraft,
   classifyRevisionFailure,
   isRevisionId,
   listPath,
@@ -72,6 +74,37 @@ describe("request construction", () => {
   it("propagates a refused transition instead of reporting success", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, status: 403, json: async () => ({ message: "no" }) }));
     await expect(transitionRevision(ID, "Approve", 2, "op-9")).rejects.toMatchObject({ status: 403 });
+  });
+});
+
+describe("draft creation", () => {
+  it("builds the exact body and refuses a malformed digest", () => {
+    expect(buildDraftBody(D, false)).toEqual({ contentDigest: D, policyPermitsPublicDisplay: false });
+    for (const bad of ["", "A".repeat(64), "a".repeat(63), `${"a".repeat(63)}g`]) {
+      expect(() => buildDraftBody(bad, true)).toThrow(MalformedRevisionResponse);
+    }
+  });
+  it("posts the body to the collection path and parses the created revision", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ ...rev, state: "Draft", version: 0 }) });
+    vi.stubGlobal("fetch", fetchMock);
+    const created = await createDraft(D, true);
+    expect(created.state).toBe("Draft");
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(String(url)).toMatch(/\/api\/v1\/tenant-publication-revisions$/);
+    expect(init.method).toBe("POST");
+    expect(JSON.parse(init.body)).toEqual({ contentDigest: D, policyPermitsPublicDisplay: true });
+  });
+  it("sends nothing for an invalid digest", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(createDraft("nope", false)).rejects.toThrow(MalformedRevisionResponse);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+  it("propagates a forbidden refusal and rejects a malformed created revision", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, status: 403, json: async () => ({ message: "no" }) }));
+    await expect(createDraft(D, false)).rejects.toMatchObject({ status: 403 });
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, json: async () => ({ id: "x" }) }));
+    await expect(createDraft(D, false)).rejects.toThrow(MalformedRevisionResponse);
   });
 });
 
