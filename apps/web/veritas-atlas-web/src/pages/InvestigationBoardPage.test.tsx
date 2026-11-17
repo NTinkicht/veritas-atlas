@@ -216,6 +216,26 @@ describe("InvestigationBoardPage collect evidence", () => {
     await waitFor(() => expect(api.collectEvidence).toHaveBeenCalledTimes(2));
     expect(screen.getAllByText(EVID, { exact: false })).toHaveLength(1);
   });
+  it("drops an answer that arrives after another investigation was opened", async () => {
+    let resolve!: (i: typeof collected) => void;
+    api.collectEvidence.mockReturnValue(new Promise<typeof collected>((r) => (resolve = r)));
+    api.listInvestigations.mockResolvedValue([A, B]);
+    await collect();
+    fireEvent.click(await screen.findByRole("button", { name: "Fresh inquiry" }));
+    await waitFor(() => expect(api.listEvidenceItems).toHaveBeenCalledWith(B.id));
+    resolve(collected);
+    await Promise.resolve();
+    await waitFor(() => expect(screen.getByText("No evidence has been collected into this investigation yet.")).toBeTruthy());
+    expect(screen.queryByText(EVID, { exact: false })).toBeNull();
+  });
+  it("keeps collecting disabled while the board is still loading", async () => {
+    api.listEvidenceItems.mockReturnValue(new Promise(() => undefined));
+    setup();
+    fireEvent.click(await screen.findByRole("button", { name: "Existing" }));
+    fireEvent.change(await screen.findByLabelText("Verified evidence id"), { target: { value: EVID } });
+    expect((screen.getByRole("button", { name: "Collect evidence" }) as HTMLButtonElement).disabled).toBe(true);
+    expect(api.collectEvidence).not.toHaveBeenCalled();
+  });
   it("leaves the board unchanged on a refusal", async () => {
     api.collectEvidence.mockRejectedValue({ status: 404 });
     await collect();

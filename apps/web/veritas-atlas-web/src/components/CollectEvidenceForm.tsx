@@ -15,14 +15,19 @@ import { FailureNotice } from "./InvestigationBoardView";
 // is the authority (author role, share authorization, closed investigation, unknown or foreign id): the
 // board changes only from a server success, and a refusal is shown, never papered over.
 
-type Props = { investigation: Investigation; signInHref: string; onCollected: (item: CollectedEvidenceItem) => void };
+type Props = {
+  investigation: Investigation;
+  /** False until the collected-evidence list was read, so a collection is never lost behind a pending read. */
+  ready: boolean;
+  signInHref: string; onCollected: (item: CollectedEvidenceItem) => void;
+};
 
 // Keyed by investigation id so every piece of state starts fresh when another investigation is opened.
 export function CollectEvidenceForm(props: Props) {
   return <CollectEvidenceBody key={props.investigation.id} {...props} />;
 }
 
-function CollectEvidenceBody({ investigation, signInHref, onCollected }: Props) {
+function CollectEvidenceBody({ investigation, ready, signInHref, onCollected }: Props) {
   const [verificationId, setVerificationId] = useState("");
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
@@ -33,7 +38,7 @@ function CollectEvidenceBody({ investigation, signInHref, onCollected }: Props) 
   const valid = isValidVerificationId(id) && isValidEvidenceNote(note);
 
   function submit() {
-    if (closed || busy || inFlight.current || !valid) return;
+    if (closed || !ready || busy || inFlight.current || !valid) return;
     inFlight.current = true;
     const submittedId = verificationId;
     const submittedNote = note;
@@ -65,6 +70,7 @@ function CollectEvidenceBody({ investigation, signInHref, onCollected }: Props) 
     >
       <h3>Collect verified evidence</h3>
       {closed ? <p className="muted">Reopen the investigation to collect evidence.</p> : null}
+      {!ready && !closed ? <p className="muted" role="status">Collecting is available once the collected evidence has loaded.</p> : null}
       <label htmlFor="collect-verification-id">Verified evidence id</label>
       <input
         id="collect-verification-id"
@@ -82,7 +88,7 @@ function CollectEvidenceBody({ investigation, signInHref, onCollected }: Props) 
         maxLength={EVIDENCE_NOTE_MAX_LENGTH}
         onChange={(event) => setNote(event.target.value)}
       />
-      <button type="submit" disabled={closed || busy || !valid}>
+      <button type="submit" disabled={closed || !ready || busy || !valid}>
         {busy ? "Collecting..." : "Collect evidence"}
       </button>
       {notice ? <FailureNotice failure={notice} signInHref={signInHref} /> : null}

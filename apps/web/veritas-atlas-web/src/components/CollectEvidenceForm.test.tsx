@@ -13,8 +13,8 @@ const EV = "22222222-2222-4222-8222-222222222222";
 const item: CollectedEvidenceItem = { id: "33333333-3333-4333-8333-333333333333", evidenceVerificationId: EV, note: "why", collectedBySubject: "analyst-1", createdAtUtc: "2026-11-02T09:00:00Z" };
 
 const onCollected = vi.fn();
-const setup = (investigation: Investigation = inv) =>
-  render(<CollectEvidenceForm investigation={investigation} signInHref="/login" onCollected={onCollected} />);
+const setup = (investigation: Investigation = inv, ready = true) =>
+  render(<CollectEvidenceForm investigation={investigation} ready={ready} signInHref="/login" onCollected={onCollected} />);
 const idBox = () => screen.getByLabelText("Verified evidence id") as HTMLInputElement;
 const button = () => screen.getByRole("button", { name: /Collect evidence|Collecting/ }) as HTMLButtonElement;
 const fill = (id: string, note = "") => {
@@ -80,6 +80,14 @@ describe("CollectEvidenceForm", () => {
     fill(EV);
     expect(button().disabled).toBe(true);
     expect(screen.getByText("Reopen the investigation to collect evidence.")).toBeTruthy();
+    fireEvent.submit(screen.getByRole("form", { name: "Collect verified evidence" }));
+    expect(api.collectEvidence).not.toHaveBeenCalled();
+  });
+  it("is disabled until the collected evidence has loaded", () => {
+    setup(inv, false);
+    fill(EV);
+    expect(button().disabled).toBe(true);
+    expect(screen.getByRole("status").textContent).toContain("once the collected evidence has loaded");
     fireEvent.submit(screen.getByRole("form", { name: "Collect verified evidence" }));
     expect(api.collectEvidence).not.toHaveBeenCalled();
   });
