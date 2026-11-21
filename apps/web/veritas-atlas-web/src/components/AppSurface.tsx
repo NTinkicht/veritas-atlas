@@ -22,13 +22,14 @@ export function AppSurface({ title, subtitle, children, links }: AppSurfaceProps
 
   return (
     <div className="app-shell">
+      <a className="skip-link" href="#main-content">Skip to main content</a>
       <aside className="app-sidebar">
         <div className="app-brand">
-          <h1>Veritas Atlas</h1>
+          <p className="app-brand-name">Veritas Atlas</p>
           <p>Evidence-led truth intelligence platform.</p>
         </div>
 
-        <nav className="app-nav">
+        <nav className="app-nav" aria-label="Primary">
           {navLinks.map((item) => {
             const isActive =
               location.pathname === item.href ||
@@ -39,6 +40,7 @@ export function AppSurface({ title, subtitle, children, links }: AppSurfaceProps
                 key={item.href}
                 className="app-nav-link"
                 to={item.href}
+                aria-current={isActive ? "page" : undefined}
                 style={
                   isActive
                     ? {
@@ -56,7 +58,7 @@ export function AppSurface({ title, subtitle, children, links }: AppSurfaceProps
         </nav>
       </aside>
 
-      <main className="app-main">
+      <main className="app-main" id="main-content" tabIndex={-1}>
         <div className="page">
           <section className="hero-card">
             <h1 className="hero-title">{title}</h1>

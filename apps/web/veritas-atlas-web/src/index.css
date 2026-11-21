@@ -74,7 +74,9 @@ tbody tr:hover { background: rgba(148,163,184,.05); }
   background: rgba(3,8,17,.82); backdrop-filter: blur(20px); border-right: 1px solid var(--border);
 }
 .app-brand { padding-bottom: 18px; margin-bottom: 18px; border-bottom: 1px solid rgba(148,163,184,.12); }
-.app-brand h1 { margin: 0; font-size: 34px; letter-spacing: -.06em; }
+.app-brand .app-brand-name { margin: 0; font-size: 34px; font-weight: 700; letter-spacing: -.06em; max-width: none; color: inherit; }
+.skip-link { position: absolute; left: 8px; top: -64px; z-index: 100; padding: 10px 14px; border-radius: 10px; background: #0b1220; color: #fff; border: 2px solid #93c5fd; }
+.skip-link:focus { top: 8px; }
 .app-brand p { margin: 10px 0 0; color: var(--muted); font-size: 14px; max-width: 180px; }
 .app-nav { display: grid; gap: 8px; }
 .app-nav-link {
