@@ -23,6 +23,10 @@ public sealed class LogRedactionTests
     [DataRow("Host=db;Password=prefix sensitive-suffix;Database=x", "sensitive-suffix")]
     [DataRow("Password='prefix''sensitive-suffix';Database=x", "sensitive-suffix")]
     [DataRow("Password=\"a\"\"b\"\"sensitive-suffix\"", "sensitive-suffix")]
+    [DataRow("{\"password\":\"hunter2\",\"user\":\"bob\"}", "hunter2")]
+    [DataRow("{\"user\":\"bob\",\"access_token\": \"secret-value\"}", "secret-value")]
+    [DataRow("{\"password\":\"hunter2\",\"access_token\":\"secret-value\"}", "secret-value")]
+    [DataRow("{'api_key': 'hunter2'}", "hunter2")]
     public void RedactMasksSecretValues(string input, string secret)
     {
         var output = LogRedactor.Redact(input);
