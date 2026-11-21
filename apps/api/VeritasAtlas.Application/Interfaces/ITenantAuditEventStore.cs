@@ -17,6 +17,13 @@ public interface ITenantAuditEventStore
     /// </summary>
     Task<IReadOnlyList<TenantAuditEventModel>> ListAsync(
         Guid tenantId, string? entityType, string? entityId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// The newest <paramref name="limit"/> events matching the same filters, returned in
+    /// (occurred, id) order. <paramref name="limit"/> must be positive.
+    /// </summary>
+    Task<IReadOnlyList<TenantAuditEventModel>> ListRecentAsync(
+        Guid tenantId, string? entityType, string? entityId, int limit, CancellationToken cancellationToken);
 }
 
 /// <summary>
