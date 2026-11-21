@@ -46,6 +46,7 @@ Source of truth is the test; this table is generated from it.
 |---|---|
 | `DELETE tenant-investigations/{investigationId:guid}/evidence-items/{itemId:guid}/bookmark` | reviewer, publisher, admin, intruder |
 | `DELETE tenant-investigations/{investigationId:guid}/shares/{grantee}` | reviewer, publisher, admin, intruder |
+| `GET tenant-audit-events` | operator, analyst, reviewer, publisher, intruder |
 | `GET tenant-fetch-attempts` | operator, analyst, reviewer, publisher, intruder |
 | `GET tenant-investigations` | intruder |
 | `GET tenant-investigations/{id:guid}` | intruder |

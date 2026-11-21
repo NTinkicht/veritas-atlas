@@ -67,8 +67,19 @@ public sealed partial class EfTenantAuditEventStore : ITenantAuditEventStore
         return new AuditEventAppendResult(AuditEventAppendOutcome.Appended, ToModel(row));
     }
 
-    public async Task<IReadOnlyList<TenantAuditEventModel>> ListAsync(
-        Guid tenantId, string? entityType, string? entityId, CancellationToken cancellationToken)
+    public Task<IReadOnlyList<TenantAuditEventModel>> ListAsync(
+        Guid tenantId, string? entityType, string? entityId, CancellationToken cancellationToken) =>
+        QueryAsync(tenantId, entityType, entityId, null, cancellationToken);
+
+    public Task<IReadOnlyList<TenantAuditEventModel>> ListRecentAsync(
+        Guid tenantId, string? entityType, string? entityId, int limit, CancellationToken cancellationToken)
+    {
+        ArgumentOutOfRangeException.ThrowIfLessThan(limit, 1);
+        return QueryAsync(tenantId, entityType, entityId, limit, cancellationToken);
+    }
+
+    private async Task<IReadOnlyList<TenantAuditEventModel>> QueryAsync(
+        Guid tenantId, string? entityType, string? entityId, int? newest, CancellationToken cancellationToken)
     {
         RequireTenant(tenantId);
         if (entityId is not null && entityType is null)
@@ -87,9 +98,21 @@ public sealed partial class EfTenantAuditEventStore : ITenantAuditEventStore
             query = query.Where(x => x.EntityId == entityId);
         }
 
-        var rows = await query
-            .OrderBy(x => x.OccurredAtUtc).ThenBy(x => x.Id)
-            .ToListAsync(cancellationToken);
+        List<TenantAuditEvent> rows;
+        if (newest is { } limit)
+        {
+            rows = await query
+                .OrderByDescending(x => x.OccurredAtUtc).ThenByDescending(x => x.Id)
+                .Take(limit).ToListAsync(cancellationToken);
+            rows.Reverse();
+        }
+        else
+        {
+            rows = await query
+                .OrderBy(x => x.OccurredAtUtc).ThenBy(x => x.Id)
+                .ToListAsync(cancellationToken);
+        }
+
         return rows.Select(ToModel).ToList();
     }
 
