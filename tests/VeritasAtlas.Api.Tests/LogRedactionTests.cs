@@ -17,6 +17,9 @@ public sealed class LogRedactionTests
     [DataRow("Authorization: Bearer hunter2.abc-def", "hunter2")]
     [DataRow("failed https://user:hunter2@db.example/path", "hunter2")]
     [DataRow("Password=\"hunter2 with space\"", "hunter2")]
+    [DataRow("Password=\"prefix\"\"sensitive-suffix\";Database=x", "sensitive-suffix")]
+    [DataRow("Password='prefix''sensitive-suffix';Database=x", "sensitive-suffix")]
+    [DataRow("Password=\"a\"\"b\"\"sensitive-suffix\"", "sensitive-suffix")]
     public void RedactMasksSecretValues(string input, string secret)
     {
         var output = LogRedactor.Redact(input);

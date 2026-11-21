@@ -13,7 +13,7 @@ public static partial class LogRedactor
 
     // key=value / key: value pairs for secret-looking keys (connection strings, query strings, headers).
     [GeneratedRegex(
-        @"(?<key>\b[\w.\-]*(?:password|passwd|pwd|secret|token|api[_\-]?key|apikey|access[_\-]?key|private[_\-]?key|credential)[\w.\-]*)(?<sep>\s*[=:]\s*)(?<val>""[^""]*""|'[^']*'|[^;&\s,""']+)",
+        @"(?<key>\b[\w.\-]*(?:password|passwd|pwd|secret|token|api[_\-]?key|apikey|access[_\-]?key|private[_\-]?key|credential)[\w.\-]*)(?<sep>\s*[=:]\s*)(?<val>""(?:[^""]|"""")*""|'(?:[^']|'')*'|[^;&\s,""']+)",
         RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex KeyValuePattern();
 
