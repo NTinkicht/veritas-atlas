@@ -15,6 +15,7 @@ const REAL: Record<string, string> = {
   "/publication-revisions": "/api/v1/tenant-publication-revisions/{id}, /transitions",
   "/claim-confidence": "/api/v1/tenant-claims/confidence",
   "/answer-report": "/api/v1/tenant-answers/compose",
+  "/audit-events": "/api/v1/tenant-audit-events",
   "/statement-classification": "/api/v1/tenant-evidence/statement-classification",
   "/claim-candidates": "/api/v1/tenant-evidence/claim-candidates",
   "/sources": "/api/v1/tenant-sources",
