@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.Extensions.Logging;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Npgsql;
 using VeritasAtlas.Api.Infrastructure;
 using VeritasAtlas.Application.Common;
 
@@ -33,6 +34,66 @@ public sealed class ExceptionHandlingMiddlewareTests
         Assert.IsFalse(string.IsNullOrEmpty(correlation));
         Assert.IsTrue(body.Contains(correlation!));
     }
+
+    [TestMethod]
+    public async Task DatabaseConnectionFailureIs503WithRetryAfterAndNoLeak()
+    {
+        var failure = new NpgsqlException(
+            "Failed to connect to Host=db.internal;Password=hunter2",
+            new System.Net.Sockets.SocketException(111));
+        string? retryAfter = null;
+        var context = new DefaultHttpContext();
+        context.Response.Body = new MemoryStream();
+        var pipeline = new CorrelationIdMiddleware(c => new ExceptionHandlingMiddleware(_ => throw failure).Invoke(c));
+        await pipeline.Invoke(context);
+        retryAfter = context.Response.Headers.RetryAfter.ToString();
+        context.Response.Body.Position = 0;
+        var body = await new StreamReader(context.Response.Body).ReadToEndAsync();
+
+        Assert.AreEqual(503, context.Response.StatusCode);
+        Assert.AreEqual(ExceptionHandlingMiddleware.RetryAfterSeconds.ToString(), retryAfter);
+        Assert.IsFalse(body.Contains("hunter2") || body.Contains("db.internal"));
+        Assert.IsTrue(body.Contains(ExceptionHandlingMiddleware.ServiceUnavailableDetail));
+        Assert.IsTrue(body.Contains(context.Response.Headers[CorrelationIdMiddleware.HeaderName].ToString()));
+    }
+
+    [TestMethod]
+    public async Task WrappedDatabaseConnectionFailureIs503()
+    {
+        var wrapped = new InvalidOperationException("wrapper",
+            new NpgsqlException("x", new IOException("reset")));
+        var (status, _, _) = await RunAsync(_ => throw wrapped);
+        Assert.AreEqual(503, status);
+    }
+
+    [TestMethod]
+    public void OnlyConnectivitySqlStatesAreClassifiedUnavailable()
+    {
+        foreach (var state in new[] { "08006", "08001", "53300", "57P01", "57P03" })
+        {
+            Assert.IsTrue(DatabaseUnavailable.Is(Pg(state)), state);
+        }
+
+        // Data and constraint errors are application errors, not an outage.
+        foreach (var state in new[] { "23505", "23503", "42P01", "40001" })
+        {
+            Assert.IsFalse(DatabaseUnavailable.Is(Pg(state)), state);
+        }
+
+        Assert.IsFalse(DatabaseUnavailable.Is(new InvalidOperationException("boom")));
+        Assert.IsFalse(DatabaseUnavailable.Is(null));
+    }
+
+    [TestMethod]
+    public async Task DatabaseConstraintViolationStaysGeneric500()
+    {
+        var (status, body, _) = await RunAsync(_ => throw Pg("23505"));
+        Assert.AreEqual(500, status);
+        Assert.IsTrue(body.Contains(ExceptionHandlingMiddleware.GenericServerErrorDetail));
+    }
+
+    private static PostgresException Pg(string sqlState) =>
+        new("msg Host=db.internal", "ERROR", "ERROR", sqlState);
 
     [TestMethod]
     public async Task DomainExceptionsKeepAppAuthoredMessageAndStatus()

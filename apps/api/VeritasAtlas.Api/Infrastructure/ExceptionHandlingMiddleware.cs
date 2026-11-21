@@ -7,6 +7,9 @@ public sealed class ExceptionHandlingMiddleware
 {
     public const string GenericServerErrorDetail = "An unexpected error occurred.";
 
+    public const string ServiceUnavailableDetail = "The service is temporarily unavailable. Try again later.";
+    public const int RetryAfterSeconds = 30;
+
     private readonly RequestDelegate _next;
 
     public ExceptionHandlingMiddleware(RequestDelegate next)
@@ -35,6 +38,17 @@ public sealed class ExceptionHandlingMiddleware
         catch (OperationCanceledException) when (context.RequestAborted.IsCancellationRequested)
         {
             // Client went away; nothing to write.
+        }
+        catch (Exception ex) when (!context.Response.HasStarted && DatabaseUnavailable.Is(ex))
+        {
+            // VER-P0-19: a database outage is retryable, not an application bug.
+            // The exception text (connection strings, hosts) is never echoed.
+            context.Response.Headers.RetryAfter = RetryAfterSeconds.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            var correlationId = context.Items.TryGetValue(CorrelationIdMiddleware.ItemKey, out var value) ? value?.ToString() : null;
+            var detail = correlationId is null
+                ? ServiceUnavailableDetail
+                : $"{ServiceUnavailableDetail} Correlation id: {correlationId}";
+            await WriteProblemDetailsAsync(context, StatusCodes.Status503ServiceUnavailable, detail);
         }
         catch (Exception) when (!context.Response.HasStarted)
         {
@@ -69,6 +83,7 @@ public sealed class ExceptionHandlingMiddleware
             400 => "Bad Request",
             404 => "Not Found",
             409 => "Conflict",
+            503 => "Service Unavailable",
             _ => "Internal Server Error"
         };
 }
