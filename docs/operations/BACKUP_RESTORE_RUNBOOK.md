@@ -6,7 +6,7 @@ Scope: the Veritas Atlas PostgreSQL database. Backup scheduling and storage are 
 
 1. Take a logical backup with `pg_dump --format=custom --no-owner --file <backup>.dump <database>` using a read-only role. Never put the password on the command line; use `PGPASSWORD` or a `.pgpass` file.
 2. Store the dump encrypted and outside the database host. It holds tenant evidence and audit data: treat it as production data, never commit it, and never copy it into a test or staging environment.
-3. Record the dump time, the `__EFMigrationsHistory` head and the row count of `tenant_audit_events`.
+3. Capture a verification manifest that describes exactly the dump's snapshot, and store it with the dump (same encrypted location, same retention). Open one `psql` session, `BEGIN ISOLATION LEVEL REPEATABLE READ;`, run `SELECT pg_export_snapshot();`, and, while that session stays open, run `pg_dump --snapshot=<id>` as in step 1 and, in the same session, compute the manifest: the full ordered `__EFMigrationsHistory` rows (`MigrationId`, `ProductVersion`), the `tenant_audit_events` row count and a content checksum over its ordered rows. Only then end the session. Events accepted after that snapshot are not in the dump and not in the manifest.
 
 ## Restore
 
@@ -16,8 +16,8 @@ Scope: the Veritas Atlas PostgreSQL database. Backup scheduling and storage are 
 
 ## Verification (must all hold before the restored copy is used)
 
-- `__EFMigrationsHistory` equals the source.
-- `tenant_audit_events` row count and a content checksum equal the source.
+- `__EFMigrationsHistory` equals the migration history recorded in the backup's manifest.
+- `tenant_audit_events` row count and content checksum equal the backup's manifest. Compare against the manifest, never against the current source: the source may have accepted newer events since the dump, or may be lost. The source is only a cross-check while it is still available and quiesced.
 - `GetPendingMigrations()` is empty for the restored database.
 - The append-only triggers are present: `UPDATE`, `DELETE` and `TRUNCATE` on `tenant_audit_events` fail with SQLSTATE `55000`.
 - Tenant-scoped reads still return only the owning tenant's rows.
