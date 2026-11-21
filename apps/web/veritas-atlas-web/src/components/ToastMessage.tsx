@@ -6,6 +6,7 @@ type ToastMessageProps = {
 export function ToastMessage({ type, message }: ToastMessageProps) {
   return (
     <div
+      role={type === "success" ? "status" : "alert"}
       className={`notice-card ${type === "success" ? "notice-success" : "notice-danger"}`}
       style={{
         position: "fixed",

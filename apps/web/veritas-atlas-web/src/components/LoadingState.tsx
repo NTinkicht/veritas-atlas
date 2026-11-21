@@ -3,5 +3,5 @@ type LoadingStateProps = {
 };
 
 export function LoadingState({ message = "Loading..." }: LoadingStateProps) {
-  return <div className="notice-card">{message}</div>;
+  return <div className="notice-card" role="status" aria-live="polite">{message}</div>;
 }

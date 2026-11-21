@@ -3,5 +3,5 @@ type ErrorStateProps = {
 };
 
 export function ErrorState({ message }: ErrorStateProps) {
-  return <div className="notice-card notice-danger">{message}</div>;
+  return <div className="notice-card notice-danger" role="alert">{message}</div>;
 }
