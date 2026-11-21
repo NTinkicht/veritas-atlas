@@ -62,16 +62,16 @@ describe("audit event filter path", () => {
     expect(() => auditEventsPath({ entityType: "a\nb" })).toThrow(
       InvalidAuditEventFilter,
     );
-    expect(() => auditEventsPath({ entityType: "x".repeat(129) })).toThrow(
+    expect(() => auditEventsPath({ entityType: "x".repeat(65) })).toThrow(
       InvalidAuditEventFilter,
     );
     expect(() =>
-      auditEventsPath({ entityType: "x", entityId: "y".repeat(257) }),
+      auditEventsPath({ entityType: "x", entityId: "y".repeat(201) }),
     ).toThrow(InvalidAuditEventFilter);
     expect(() =>
       auditEventsPath({
-        entityType: "x".repeat(128),
-        entityId: "y".repeat(256),
+        entityType: "x".repeat(64),
+        entityId: "y".repeat(200),
       }),
     ).not.toThrow();
   });

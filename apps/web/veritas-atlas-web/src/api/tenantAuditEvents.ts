@@ -5,8 +5,9 @@ import { apiGet } from "./http";
 // response is rejected whole and server text is never echoed.
 
 export const AUDIT_EVENTS_PATH = "/api/v1/tenant-audit-events";
-const MAX_ENTITY_TYPE = 128;
-const MAX_ENTITY_ID = 256;
+// Mirrors TenantAuditEventLimits (ITenantAuditEventStore.cs): 64 / 200.
+const MAX_ENTITY_TYPE = 64;
+const MAX_ENTITY_ID = 200;
 
 export type AuditEvent = {
   id: string;
