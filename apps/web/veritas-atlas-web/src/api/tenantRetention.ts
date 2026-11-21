@@ -69,7 +69,7 @@ export function parseRetentionEligibility(raw: unknown): RetentionEligibility {
   const outcome = r.outcome;
   if (outcome !== "Allow" && outcome !== "Deny") throw new MalformedRetentionResponse("outcome");
   const code = r.denialCode ?? null;
-  if (outcome === "Allow" ? code !== null : typeof code !== "string" || !(code in RETENTION_DENIAL_LABELS)) {
+  if (outcome === "Allow" ? code !== null : typeof code !== "string" || !Object.hasOwn(RETENTION_DENIAL_LABELS, code)) {
     throw new MalformedRetentionResponse("denialCode");
   }
   return {

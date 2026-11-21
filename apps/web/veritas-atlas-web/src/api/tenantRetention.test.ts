@@ -18,6 +18,8 @@ describe("retention parsing", () => {
   it.each([
     ["unknown outcome", { ...good, outcome: "Maybe" }],
     ["unknown denial code", { ...good, denialCode: "made_up" }],
+    ["inherited denial code __proto__", { ...good, denialCode: "__proto__" }],
+    ["inherited denial code toString", { ...good, denialCode: "toString" }],
     ["deny without a code", { ...good, denialCode: null }],
     ["allow with a code", { ...good, outcome: "Allow" }],
     ["negative count", { ...good, parseRunCount: -1 }],
