@@ -96,7 +96,82 @@ public sealed class BackupRestoreDrillTests
         }
 
         Assert.AreEqual("3", await Scalar(restored, "SELECT count(*) FROM tenant_audit_events"));
+
+        // Every guard trigger (table, name, enabled state, definition and function body) must survive
+        // the restore, not only the audit ledger's, or historical evidence would silently turn mutable.
+        var sourceTriggers = await Scalar(db.Source, TriggerFingerprint);
+        var restoredTriggers = await Scalar(restored, TriggerFingerprint);
+        var restoredNames = (await Scalar(restored, TriggerNames))!.Split(',');
+        CollectionAssert.AreEquivalent(GuardTriggers, restoredNames, "restored guard triggers must be exactly the migrated set");
+        Assert.AreEqual(sourceTriggers, restoredTriggers, "trigger definitions must be identical after restore");
+
+        // Sensitivity control: losing one guard trigger changes the fingerprint.
+        await after.Database.ExecuteSqlRawAsync("DROP TRIGGER tr_tenant_raw_retrievals_no_truncate ON tenant_raw_retrievals");
+        Assert.AreNotEqual(sourceTriggers, await Scalar(restored, TriggerFingerprint), "the fingerprint must detect a missing trigger");
     }
+
+    private const string TriggerFingerprint =
+        "SELECT md5(string_agg(concat_ws('|', c.relname, t.tgname, t.tgenabled, pg_get_triggerdef(t.oid), pg_get_functiondef(t.tgfoid)), ';' ORDER BY c.relname, t.tgname)) " +
+        "FROM pg_trigger t JOIN pg_class c ON c.oid = t.tgrelid JOIN pg_namespace n ON n.oid = c.relnamespace " +
+        "WHERE NOT t.tgisinternal AND n.nspname = 'public'";
+
+    private const string TriggerNames =
+        "SELECT string_agg(t.tgname, ',' ORDER BY t.tgname) " +
+        "FROM pg_trigger t JOIN pg_class c ON c.oid = t.tgrelid JOIN pg_namespace n ON n.oid = c.relnamespace " +
+        "WHERE NOT t.tgisinternal AND n.nspname = 'public'";
+
+    /// <summary>Every tr_* guard trigger the migration chain creates (some via dynamic SQL); extend when a migration adds one.</summary>
+    private static readonly string[] GuardTriggers =
+    [
+        "tr_tenant_audit_events_append_only",
+        "tr_tenant_audit_events_no_truncate",
+        "tr_tenant_evidence_chunks_append_only",
+        "tr_tenant_evidence_chunks_no_truncate",
+        "tr_tenant_evidence_chunks_run_guard",
+        "tr_tenant_evidence_verifications_append_only",
+        "tr_tenant_evidence_verifications_guard",
+        "tr_tenant_evidence_verifications_no_truncate",
+        "tr_tenant_fetch_attempts_append_only",
+        "tr_tenant_fetch_attempts_no_truncate",
+        "tr_tenant_investigation_annotations_append_only",
+        "tr_tenant_investigation_annotations_closed_guard",
+        "tr_tenant_investigation_annotations_guard",
+        "tr_tenant_investigation_annotations_no_truncate",
+        "tr_tenant_investigation_bookmarks_closed_guard",
+        "tr_tenant_investigation_bookmarks_guard",
+        "tr_tenant_investigation_evidence_items_append_only",
+        "tr_tenant_investigation_evidence_items_closed_guard",
+        "tr_tenant_investigation_evidence_items_guard",
+        "tr_tenant_investigation_evidence_items_no_truncate",
+        "tr_tenant_investigation_shares_closed_guard",
+        "tr_tenant_investigation_shares_guard",
+        "tr_tenant_investigation_shares_no_delete",
+        "tr_tenant_investigation_state_events_guard",
+        "tr_tenant_investigation_state_events_row_immutable",
+        "tr_tenant_investigation_state_events_truncate_immutable",
+        "tr_tenant_investigations_immutable",
+        "tr_tenant_investigations_no_truncate",
+        "tr_tenant_parse_runs_append_only",
+        "tr_tenant_parse_runs_no_truncate",
+        "tr_tenant_publication_revisions_audit_check",
+        "tr_tenant_publication_revisions_guard",
+        "tr_tenant_publication_revisions_no_truncate",
+        "tr_tenant_publication_transitions_append_only",
+        "tr_tenant_publication_transitions_no_truncate",
+        "tr_tenant_publication_visibility_changes_append_only",
+        "tr_tenant_publication_visibility_changes_no_truncate",
+        "tr_tenant_raw_retrieval_retention_records_guard",
+        "tr_tenant_raw_retrieval_retention_records_row_immutable",
+        "tr_tenant_raw_retrieval_retention_records_truncate_immutable",
+        "tr_tenant_raw_retrievals_immutable",
+        "tr_tenant_raw_retrievals_no_truncate",
+        "tr_tenant_retrieval_attestations_append_only",
+        "tr_tenant_retrieval_attestations_no_truncate",
+        "tr_tenant_retrieval_checkpoints_guard",
+        "tr_tenant_retrieval_checkpoints_no_truncate",
+        "tr_tenant_source_fetch_policies_append_only",
+        "tr_tenant_source_fetch_policies_no_truncate"
+    ];
 
     private static (string Source, NpgsqlConnectionStringBuilder SourceBuilder, NpgsqlConnectionStringBuilder Restored, string Admin)?
         Databases()

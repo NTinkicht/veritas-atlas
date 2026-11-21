@@ -21,6 +21,7 @@ Scope: the Veritas Atlas PostgreSQL database. Backup scheduling and storage are 
 - `GetPendingMigrations()` is empty for the restored database.
 - The append-only triggers are present: `UPDATE`, `DELETE` and `TRUNCATE` on `tenant_audit_events` fail with SQLSTATE `55000`.
 - Tenant-scoped reads still return only the owning tenant's rows.
+- Every guard trigger (`tr_*`: append-only, immutable, no-truncate and state guards across the evidence, investigation, publication and audit tables) exists, is enabled and has the same definition and function body as in the backup: compare `pg_get_triggerdef` and `pg_get_functiondef` of all non-internal triggers. A restore that lost one would make historical evidence mutable.
 
 The automated drill is `BackupRestoreDrillTests` in `tests/VeritasAtlas.Api.Tests`. Run it with `VERITAS_TEST_POSTGRES` pointing at a disposable PostgreSQL (the role needs `CREATEDB`) and `pg_dump`/`pg_restore` on `PATH`; it creates and drops its own `*_drill_src` and `*_drill_restored` databases.
 
