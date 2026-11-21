@@ -34,11 +34,13 @@ public static partial class LogRedactor
             return text ?? string.Empty;
         }
 
-        var result = KeyValuePattern().Replace(text, m => MaskKeyValue(m, text));
+        var result = RedactKeyValues(text);
         result = AuthSchemePattern().Replace(result, m => m.Groups["scheme"].Value + " " + Mask);
         result = UrlCredentialPattern().Replace(result, m => m.Groups["pre"].Value + Mask);
         return result;
     }
+
+    private static string RedactKeyValues(string text) => KeyValuePattern().Replace(text, m => MaskKeyValue(m, text));
 
     private static string MaskKeyValue(Match m, string text)
     {
@@ -50,7 +52,8 @@ public static partial class LogRedactor
             var end = value.IndexOfAny(['&', ',', ' ', '\t', '"', '\'']);
             if (end >= 0)
             {
-                return prefix + Mask + value[end..];
+                // The restored tail may hold further secret parameters: scan it again.
+                return prefix + Mask + RedactKeyValues(value[end..]);
             }
         }
 

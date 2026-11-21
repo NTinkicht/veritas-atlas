@@ -44,6 +44,19 @@ public sealed class LogRedactionTests
     }
 
     [TestMethod]
+    [DataRow("/cb?access_token=first-secret&refresh_token=second-secret", "/cb?access_token=[REDACTED]&refresh_token=[REDACTED]")]
+    [DataRow("/cb?a=keep1&access_token=s1&b=keep2&refresh_token=s2&c=keep3&api_key=s3&d=keep4",
+        "/cb?a=keep1&access_token=[REDACTED]&b=keep2&refresh_token=[REDACTED]&c=keep3&api_key=[REDACTED]&d=keep4")]
+    [DataRow("Host=db;Password=s1;Token=s2;Database=x", "Host=db;Password=[REDACTED];Token=[REDACTED];Database=x")]
+    [DataRow("Host=db;Password=a&b;ApiKey=c,d;Database=x", "Host=db;Password=[REDACTED];ApiKey=[REDACTED];Database=x")]
+    [DataRow("GET /cb?token=s1 Bearer s2", "GET /cb?token=[REDACTED] Bearer [REDACTED]")]
+    [DataRow("GET /cb?token=s1&x=keep Authorization: Bearer s2", "GET /cb?token=[REDACTED]&x=keep Authorization: Bearer [REDACTED]")]
+    public void RedactHandlesMultipleSecretsAndAdjacentShapes(string input, string expected)
+    {
+        Assert.AreEqual(expected, LogRedactor.Redact(input));
+    }
+
+    [TestMethod]
     public void RedactKeepsNonSecretText()
     {
         const string input = "Host=db.example;Database=veritas;timeout waiting for connection to /api/x";
