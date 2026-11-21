@@ -8,7 +8,9 @@ export type RetrievalsView =
   | { kind: "error"; sourceKey: string; failure: RawRetrievalsFailure }
   | { kind: "loaded"; sourceKey: string; retrievals: RawRetrieval[] };
 
-export function RawRetrievalsPanel({ view, signInHref }: { view: RetrievalsView; signInHref: string }) {
+export function RawRetrievalsPanel({
+  view, signInHref, onViewRetention,
+}: { view: RetrievalsView; signInHref: string; onViewRetention?: (retrievalId: string) => void }) {
   if (view.kind === "idle") return null;
   if (view.kind === "loading") return <p className="notice-card" role="status">Loading raw retrievals...</p>;
   if (view.kind === "error") {
@@ -28,10 +30,13 @@ export function RawRetrievalsPanel({ view, signInHref }: { view: RetrievalsView;
         <ul>
           {view.retrievals.map((r) => (
             <li key={r.id}>
-              <code>{r.finalUri}</code>{" "}
+              <code id={`retrieval-${r.id}`}>{r.finalUri}</code>{" "}
               <time dateTime={r.retrievedAtUtc}>{r.retrievedAtUtc}</time>{" "}
               <span>{r.byteLength} bytes</span>{" "}
               <span className="muted">sha256 <code>{r.contentSha256}</code></span>
+              {onViewRetention ? (
+                <> <button type="button" aria-describedby={`retrieval-${r.id}`} onClick={() => onViewRetention(r.id)}>View retention</button></>
+              ) : null}
             </li>
           ))}
         </ul>
