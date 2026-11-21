@@ -100,6 +100,30 @@ public sealed class OperationalSafetyPipelineTests
         Assert.IsFalse(preflight.Headers.Contains("Access-Control-Allow-Origin"));
     }
 
+    [TestMethod]
+    public async Task EveryResponseCarriesBaselineSecurityHeaders()
+    {
+        using var factory = new ApiFactory();
+        using var client = factory.CreateClient();
+
+        // 200 health, 401 default-deny for an unknown route and a protected route.
+        var expected = new[]
+        {
+            ("/health/live", HttpStatusCode.OK),
+            ("/no-such-route", HttpStatusCode.Unauthorized),
+            ("/api/v1/auth/me", HttpStatusCode.Unauthorized)
+        };
+        foreach (var (path, status) in expected)
+        {
+            using var response = await client.GetAsync(path);
+            Assert.AreEqual(status, response.StatusCode, path);
+            Assert.AreEqual("nosniff", string.Join(",", response.Headers.GetValues("X-Content-Type-Options")), path);
+            Assert.IsTrue(response.Headers.CacheControl?.NoStore == true, path);
+            Assert.AreEqual("no-referrer", string.Join(",", response.Headers.GetValues("Referrer-Policy")), path);
+            Assert.IsTrue(response.Headers.Contains("Content-Security-Policy"), path);
+        }
+    }
+
     private static Task<HttpResponseMessage> Preflight(HttpClient client, string origin)
     {
         var request = new HttpRequestMessage(HttpMethod.Options, "/health/live");
