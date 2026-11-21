@@ -50,6 +50,7 @@ import { LoginPage } from "./pages/LoginPage";
 import { AuthMePage } from "./pages/AuthMePage";
 import { Phase11AuthCenterPage } from "./pages/Phase11AuthCenterPage";
 import { RolePolicyPage } from "./pages/RolePolicyPage";
+import { AuditEventsPage } from "./pages/AuditEventsPage";
 import { AuditPersistencePage } from "./pages/AuditPersistencePage";
 import { Phase10HardeningCenterPage } from "./pages/Phase10HardeningCenterPage";
 import { WorkflowAuditPage } from "./pages/WorkflowAuditPage";
@@ -135,6 +136,7 @@ const allRoutes: RouteObject[] = [
   { path: "/publication-revisions", element: protect(<PublicationRevisionDeskPage />) },
   { path: "/claim-confidence", element: protect(<ClaimConfidencePage />) },
   { path: "/answer-report", element: protect(<AnswerReportPage />) },
+  { path: "/audit-events", element: protect(<AuditEventsPage />) },
   { path: "/statement-classification", element: protect(<StatementClassificationPage />) },
   { path: "/claim-candidates", element: protect(<ClaimCandidatesPage />) },
   { path: "/citation-inspector", element: protect(<CitationInspectorPage />) },

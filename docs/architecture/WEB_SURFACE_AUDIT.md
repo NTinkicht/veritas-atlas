@@ -19,6 +19,7 @@ The table mirrors `src/routeAudit.ts`. `src/routes.test.ts` fails when a route h
 | `/publication-revisions` | PublicationRevisionDeskPage | REAL | /api/v1/tenant-publication-revisions/{id}, /transitions |
 | `/claim-confidence` | ClaimConfidencePage | REAL | /api/v1/tenant-claims/confidence |
 | `/answer-report` | AnswerReportPage | REAL | /api/v1/tenant-answers/compose |
+| `/audit-events` | AuditEventsPage | REAL | /api/v1/tenant-audit-events |
 | `/statement-classification` | StatementClassificationPage | REAL | /api/v1/tenant-evidence/statement-classification |
 | `/claim-candidates` | ClaimCandidatesPage | REAL | /api/v1/tenant-evidence/claim-candidates |
 | `/citation-inspector` | CitationInspectorPage | REAL | /api/v1/tenant-claims/validate-evidence |
