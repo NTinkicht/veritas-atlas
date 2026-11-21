@@ -48,13 +48,14 @@ public sealed class RequestLoggingMiddleware
         {
             var elapsedMs = (DateTime.UtcNow - startedAtUtc).TotalMilliseconds;
 
+            // The raw exception is not passed to the sink: its message may hold secrets.
             _logger.LogError(
-                ex,
-                "Request failed {Method} {Path} ElapsedMs={ElapsedMs} CorrelationId={CorrelationId}",
+                "Request failed {Method} {Path} ElapsedMs={ElapsedMs} CorrelationId={CorrelationId} Exception={Exception}",
                 method,
                 path,
                     Math.Round(elapsedMs, 2),
-                correlationId);
+                correlationId,
+                LogRedactor.Describe(ex));
 
             throw;
         }
