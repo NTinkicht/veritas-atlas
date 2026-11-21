@@ -11,16 +11,21 @@ public static partial class LogRedactor
 {
     public const string Mask = "[REDACTED]";
 
-    // key=value / key: value pairs for secret-looking keys. An unquoted value runs to ';' or end of line
-    // (connection-string semantics: a password may contain '&', ',' or spaces). Inside a query string
-    // (key preceded by '?' or '&') it stops at '&', whitespace, ',' or a quote so later parameters survive.
+    // key=value / key: value pairs for secret-looking keys. The regex only finds the start of the value
+    // (quoted values with doubled-quote escapes are consumed whole; an unquoted value is taken to end of
+    // line). MaskKeyValue then decides where an unquoted value really ends, by context:
+    //   query string (key preceded by '?' or '&'): ends ONLY at '&', '#', whitespace or a quote, so ',', ';'
+    //     and percent-encoded characters belong to the secret;
+    //   anything else (connection string, header, log text): ends at ';' or end of line (so '&', ',' and
+    //     spaces belong to the secret), which over-redacts when unsure.
+    // Whatever follows the secret is scanned again so later secrets are never skipped.
     [GeneratedRegex(
-        @"(?<key>\b[\w.\-]*(?:password|passwd|pwd|secret|token|api[_\-]?key|apikey|access[_\-]?key|private[_\-]?key|credential)[\w.\-]*)(?<sep>\s*[=:]\s*)(?<val>""(?:[^""]|"""")*""|'(?:[^']|'')*'|[^;\r\n]+)",
+        @"(?<key>\b[\w.\-]*(?:password|passwd|pwd|secret|token|api[_\-]?key|apikey|access[_\-]?key|private[_\-]?key|credential)[\w.\-]*)(?<sep>\s*[=:]\s*)(?<val>""(?:[^""]|"""")*""|'(?:[^']|'')*'|[^\r\n]+)",
         RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex KeyValuePattern();
 
     // Authorization: Bearer xxx / Basic xxx, or a bare "Bearer xxx".
-    [GeneratedRegex(@"\b(?<scheme>Bearer|Basic)\s+(?<val>[A-Za-z0-9\-._~+/]+=*)", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    [GeneratedRegex(@"\b(?<scheme>Bearer|Basic)\s+(?<val>[^\s""']+)", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex AuthSchemePattern();
 
     // Credentials embedded in URLs: scheme://user:pass@host.
@@ -46,18 +51,20 @@ public static partial class LogRedactor
     {
         var prefix = m.Groups["key"].Value + m.Groups["sep"].Value;
         var value = m.Groups["val"].Value;
-        var inQuery = m.Index > 0 && (text[m.Index - 1] == '?' || text[m.Index - 1] == '&');
-        if (inQuery && value.Length > 0 && value[0] != '"' && value[0] != '\'')
+        if (value.Length == 0 || value[0] == '"' || value[0] == '\'')
         {
-            var end = value.IndexOfAny(['&', ',', ' ', '\t', '"', '\'']);
-            if (end >= 0)
-            {
-                // The restored tail may hold further secret parameters: scan it again.
-                return prefix + Mask + RedactKeyValues(value[end..]);
-            }
+            // Quoted: the regex consumed the whole quoted value when it was well formed. An unterminated quote
+            // is masked to the end of the line (fail closed).
+            return prefix + Mask;
         }
 
-        return prefix + Mask;
+        var inQuery = m.Index > 0 && (text[m.Index - 1] == '?' || text[m.Index - 1] == '&');
+        var end = inQuery
+            ? value.IndexOfAny(['&', '#', ' ', '\t', '"', '\''])
+            : value.IndexOf(';');
+        return end < 0
+            ? prefix + Mask
+            : prefix + Mask + RedactKeyValues(value[end..]);
     }
 
     /// <summary>Type, redacted message and redacted stack for the exception and its inner chain.</summary>
