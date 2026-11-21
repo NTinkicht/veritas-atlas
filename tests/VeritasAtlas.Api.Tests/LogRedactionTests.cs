@@ -18,6 +18,9 @@ public sealed class LogRedactionTests
     [DataRow("failed https://user:hunter2@db.example/path", "hunter2")]
     [DataRow("Password=\"hunter2 with space\"", "hunter2")]
     [DataRow("Password=\"prefix\"\"sensitive-suffix\";Database=x", "sensitive-suffix")]
+    [DataRow("Host=db;Password=prefix&sensitive-suffix;Database=x", "sensitive-suffix")]
+    [DataRow("Host=db;Password=prefix,sensitive-suffix;Database=x", "sensitive-suffix")]
+    [DataRow("Host=db;Password=prefix sensitive-suffix;Database=x", "sensitive-suffix")]
     [DataRow("Password='prefix''sensitive-suffix';Database=x", "sensitive-suffix")]
     [DataRow("Password=\"a\"\"b\"\"sensitive-suffix\"", "sensitive-suffix")]
     public void RedactMasksSecretValues(string input, string secret)
@@ -25,6 +28,19 @@ public sealed class LogRedactionTests
         var output = LogRedactor.Redact(input);
         Assert.IsFalse(output.Contains(secret, StringComparison.Ordinal), output);
         Assert.IsTrue(output.Contains(LogRedactor.Mask, StringComparison.Ordinal), output);
+    }
+
+    [TestMethod]
+    public void RedactKeepsConnectionStringStructureAfterUnquotedPassword()
+    {
+        Assert.AreEqual("Host=db;Password=[REDACTED];Database=x", LogRedactor.Redact("Host=db;Password=a&b,c;Database=x"));
+    }
+
+    [TestMethod]
+    public void RedactKeepsOtherQueryParametersAfterSecret()
+    {
+        var output = LogRedactor.Redact("GET /cb?code=keep1&access_token=hunter2&state=keep2");
+        Assert.AreEqual("GET /cb?code=keep1&access_token=[REDACTED]&state=keep2", output);
     }
 
     [TestMethod]

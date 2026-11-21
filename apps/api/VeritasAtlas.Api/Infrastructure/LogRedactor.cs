@@ -11,9 +11,11 @@ public static partial class LogRedactor
 {
     public const string Mask = "[REDACTED]";
 
-    // key=value / key: value pairs for secret-looking keys (connection strings, query strings, headers).
+    // key=value / key: value pairs for secret-looking keys. An unquoted value runs to ';' or end of line
+    // (connection-string semantics: a password may contain '&', ',' or spaces). Inside a query string
+    // (key preceded by '?' or '&') it stops at '&', whitespace, ',' or a quote so later parameters survive.
     [GeneratedRegex(
-        @"(?<key>\b[\w.\-]*(?:password|passwd|pwd|secret|token|api[_\-]?key|apikey|access[_\-]?key|private[_\-]?key|credential)[\w.\-]*)(?<sep>\s*[=:]\s*)(?<val>""(?:[^""]|"""")*""|'(?:[^']|'')*'|[^;&\s,""']+)",
+        @"(?<key>\b[\w.\-]*(?:password|passwd|pwd|secret|token|api[_\-]?key|apikey|access[_\-]?key|private[_\-]?key|credential)[\w.\-]*)(?<sep>\s*[=:]\s*)(?<val>""(?:[^""]|"""")*""|'(?:[^']|'')*'|[^;\r\n]+)",
         RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex KeyValuePattern();
 
@@ -32,10 +34,27 @@ public static partial class LogRedactor
             return text ?? string.Empty;
         }
 
-        var result = KeyValuePattern().Replace(text, m => m.Groups["key"].Value + m.Groups["sep"].Value + Mask);
+        var result = KeyValuePattern().Replace(text, m => MaskKeyValue(m, text));
         result = AuthSchemePattern().Replace(result, m => m.Groups["scheme"].Value + " " + Mask);
         result = UrlCredentialPattern().Replace(result, m => m.Groups["pre"].Value + Mask);
         return result;
+    }
+
+    private static string MaskKeyValue(Match m, string text)
+    {
+        var prefix = m.Groups["key"].Value + m.Groups["sep"].Value;
+        var value = m.Groups["val"].Value;
+        var inQuery = m.Index > 0 && (text[m.Index - 1] == '?' || text[m.Index - 1] == '&');
+        if (inQuery && value.Length > 0 && value[0] != '"' && value[0] != '\'')
+        {
+            var end = value.IndexOfAny(['&', ',', ' ', '\t', '"', '\'']);
+            if (end >= 0)
+            {
+                return prefix + Mask + value[end..];
+            }
+        }
+
+        return prefix + Mask;
     }
 
     /// <summary>Type, redacted message and redacted stack for the exception and its inner chain.</summary>
