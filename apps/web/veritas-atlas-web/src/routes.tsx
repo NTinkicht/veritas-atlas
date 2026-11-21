@@ -1,5 +1,6 @@
 import type React from "react";
 import type { RouteObject } from "react-router-dom";
+import { RouteErrorBoundary } from "./components/RouteErrorBoundary";
 import { PersonsPage } from "./pages/PersonsPage";
 import { PersonDetailPage } from "./pages/PersonDetailPage";
 import { CasesPage } from "./pages/CasesPage";
@@ -255,4 +256,11 @@ const allRoutes: RouteObject[] = [
 // reachable in Development only, so seeded or placeholder pages never appear as real.
 export function buildRoutes(dev: boolean): RouteObject[] {
   return allRoutes.filter((route) => isMounted(route.path ?? "", dev));
+}
+
+// The app router: every mounted route sits under one pathless parent whose errorElement is the
+// generic RouteErrorBoundary, so a render crash or an unmatched URL never shows the router's
+// default error page (which prints the exception message and stack).
+export function buildAppRoutes(dev: boolean): RouteObject[] {
+  return [{ errorElement: <RouteErrorBoundary />, children: buildRoutes(dev) }];
 }
