@@ -20,16 +20,31 @@ public static partial class LogRedactor
     //     spaces belong to the secret), which over-redacts when unsure.
     // Whatever follows the secret is scanned again so later secrets are never skipped.
     [GeneratedRegex(
-        @"(?<key>\b[\w.\-]*(?:password|passwd|pwd|secret|token|api[_\-]?key|apikey|access[_\-]?key|private[_\-]?key|credential)[\w.\-]*)(?<sep>\s*[=:]\s*)(?<val>""(?:[^""]|"""")*""|'(?:[^']|'')*'|[^\r\n]+)",
+        @"(?<key>\b[\w.\-]*(?:password|passwd|pwd|secret|token|api[_\-]?key|apikey|access[_\-]?key|private[_\-]?key|credential|signature)[\w.\-]*|\bsig\b)(?<kq>\\?[""']?)(?<sep>\s*[=:]\s*)(?<val>\\""(?:(?!\\"").)*\\""|""(?:[^""\\]|\\.|"""")*""|'(?:[^'\\]|\\.|'')*'|[^\r\n]+)",
         RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex KeyValuePattern();
+
+    // JSON-ish text: a quoted or escaped-quoted key (\"password\":\"x\") is handled by the key regex via
+    // the optional (?<kq>) group; an unquoted JSON value (number/true/null) then ends at , } ] or whitespace.
+
+    // Cookie / Set-Cookie headers: the whole header value is secret.
+    [GeneratedRegex(@"\b(?<h>(?:Set-)?Cookie)(?<sep>\s*:\s*)(?<val>[^\r\n]+)", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex CookieHeaderPattern();
+
+    // Authorization / Proxy-Authorization with any scheme: Bearer/Basic are kept readable, the credential is masked.
+    [GeneratedRegex(@"\b(?<h>(?:Proxy-)?Authorization)(?<sep>\s*:\s*)(?<scheme>(?:Bearer|Basic|Token|Digest|Negotiate|NTLM|ApiKey|Bot)\s+)?(?<val>[^\s""']+)", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex AuthorizationHeaderPattern();
+
+    // XML-ish elements: <password>x</password>.
+    [GeneratedRegex(@"(?<open><(?<tag>[\w.\-:]*(?:password|passwd|pwd|secret|token|api[_\-]?key|apikey|access[_\-]?key|private[_\-]?key|credential|signature)[\w.\-:]*)(?:\s[^>]*)?>)(?<val>[^<]+)(?=</\k<tag>\s*>)", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex XmlElementPattern();
 
     // Authorization: Bearer xxx / Basic xxx, or a bare "Bearer xxx".
     [GeneratedRegex(@"\b(?<scheme>Bearer|Basic)\s+(?<val>[^\s""']+)", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex AuthSchemePattern();
 
     // Credentials embedded in URLs: scheme://user:pass@host.
-    [GeneratedRegex(@"(?<pre>\b[a-z][a-z0-9+.\-]*://[^/\s:@]+:)(?<val>[^@\s/]+)(?=@)", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    [GeneratedRegex(@"(?<pre>\b[a-z][a-z0-9+.\-]*://)(?<val>[^\s/?#@]+)(?=@)", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex UrlCredentialPattern();
 
     public static string Redact(string? text)
@@ -39,7 +54,10 @@ public static partial class LogRedactor
             return text ?? string.Empty;
         }
 
-        var result = RedactKeyValues(text);
+        var result = CookieHeaderPattern().Replace(text, m => m.Groups["h"].Value + m.Groups["sep"].Value + Mask);
+        result = AuthorizationHeaderPattern().Replace(result, m => m.Groups["h"].Value + m.Groups["sep"].Value + m.Groups["scheme"].Value + Mask);
+        result = RedactKeyValues(result);
+        result = XmlElementPattern().Replace(result, m => m.Groups["open"].Value + Mask);
         result = AuthSchemePattern().Replace(result, m => m.Groups["scheme"].Value + " " + Mask);
         result = UrlCredentialPattern().Replace(result, m => m.Groups["pre"].Value + Mask);
         return result;
@@ -49,7 +67,8 @@ public static partial class LogRedactor
 
     private static string MaskKeyValue(Match m, string text)
     {
-        var prefix = m.Groups["key"].Value + m.Groups["sep"].Value;
+        var prefix = m.Groups["key"].Value + m.Groups["kq"].Value + m.Groups["sep"].Value;
+        var jsonKey = m.Groups["kq"].Length > 0;
         var value = m.Groups["val"].Value;
         if (value.Length == 0 || value[0] == '"' || value[0] == '\'')
         {
@@ -59,7 +78,9 @@ public static partial class LogRedactor
         }
 
         var inQuery = m.Index > 0 && (text[m.Index - 1] == '?' || text[m.Index - 1] == '&');
-        var end = inQuery
+        var end = jsonKey
+            ? value.IndexOfAny([',', '}', ']', ' ', '\t', '\r'])
+            : inQuery
             ? value.IndexOfAny(['&', '#', ' ', '\t', '"', '\''])
             : value.IndexOf(';');
         return end < 0

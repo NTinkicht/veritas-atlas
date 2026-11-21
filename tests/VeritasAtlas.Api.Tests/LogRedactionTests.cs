@@ -66,6 +66,48 @@ public sealed class LogRedactionTests
     }
 
     [TestMethod]
+    [DataRow("{\"password\":\"hunter2\",\"access_token\":\"secret-value\"}", "{\"password\":[REDACTED],\"access_token\":[REDACTED]}")]
+    [DataRow("{\"user\":\"keep\",\"password\" : \"hunter2\" , \"n\":1}", "{\"user\":\"keep\",\"password\" : [REDACTED] , \"n\":1}")]
+    [DataRow("{\"auth\":{\"client_secret\":\"s1\",\"id\":\"keep\"}}", "{\"auth\":{\"client_secret\":[REDACTED],\"id\":\"keep\"}}")]
+    [DataRow("[{\"token\":\"a\"},{\"token\":\"b\",\"x\":\"keep\"}]", "[{\"token\":[REDACTED]},{\"token\":[REDACTED],\"x\":\"keep\"}]")]
+    [DataRow("{\"password\":\"ab\\\"cd-suffix\",\"x\":\"keep\"}", "{\"password\":[REDACTED],\"x\":\"keep\"}")]
+    [DataRow("{'password': 'a,b', 'x': 'keep'}", "{'password': [REDACTED], 'x': 'keep'}")]
+    [DataRow("{\"pwd\":12345,\"x\":\"keep\"}", "{\"pwd\":[REDACTED],\"x\":\"keep\"}")]
+    [DataRow("{\"token\":null,\"secret\":true,\"x\":\"keep\"}", "{\"token\":[REDACTED],\"secret\":[REDACTED],\"x\":\"keep\"}")]
+    [DataRow("body=\\\"password\\\":\\\"hunter2\\\",\\\"x\\\":\\\"keep\\\"", "body=\\\"password\\\":[REDACTED],\\\"x\\\":\\\"keep\\\"")]
+    [DataRow("failed {\"password\":\"p1\"} at /cb?token=t1&state=keep; Host=db;Pwd=p2;Database=x", "failed {\"password\":[REDACTED]} at /cb?token=[REDACTED]&state=keep; Host=db;Pwd=[REDACTED];Database=x")]
+    public void RedactHandlesJsonShapes(string input, string expected)
+    {
+        Assert.AreEqual(expected, LogRedactor.Redact(input));
+    }
+
+    [TestMethod]
+    [DataRow("https://user:hunter2@db.example/path?x=keep", "https://[REDACTED]@db.example/path?x=keep")]
+    [DataRow("https://ghp_tokenonly@github.com/o/r", "https://[REDACTED]@github.com/o/r")]
+    [DataRow("postgres://u:p%40ss%2Fw@h:5432/db", "postgres://[REDACTED]@h:5432/db")]
+    [DataRow("Authorization: Bearer abc.def", "Authorization: Bearer [REDACTED]")]
+    [DataRow("authorization: basic dXNlcjpwYXNz", "authorization: basic [REDACTED]")]
+    [DataRow("Authorization: Token abc123", "Authorization: Token [REDACTED]")]
+    [DataRow("Authorization: rawsecretvalue", "Authorization: [REDACTED]")]
+    [DataRow("Proxy-Authorization: Basic abc", "Proxy-Authorization: Basic [REDACTED]")]
+    [DataRow("Cookie: sid=abc; theme=dark", "Cookie: [REDACTED]")]
+    [DataRow("Set-Cookie: session=abc; Path=/; HttpOnly", "Set-Cookie: [REDACTED]")]
+    [DataRow("x-api-key: abc123", "x-api-key: [REDACTED]")]
+    [DataRow("/x?X-API-KEY=abc123&a=keep", "/x?X-API-KEY=[REDACTED]&a=keep")]
+    [DataRow("apikey=abc;a=keep", "apikey=[REDACTED];a=keep")]
+    [DataRow("api-key: abc", "api-key: [REDACTED]")]
+    [DataRow("client_secret=abc", "client_secret=[REDACTED]")]
+    [DataRow("/x?sig=abc&signature=def&design=keep&a=1", "/x?sig=[REDACTED]&signature=[REDACTED]&design=keep&a=1")]
+    [DataRow("<password>hunter2</password><user>keep</user>", "<password>[REDACTED]</password><user>keep</user>")]
+    [DataRow("<client-secret type=\"x\">a b</client-secret>", "<client-secret type=\"x\">[REDACTED]</client-secret>")]
+    [DataRow("PASSWORD=Abc;TOKEN=Def", "PASSWORD=[REDACTED];TOKEN=[REDACTED]")]
+    [DataRow("Cookie: sid=abc\nHost=db;Password=p;Database=x", "Cookie: [REDACTED]\nHost=db;Password=[REDACTED];Database=x")]
+    public void RedactHandlesHeadersUrlsXmlAndKeyNames(string input, string expected)
+    {
+        Assert.AreEqual(expected, LogRedactor.Redact(input));
+    }
+
+    [TestMethod]
     public void RedactKeepsNonSecretText()
     {
         const string input = "Host=db.example;Database=veritas;timeout waiting for connection to /api/x";
