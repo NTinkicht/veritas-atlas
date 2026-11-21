@@ -18,9 +18,10 @@ public static partial class LogRedactor
     //     and percent-encoded characters belong to the secret;
     //   anything else (connection string, header, log text): ends at ';' or end of line (so '&', ',' and
     //     spaces belong to the secret), which over-redacts when unsure.
+    // A closing quote right after the key is accepted so JSON pairs ("password":"x") are redacted.
     // Whatever follows the secret is scanned again so later secrets are never skipped.
     [GeneratedRegex(
-        @"(?<key>\b[\w.\-]*(?:password|passwd|pwd|secret|token|api[_\-]?key|apikey|access[_\-]?key|private[_\-]?key|credential)[\w.\-]*)(?<sep>\s*[=:]\s*)(?<val>""(?:[^""]|"""")*""|'(?:[^']|'')*'|[^\r\n]+)",
+        @"(?<key>\b[\w.\-]*(?:password|passwd|pwd|secret|token|api[_\-]?key|apikey|access[_\-]?key|private[_\-]?key|credential)[\w.\-]*)(?<kq>[""']?)(?<sep>\s*[=:]\s*)(?<val>""(?:[^""]|"""")*""|'(?:[^']|'')*'|[^\r\n]+)",
         RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex KeyValuePattern();
 
@@ -49,7 +50,7 @@ public static partial class LogRedactor
 
     private static string MaskKeyValue(Match m, string text)
     {
-        var prefix = m.Groups["key"].Value + m.Groups["sep"].Value;
+        var prefix = m.Groups["key"].Value + m.Groups["kq"].Value + m.Groups["sep"].Value;
         var value = m.Groups["val"].Value;
         if (value.Length == 0 || value[0] == '"' || value[0] == '\'')
         {
