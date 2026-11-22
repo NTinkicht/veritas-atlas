@@ -1399,6 +1399,42 @@ public sealed class TenantInvestigationBookmarkConfiguration : IEntityTypeConfig
     }
 }
 
+public sealed class TenantInvestigationTagConfiguration : IEntityTypeConfiguration<VeritasAtlas.Infrastructure.Persistence.TenantInvestigationTag>
+{
+    public void Configure(EntityTypeBuilder<VeritasAtlas.Infrastructure.Persistence.TenantInvestigationTag> builder)
+    {
+        builder.ToTable("tenant_investigation_tags", table =>
+        {
+            table.HasCheckConstraint(
+                "ck_tenant_investigation_tags_tenant_id_not_empty",
+                "tenant_id <> '00000000-0000-0000-0000-000000000000'::uuid");
+            table.HasCheckConstraint(
+                "ck_tenant_investigation_tags_subject_shape",
+                "length(btrim(subject)) > 0 AND subject !~ '[\\x01-\\x1f\\x7f-\\x9f]'");
+            table.HasCheckConstraint(
+                "ck_tenant_investigation_tags_tag_shape",
+                "tag ~ '^[a-z0-9][a-z0-9_.-]*$'");
+        });
+
+        builder.HasKey(x => new { x.TenantId, x.InvestigationId, x.Subject, x.Tag }).HasName("pk_tenant_investigation_tags");
+        builder.Property(x => x.TenantId).HasColumnName("tenant_id").IsRequired();
+        builder.Property(x => x.InvestigationId).HasColumnName("investigation_id").IsRequired();
+        builder.Property(x => x.Subject)
+            .HasColumnName("subject")
+            .HasMaxLength(VeritasAtlas.Application.Interfaces.TenantInvestigationLimits.MaxSubjectLength)
+            .IsRequired();
+        builder.Property(x => x.Tag)
+            .HasColumnName("tag")
+            .HasMaxLength(VeritasAtlas.Application.Interfaces.TenantInvestigationTagLimits.MaxTagLength)
+            .IsRequired();
+        builder.Property(x => x.CreatedAtUtc).HasColumnName("created_at_utc").IsRequired();
+
+        builder.HasIndex(x => new { x.TenantId, x.Subject, x.Tag, x.InvestigationId })
+            .HasDatabaseName("ix_tenant_investigation_tags_by_tag");
+        // No FKs (append-only parents): the insert guard trigger checks the investigation reference.
+    }
+}
+
 public sealed class TenantInvestigationShareConfiguration : IEntityTypeConfiguration<VeritasAtlas.Infrastructure.Persistence.TenantInvestigationShare>
 {
     public void Configure(EntityTypeBuilder<VeritasAtlas.Infrastructure.Persistence.TenantInvestigationShare> builder)

@@ -149,6 +149,8 @@ public sealed class BackupRestoreDrillTests
         "tr_tenant_investigation_state_events_guard",
         "tr_tenant_investigation_state_events_row_immutable",
         "tr_tenant_investigation_state_events_truncate_immutable",
+        "tr_tenant_investigation_tags_closed_guard",
+        "tr_tenant_investigation_tags_guard",
         "tr_tenant_investigations_immutable",
         "tr_tenant_investigations_no_truncate",
         "tr_tenant_parse_runs_append_only",
