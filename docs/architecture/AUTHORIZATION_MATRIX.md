@@ -28,6 +28,7 @@ test until the pinned matrix and this document are updated together.
 
 query -> evidence -> claims -> review -> publication:
 
+- Saved evidence searches (create, list, delete): operator and analyst only; each subject sees only its own.
 - Investigations, collected evidence, annotations, bookmarks: writes are
   not denied to `operator` and `analyst`; reviewers, publishers and admins are denied.
 - Publication revisions: creation is not denied to `operator`/`analyst`; transitions are denied to
@@ -44,6 +45,9 @@ Source of truth is the test; this table is generated from it.
 
 | Endpoint (under `api/v1/`) | Roles answered with 403 |
 |---|---|
+| `DELETE tenant-saved-searches/{id:guid}` | reviewer, publisher, admin, intruder |
+| `GET tenant-saved-searches` | reviewer, publisher, admin, intruder |
+| `POST tenant-saved-searches` | reviewer, publisher, admin, intruder |
 | `DELETE tenant-investigations/{investigationId:guid}/evidence-items/{itemId:guid}/bookmark` | reviewer, publisher, admin, intruder |
 | `DELETE tenant-investigations/{investigationId:guid}/shares/{grantee}` | reviewer, publisher, admin, intruder |
 | `GET tenant-audit-events` | operator, analyst, reviewer, publisher, intruder |

@@ -220,6 +220,9 @@ public sealed class AuthorizationMatrixTests
     private static readonly string[] PinnedMatrix =
     [
         "DELETE api/v1/tenant-investigations/{investigationId:guid}/evidence-items/{itemId:guid}/bookmark | denied: reviewer,publisher,admin,intruder",
+        "DELETE api/v1/tenant-saved-searches/{id:guid} | denied: reviewer,publisher,admin,intruder",
+        "GET api/v1/tenant-saved-searches | denied: reviewer,publisher,admin,intruder",
+        "POST api/v1/tenant-saved-searches | denied: reviewer,publisher,admin,intruder",
         "DELETE api/v1/tenant-investigations/{investigationId:guid}/shares/{grantee} | denied: reviewer,publisher,admin,intruder",
         "GET api/v1/agent-runs | denied: intruder",
         "GET api/v1/auth-diagnostics/protected | denied: intruder",
