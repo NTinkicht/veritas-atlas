@@ -1946,6 +1946,96 @@ namespace VeritasAtlas.Infrastructure.Migrations
                         });
                 });
 
+            modelBuilder.Entity("VeritasAtlas.Infrastructure.Persistence.TenantSavedSearch", b =>
+                {
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<string>("Freshness")
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("freshness");
+
+                    b.Property<string>("Jurisdiction")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("jurisdiction");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("name");
+
+                    b.Property<string>("ParserName")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("parser_name");
+
+                    b.Property<string>("ParserVersion")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("parser_version");
+
+                    b.Property<string>("Query")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("query");
+
+                    b.Property<Guid?>("SourceEntryId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("source_entry_id");
+
+                    b.Property<string>("SourceType")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("source_type");
+
+                    b.Property<string>("Subject")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("subject");
+
+                    b.Property<string>("SubjectTerm")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("subject_term");
+
+                    b.HasKey("TenantId", "Id")
+                        .HasName("pk_tenant_saved_searches");
+
+                    b.HasIndex("TenantId", "Subject", "CreatedAtUtc")
+                        .HasDatabaseName("ix_tenant_saved_searches_subject");
+
+                    b.HasIndex("TenantId", "Subject", "Name")
+                        .IsUnique()
+                        .HasDatabaseName("ux_tenant_saved_searches_name");
+
+                    b.ToTable("tenant_saved_searches", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_tenant_saved_searches_freshness_known", "freshness IS NULL OR freshness IN ('Current', 'Stale', 'Unknown', 'Superseded')");
+
+                            t.HasCheckConstraint("ck_tenant_saved_searches_name_shape", "length(btrim(name)) > 0 AND name = btrim(name) AND name !~ '[\\x01-\\x1f\\x7f-\\x9f]'");
+
+                            t.HasCheckConstraint("ck_tenant_saved_searches_query_shape", "length(btrim(query)) > 0 AND query !~ '[\\x01-\\x1f\\x7f-\\x9f]'");
+
+                            t.HasCheckConstraint("ck_tenant_saved_searches_subject_shape", "length(btrim(subject)) > 0 AND subject !~ '[\\x01-\\x1f\\x7f-\\x9f]'");
+
+                            t.HasCheckConstraint("ck_tenant_saved_searches_tenant_id_not_empty", "tenant_id <> '00000000-0000-0000-0000-000000000000'::uuid");
+                        });
+                });
+
             modelBuilder.Entity("VeritasAtlas.Infrastructure.Persistence.TenantSourceFetchPolicy", b =>
                 {
                     b.Property<Guid>("TenantId")
