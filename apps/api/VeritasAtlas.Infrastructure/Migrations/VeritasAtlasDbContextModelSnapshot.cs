@@ -1946,6 +1946,46 @@ namespace VeritasAtlas.Infrastructure.Migrations
                         });
                 });
 
+            modelBuilder.Entity("VeritasAtlas.Infrastructure.Persistence.TenantInvestigationTag", b =>
+                {
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<Guid>("InvestigationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("investigation_id");
+
+                    b.Property<string>("Subject")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("subject");
+
+                    b.Property<string>("Tag")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("tag");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.HasKey("TenantId", "InvestigationId", "Subject", "Tag")
+                        .HasName("pk_tenant_investigation_tags");
+
+                    b.HasIndex("TenantId", "Subject", "Tag", "InvestigationId")
+                        .HasDatabaseName("ix_tenant_investigation_tags_by_tag");
+
+                    b.ToTable("tenant_investigation_tags", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_tenant_investigation_tags_subject_shape", "length(btrim(subject)) > 0 AND subject !~ '[\\x01-\\x1f\\x7f-\\x9f]'");
+
+                            t.HasCheckConstraint("ck_tenant_investigation_tags_tag_shape", "tag ~ '^[a-z0-9][a-z0-9_.-]*$'");
+
+                            t.HasCheckConstraint("ck_tenant_investigation_tags_tenant_id_not_empty", "tenant_id <> '00000000-0000-0000-0000-000000000000'::uuid");
+                        });
+                });
+
             modelBuilder.Entity("VeritasAtlas.Infrastructure.Persistence.TenantSavedSearch", b =>
                 {
                     b.Property<Guid>("TenantId")
