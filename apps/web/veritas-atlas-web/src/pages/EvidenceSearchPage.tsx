@@ -8,6 +8,7 @@ import {
   type FreshnessLabel,
 } from "../api/evidenceSearch";
 import { AppSurface } from "../components/AppSurface";
+import { SavedSearchesPanel } from "../components/SavedSearchesPanel";
 import { CitationInspector, EvidenceResults, type SearchView } from "../components/EvidenceSearchView";
 
 const PAGE_SIZE = 20;
@@ -136,6 +137,18 @@ export function EvidenceSearchPage() {
           </p>
         ) : null}
       </form>
+
+      <SavedSearchesPanel
+        current={{ name: "", q, freshness, jurisdiction, type }}
+        onApply={(saved) => {
+          setQ(saved.query);
+          setFreshness(saved.freshness ?? "");
+          setJurisdiction(saved.jurisdiction ?? "");
+          setType(saved.sourceType ?? "");
+          setFormError(null);
+        }}
+        signInHref={signInHref}
+      />
 
       <div className="es-layout">
         <section aria-labelledby="es-results-title">
