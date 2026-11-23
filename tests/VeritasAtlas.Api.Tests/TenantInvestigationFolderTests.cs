@@ -311,6 +311,37 @@ public sealed class TenantInvestigationFolderTests
         await Assert.ThrowsExactlyAsync<ArgumentException>(() => store.SetAsync(Guid.Empty, invA, "ok", "synthetic", CancellationToken.None));
     }
 
+    [TestMethod]
+    public async Task ClearWaitsForTheSubjectFolderLockSoItCannotRaceASetOverRealPostgres()
+    {
+        if (Database() is not { } cs) return;
+        await TenantInvestigationEvidenceItemTests.ResetAsync(cs);
+        await using var db = new VeritasAtlasDbContext(TenantInvestigationEvidenceItemTests.Options(cs));
+        var investigations = new EfTenantInvestigationStore(db, TimeProvider.System);
+        var inv = (await investigations.CreateAsync(TenantA, new InvestigationInput("k", "T", "synthetic"), CancellationToken.None)).Investigation!.Id;
+        var store = new EfTenantInvestigationFolderStore(db, TimeProvider.System);
+        Assert.AreEqual(FolderSetOutcome.Created, (await store.SetAsync(TenantA, inv, "a", "synthetic", CancellationToken.None)).Outcome);
+
+        // Hold the lock a concurrent SetAsync would hold; ClearAsync must wait for it.
+        await using var connection = new NpgsqlConnection(cs);
+        await connection.OpenAsync();
+        await using var holder = await connection.BeginTransactionAsync();
+        var lockKey = $"investigation_folder:{TenantA:D}:{inv:D}:synthetic";
+        await using (var take = new NpgsqlCommand("SELECT pg_advisory_xact_lock(hashtextextended(@k, 0))", connection, holder))
+        {
+            take.Parameters.AddWithValue("k", lockKey);
+            await take.ExecuteNonQueryAsync();
+        }
+
+        await using var db2 = new VeritasAtlasDbContext(TenantInvestigationEvidenceItemTests.Options(cs));
+        var clear = new EfTenantInvestigationFolderStore(db2, TimeProvider.System)
+            .ClearAsync(TenantA, inv, "synthetic", CancellationToken.None);
+        await Task.Delay(1500);
+        Assert.IsFalse(clear.IsCompleted, "clear must wait for the per-subject folder lock");
+        await holder.CommitAsync();
+        Assert.AreEqual(FolderClearOutcome.Cleared, await clear);
+    }
+
     private static async Task<string> GetName(HttpClient client, Guid investigation, string bearer)
     {
         using var response = await Send(client, HttpMethod.Get, Folder(investigation), bearer);

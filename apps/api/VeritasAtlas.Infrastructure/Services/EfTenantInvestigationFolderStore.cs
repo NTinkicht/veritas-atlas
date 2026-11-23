@@ -91,6 +91,12 @@ public sealed class EfTenantInvestigationFolderStore : ITenantInvestigationFolde
             _db.ChangeTracker.Clear();
             return new FolderSetResult(FolderSetOutcome.NotFound, null);
         }
+        catch (DbUpdateConcurrencyException)
+        {
+            // Fail closed: the row vanished underneath the update; report nothing changed.
+            _db.ChangeTracker.Clear();
+            return new FolderSetResult(FolderSetOutcome.NotFound, null);
+        }
 
         return new FolderSetResult(outcome, ToModel(row));
     }
@@ -109,6 +115,12 @@ public sealed class EfTenantInvestigationFolderStore : ITenantInvestigationFolde
             return FolderClearOutcome.InvestigationClosed;
         }
 
+        // Same per-(tenant, investigation, subject) lock as SetAsync so a concurrent set cannot
+        // update a row this clear deletes (which would surface as a concurrency exception).
+        await using var transaction = await _db.Database.BeginTransactionAsync(cancellationToken);
+        var lockKey = $"investigation_folder:{tenantId:D}:{investigationId:D}:{subject}";
+        await _db.Database.ExecuteSqlInterpolatedAsync(
+            $"SELECT pg_advisory_xact_lock(hashtextextended({lockKey}, 0))", cancellationToken);
         var row = await _db.TenantInvestigationFolders.SingleOrDefaultAsync(
             x => x.TenantId == tenantId && x.InvestigationId == investigationId && x.Subject == subject,
             cancellationToken);
@@ -122,6 +134,7 @@ public sealed class EfTenantInvestigationFolderStore : ITenantInvestigationFolde
         try
         {
             await _db.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
         }
         catch (DbUpdateException ex) when (InvestigationStateQueries.IsClosedViolation(ex))
         {
