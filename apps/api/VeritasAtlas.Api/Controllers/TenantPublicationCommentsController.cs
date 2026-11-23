@@ -16,7 +16,8 @@ namespace VeritasAtlas.Api.Controllers;
 [Route("api/v1/tenant-publication-revisions/{id:guid}/comments")]
 public sealed class TenantPublicationCommentsController : ControllerBase
 {
-    public const int MaxRequestBytes = 8 * 1024;
+    // Worst case JSON for a valid comment: 2000 UTF-16 units each escaped as \uXXXX (6 bytes) = 12000, plus the envelope.
+    public const int MaxRequestBytes = 16 * 1024;
     private readonly ITenantPublicationCommentStore _store;
 
     public TenantPublicationCommentsController(ITenantPublicationCommentStore store)

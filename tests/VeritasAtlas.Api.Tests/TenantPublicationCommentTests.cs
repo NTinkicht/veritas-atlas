@@ -8,6 +8,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Npgsql;
+using VeritasAtlas.Api.Controllers;
 using VeritasAtlas.Api.Infrastructure.Auth;
 using VeritasAtlas.Application.Interfaces;
 using VeritasAtlas.Infrastructure.Persistence;
@@ -93,6 +94,49 @@ public sealed class TenantPublicationCommentTests
         Assert.AreEqual(HttpStatusCode.Created, ok.StatusCode);
         Assert.AreEqual((TenantA, "synthetic-reviewer"), store.Added.Single());
         Assert.IsFalse(store.LastBody!.StartsWith(' ') || store.LastBody.EndsWith(' '), "the body is stored trimmed");
+    }
+
+    [TestMethod]
+    public async Task WorstCaseUnicodeEscapedCommentIsAcceptedAndOversizedBodiesAreRefused()
+    {
+        // The in-process test server does not enforce [RequestSizeLimit], so pin the attribute itself: it must
+        // cover the worst-case JSON (every character as a 6-byte escape) plus the envelope, and stay bounded.
+        var limit = typeof(TenantPublicationCommentsController).GetMethod(nameof(TenantPublicationCommentsController.Add))!
+            .GetCustomAttributes(typeof(Microsoft.AspNetCore.Mvc.RequestSizeLimitAttribute), false)
+            .Single();
+        var bytes = (long)limit.GetType().GetField("_bytes", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!
+            .GetValue(limit)!;
+        Assert.AreEqual((long)TenantPublicationCommentsController.MaxRequestBytes, bytes);
+        Assert.IsTrue(bytes >= 6L * TenantPublicationCommentRules.MaxBodyLength + 512,
+            "the limit must admit a 2000-character comment written entirely as unicode escapes");
+        Assert.IsTrue(bytes <= 64 * 1024, "the limit must stay bounded");
+
+        var store = new CountingStore();
+        using var factory = new ApiFactory(store: store);
+        using var client = factory.CreateClient();
+        var reviewer = Token("synthetic-reviewer", "reviewer", TenantA);
+        var id = Guid.NewGuid();
+
+        async Task<HttpResponseMessage> Raw(string json)
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Post, Comments(id));
+            request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", reviewer);
+            request.Content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
+            return await client.SendAsync(request);
+        }
+
+        // 2000 valid characters, every one written as a \uXXXX escape: about 12 KB on the wire.
+        var escaped = string.Concat(Enumerable.Repeat("\\u0061", TenantPublicationCommentRules.MaxBodyLength));
+        var worstCase = $"{{\"clientKey\":\"{Guid.NewGuid()}\",\"body\":\"{escaped}\"}}";
+        Assert.IsTrue(worstCase.Length > 8 * 1024, "the fixture must exceed the former 8 KiB limit");
+        using var ok = await Raw(worstCase);
+        Assert.AreEqual(HttpStatusCode.Created, ok.StatusCode);
+        Assert.AreEqual(TenantPublicationCommentRules.MaxBodyLength, store.LastBody!.Length);
+
+        var oversized = $"{{\"clientKey\":\"{Guid.NewGuid()}\",\"body\":\"{new string('a', TenantPublicationCommentsController.MaxRequestBytes)}\"}}";
+        using var refused = await Raw(oversized);
+        Assert.IsTrue(refused.StatusCode is HttpStatusCode.BadRequest or HttpStatusCode.RequestEntityTooLarge, refused.StatusCode.ToString());
+        Assert.AreEqual(1, store.Calls, "the oversized body never reaches the store");
     }
 
     [TestMethod]
