@@ -1923,6 +1923,7 @@ public sealed class TenantSavedSearchConfiguration : IEntityTypeConfiguration<Ve
             table.HasCheckConstraint(
                 "ck_tenant_saved_searches_freshness_known",
                 "freshness IS NULL OR freshness IN ('Current', 'Stale', 'Unknown', 'Superseded')");
+            table.HasCheckConstraint("ck_tenant_saved_searches_version_positive", "version >= 1");
         });
 
         builder.HasKey(x => new { x.TenantId, x.Id }).HasName("pk_tenant_saved_searches");
@@ -1953,12 +1954,61 @@ public sealed class TenantSavedSearchConfiguration : IEntityTypeConfiguration<Ve
         builder.Property(x => x.SubjectTerm).HasColumnName("subject_term")
             .HasMaxLength(VeritasAtlas.Application.Interfaces.EvidenceSearchLimits.MaxFilterLength);
         builder.Property(x => x.CreatedAtUtc).HasColumnName("created_at_utc").IsRequired();
+        builder.Property(x => x.Version).HasColumnName("version").HasDefaultValue(1).IsRequired();
 
         builder.HasIndex(x => new { x.TenantId, x.Subject, x.Name })
             .IsUnique()
             .HasDatabaseName("ux_tenant_saved_searches_name");
         builder.HasIndex(x => new { x.TenantId, x.Subject, x.CreatedAtUtc })
             .HasDatabaseName("ix_tenant_saved_searches_subject");
+    }
+}
+
+public sealed class TenantSavedSearchVersionConfiguration : IEntityTypeConfiguration<VeritasAtlas.Infrastructure.Persistence.TenantSavedSearchVersion>
+{
+    public void Configure(EntityTypeBuilder<VeritasAtlas.Infrastructure.Persistence.TenantSavedSearchVersion> builder)
+    {
+        builder.ToTable("tenant_saved_search_versions", table =>
+        {
+            table.HasCheckConstraint("ck_tenant_saved_search_versions_version_positive", "version >= 1");
+            table.HasCheckConstraint(
+                "ck_tenant_saved_search_versions_freshness_known",
+                "freshness IS NULL OR freshness IN ('Current', 'Stale', 'Unknown', 'Superseded')");
+            table.HasCheckConstraint(
+                "ck_tenant_saved_search_versions_name_shape",
+                "length(btrim(name)) > 0 AND name = btrim(name) AND name !~ '[\\x01-\\x1f\\x7f-\\x9f]'");
+            table.HasCheckConstraint(
+                "ck_tenant_saved_search_versions_query_shape",
+                "length(btrim(query)) > 0 AND query !~ '[\\x01-\\x1f\\x7f-\\x9f]'");
+        });
+
+        builder.HasKey(x => new { x.TenantId, x.SavedSearchId, x.Version }).HasName("pk_tenant_saved_search_versions");
+        builder.Property(x => x.TenantId).HasColumnName("tenant_id").IsRequired();
+        builder.Property(x => x.SavedSearchId).HasColumnName("saved_search_id").IsRequired();
+        builder.Property(x => x.Version).HasColumnName("version").IsRequired();
+        builder.Property(x => x.Name).HasColumnName("name")
+            .HasMaxLength(VeritasAtlas.Application.Interfaces.TenantSavedSearchLimits.MaxNameLength).IsRequired();
+        builder.Property(x => x.Query).HasColumnName("query")
+            .HasMaxLength(VeritasAtlas.Application.Interfaces.EvidenceSearchLimits.MaxQueryLength).IsRequired();
+        builder.Property(x => x.SourceEntryId).HasColumnName("source_entry_id");
+        builder.Property(x => x.Jurisdiction).HasColumnName("jurisdiction")
+            .HasMaxLength(VeritasAtlas.Application.Interfaces.EvidenceSearchLimits.MaxFilterLength);
+        builder.Property(x => x.SourceType).HasColumnName("source_type")
+            .HasMaxLength(VeritasAtlas.Application.Interfaces.EvidenceSearchLimits.MaxFilterLength);
+        builder.Property(x => x.Freshness).HasColumnName("freshness").HasMaxLength(16);
+        builder.Property(x => x.ParserName).HasColumnName("parser_name")
+            .HasMaxLength(VeritasAtlas.Application.Interfaces.EvidenceSearchLimits.MaxFilterLength);
+        builder.Property(x => x.ParserVersion).HasColumnName("parser_version")
+            .HasMaxLength(VeritasAtlas.Application.Interfaces.EvidenceSearchLimits.MaxFilterLength);
+        builder.Property(x => x.SubjectTerm).HasColumnName("subject_term")
+            .HasMaxLength(VeritasAtlas.Application.Interfaces.EvidenceSearchLimits.MaxFilterLength);
+        builder.Property(x => x.CreatedAtUtc).HasColumnName("created_at_utc").IsRequired();
+
+        builder.HasOne<VeritasAtlas.Infrastructure.Persistence.TenantSavedSearch>()
+            .WithMany()
+            .HasForeignKey(x => new { x.TenantId, x.SavedSearchId })
+            .HasConstraintName("fk_tenant_saved_search_versions_saved_search")
+            .OnDelete(DeleteBehavior.Cascade);
     }
 }
 

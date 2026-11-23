@@ -53,6 +53,7 @@ Source of truth is the test; this table is generated from it.
 | `GET tenant-investigations/{investigationId:guid}/folder` | intruder |
 | `GET tenant-investigations/{investigationId:guid}/tags` | intruder |
 | `GET tenant-saved-searches` | reviewer, publisher, admin, intruder |
+| `GET tenant-saved-searches/{id:guid}/versions` | reviewer, publisher, admin, intruder |
 | `POST tenant-saved-searches` | reviewer, publisher, admin, intruder |
 | `DELETE tenant-investigations/{investigationId:guid}/evidence-items/{itemId:guid}/bookmark` | reviewer, publisher, admin, intruder |
 | `DELETE tenant-investigations/{investigationId:guid}/shares/{grantee}` | reviewer, publisher, admin, intruder |
@@ -90,6 +91,7 @@ Source of truth is the test; this table is generated from it.
 | `GET tenant-raw-retrievals/{id:guid}/retention` | operator, analyst, reviewer, publisher, intruder |
 | `PUT tenant-investigations/{investigationId:guid}/folder` | reviewer, publisher, admin, intruder |
 | `PUT tenant-investigations/{investigationId:guid}/tags/{tag}` | reviewer, publisher, admin, intruder |
+| `PUT tenant-saved-searches/{id:guid}` | reviewer, publisher, admin, intruder |
 | `PUT tenant-raw-retrievals/{id:guid}/retention` | operator, analyst, reviewer, publisher, intruder |
 | `GET tenant-raw-retrievals/{id:guid}/parses/{parseRunId:guid}/verification` | operator, analyst, reviewer, publisher, intruder |
 | `POST tenant-raw-retrievals/{id:guid}/parses/{parseRunId:guid}/verification` | operator, analyst, reviewer, publisher, intruder |
