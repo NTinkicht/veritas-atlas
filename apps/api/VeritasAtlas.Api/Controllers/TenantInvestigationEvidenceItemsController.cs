@@ -76,6 +76,76 @@ public sealed class TenantInvestigationEvidenceItemsController : ControllerBase
         };
     }
 
+    /// <summary>
+    /// VER-P1-01: batch import of verified evidence into one investigation, all-or-nothing and
+    /// idempotent (a repeated batch replays every entry). Same author roles, share gate and
+    /// anti-oracle 404 as the single collect; every refusal happens before the store is touched.
+    /// </summary>
+    [HttpPost("batch")]
+    public async Task<IActionResult> CollectBatch(
+        Guid investigationId,
+        [FromBody] CollectEvidenceItemBatchRequest? request,
+        CancellationToken cancellationToken)
+    {
+        if (TenantClaim.GetTenantId(User) is not { } tenantId) return TenantRequired();
+
+        if (ActorOrNull() is not { } actor) return ActorRequired();
+
+        if (!HasExactlyOneRoleIn(User, AuthorRoles))
+        {
+            return Error(StatusCodes.Status403Forbidden, "author_required",
+                "Only an operator or analyst may collect evidence.");
+        }
+
+        var entries = request?.Items;
+        if (entries is null || entries.Count < 1 || entries.Count > TenantInvestigationEvidenceLimits.MaxBatchSize)
+        {
+            return Error(StatusCodes.Status400BadRequest, "invalid_batch",
+                $"items must hold 1-{TenantInvestigationEvidenceLimits.MaxBatchSize} entries.");
+        }
+
+        for (var i = 0; i < entries.Count; i++)
+        {
+            if (entries[i]?.EvidenceVerificationId is not { } id || id == Guid.Empty)
+            {
+                return Error(StatusCodes.Status400BadRequest, "invalid_evidence_verification_id",
+                    $"items[{i}].evidenceVerificationId must be the id of a verified evidence record.");
+            }
+
+            if (!TenantInvestigationEvidenceLimits.IsValidNote(entries[i]!.Note))
+            {
+                return Error(StatusCodes.Status400BadRequest, "invalid_note",
+                    $"items[{i}].note must be omitted or 1-{TenantInvestigationEvidenceLimits.MaxNoteLength} characters, without leading or trailing whitespace or control characters.");
+            }
+        }
+
+        if (entries.Select(x => x!.EvidenceVerificationId!.Value).Distinct().Count() != entries.Count)
+        {
+            return Error(StatusCodes.Status400BadRequest, "duplicate_evidence_in_batch",
+                "Each evidence record may appear only once per batch.");
+        }
+
+        if (!await _shares.IsAuthorizedAsync(tenantId, investigationId, actor, cancellationToken)) return NotFoundError();
+
+        var result = await _store.CollectBatchAsync(
+            tenantId, investigationId,
+            entries.Select(x => new EvidenceItemInput(x!.EvidenceVerificationId!.Value, x.Note, actor)).ToList(),
+            cancellationToken);
+
+        return result.Outcome switch
+        {
+            EvidenceItemCollectOutcome.Collected => StatusCode(
+                result.Entries!.Any(x => !x.Replayed) ? StatusCodes.Status201Created : StatusCodes.Status200OK,
+                new TenantInvestigationEvidenceItemBatchResponse(
+                    result.Entries!.Select(x => new TenantInvestigationEvidenceItemBatchEntryResponse(ToResponse(x.Item), x.Replayed)).ToList())),
+            EvidenceItemCollectOutcome.InvestigationClosed => Error(StatusCodes.Status409Conflict, "investigation_closed",
+                "The investigation is closed; reopen it to change it."),
+            EvidenceItemCollectOutcome.NoteConflict => Error(StatusCodes.Status409Conflict, "note_conflict",
+                $"items[{result.FailedIndex}] was already collected with a different note; nothing was imported."),
+            _ => NotFoundError()
+        };
+    }
+
     [HttpGet]
     public async Task<IActionResult> List(Guid investigationId, CancellationToken cancellationToken)
     {
@@ -171,6 +241,14 @@ public sealed record CollectEvidenceItemRequest(Guid? EvidenceVerificationId, st
 public sealed record TenantInvestigationEvidenceItemResponse(
     Guid Id, Guid InvestigationId, Guid EvidenceVerificationId, string? Note,
     string CollectedBySubject, DateTime CreatedAtUtc);
+
+public sealed record CollectEvidenceItemBatchRequest(IReadOnlyList<CollectEvidenceItemRequest?>? Items);
+
+public sealed record TenantInvestigationEvidenceItemBatchEntryResponse(
+    TenantInvestigationEvidenceItemResponse Item, bool Replayed);
+
+public sealed record TenantInvestigationEvidenceItemBatchResponse(
+    IReadOnlyList<TenantInvestigationEvidenceItemBatchEntryResponse> Items);
 
 public sealed record TenantInvestigationEvidenceItemListResponse(
     IReadOnlyList<TenantInvestigationEvidenceItemResponse> Items);

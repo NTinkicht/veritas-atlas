@@ -81,6 +81,7 @@ Source of truth is the test; this table is generated from it.
 | `POST tenant-investigations/{id:guid}/close` | reviewer, publisher, admin, intruder |
 | `POST tenant-investigations/{id:guid}/reopen` | reviewer, publisher, admin, intruder |
 | `POST tenant-investigations/{investigationId:guid}/evidence-items` | reviewer, publisher, admin, intruder |
+| `POST tenant-investigations/{investigationId:guid}/evidence-items/batch` | reviewer, publisher, admin, intruder |
 | `POST tenant-investigations/{investigationId:guid}/evidence-items/{itemId:guid}/annotations` | reviewer, publisher, admin, intruder |
 | `POST tenant-publication-revisions` | reviewer, publisher, admin, intruder |
 | `POST tenant-publication-revisions/{id:guid}/transitions` | admin, intruder |
