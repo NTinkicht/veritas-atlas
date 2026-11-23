@@ -1961,3 +1961,36 @@ public sealed class TenantSavedSearchConfiguration : IEntityTypeConfiguration<Ve
             .HasDatabaseName("ix_tenant_saved_searches_subject");
     }
 }
+
+public sealed class TenantInvestigationFolderConfiguration : IEntityTypeConfiguration<VeritasAtlas.Infrastructure.Persistence.TenantInvestigationFolder>
+{
+    public void Configure(EntityTypeBuilder<VeritasAtlas.Infrastructure.Persistence.TenantInvestigationFolder> builder)
+    {
+        builder.ToTable("tenant_investigation_folders", table =>
+        {
+            table.HasCheckConstraint(
+                "ck_tenant_investigation_folders_tenant_id_not_empty",
+                "tenant_id <> '00000000-0000-0000-0000-000000000000'::uuid");
+            table.HasCheckConstraint(
+                "ck_tenant_investigation_folders_subject_shape",
+                "length(btrim(subject)) > 0 AND subject !~ '[\\x01-\\x1f\\x7f-\\x9f]'");
+            table.HasCheckConstraint(
+                "ck_tenant_investigation_folders_name_shape",
+                "name ~ '^[A-Za-z0-9_.-]+( [A-Za-z0-9_.-]+)*$'");
+        });
+
+        builder.HasKey(x => new { x.TenantId, x.InvestigationId, x.Subject }).HasName("pk_tenant_investigation_folders");
+        builder.Property(x => x.TenantId).HasColumnName("tenant_id").IsRequired();
+        builder.Property(x => x.InvestigationId).HasColumnName("investigation_id").IsRequired();
+        builder.Property(x => x.Subject)
+            .HasColumnName("subject")
+            .HasMaxLength(VeritasAtlas.Application.Interfaces.TenantInvestigationLimits.MaxSubjectLength)
+            .IsRequired();
+        builder.Property(x => x.Name)
+            .HasColumnName("name")
+            .HasMaxLength(VeritasAtlas.Application.Interfaces.TenantInvestigationFolderLimits.MaxNameLength)
+            .IsRequired();
+        builder.Property(x => x.UpdatedAtUtc).HasColumnName("updated_at_utc").IsRequired();
+        // No FKs (append-only parents): the guard trigger checks the investigation reference.
+    }
+}

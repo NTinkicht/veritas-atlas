@@ -220,8 +220,10 @@ public sealed class AuthorizationMatrixTests
     private static readonly string[] PinnedMatrix =
     [
         "DELETE api/v1/tenant-investigations/{investigationId:guid}/evidence-items/{itemId:guid}/bookmark | denied: reviewer,publisher,admin,intruder",
+        "DELETE api/v1/tenant-investigations/{investigationId:guid}/folder | denied: reviewer,publisher,admin,intruder",
         "DELETE api/v1/tenant-investigations/{investigationId:guid}/tags/{tag} | denied: reviewer,publisher,admin,intruder",
         "DELETE api/v1/tenant-saved-searches/{id:guid} | denied: reviewer,publisher,admin,intruder",
+        "GET api/v1/tenant-investigations/{investigationId:guid}/folder | denied: intruder",
         "GET api/v1/tenant-investigations/{investigationId:guid}/tags | denied: intruder",
         "GET api/v1/tenant-saved-searches | denied: reviewer,publisher,admin,intruder",
         "POST api/v1/tenant-saved-searches | denied: reviewer,publisher,admin,intruder",
@@ -328,6 +330,7 @@ public sealed class AuthorizationMatrixTests
         "GET api/v1/tenant-raw-retrievals/{id:guid}/attestations | denied: operator,analyst,reviewer,publisher,intruder",
         "GET api/v1/tenant-raw-retrievals/{id:guid}/retention-eligibility | denied: operator,analyst,reviewer,publisher,intruder",
         "GET api/v1/tenant-raw-retrievals/{id:guid}/retention | denied: operator,analyst,reviewer,publisher,intruder",
+        "PUT api/v1/tenant-investigations/{investigationId:guid}/folder | denied: reviewer,publisher,admin,intruder",
         "PUT api/v1/tenant-investigations/{investigationId:guid}/tags/{tag} | denied: reviewer,publisher,admin,intruder",
         "PUT api/v1/tenant-raw-retrievals/{id:guid}/retention | denied: operator,analyst,reviewer,publisher,intruder",
         "GET api/v1/tenant-raw-retrievals/{id:guid}/parses/{parseRunId:guid}/verification | denied: operator,analyst,reviewer,publisher,intruder",

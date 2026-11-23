@@ -28,6 +28,7 @@ test until the pinned matrix and this document are updated together.
 
 query -> evidence -> claims -> review -> publication:
 
+- Investigation folder (set, clear, get): operator and analyst may write, every known workflow role may read; one private folder per subject, and an investigation the caller cannot see answers 404.
 - Investigation tags (add, remove, list): operator and analyst may write, every known workflow role may read; each subject sees only its own tags, and an investigation the caller cannot see answers 404.
 - Saved evidence searches (create, list, delete): operator and analyst only; each subject sees only its own.
 - Investigations, collected evidence, annotations, bookmarks: writes are
@@ -46,8 +47,10 @@ Source of truth is the test; this table is generated from it.
 
 | Endpoint (under `api/v1/`) | Roles answered with 403 |
 |---|---|
+| `DELETE tenant-investigations/{investigationId:guid}/folder` | reviewer, publisher, admin, intruder |
 | `DELETE tenant-investigations/{investigationId:guid}/tags/{tag}` | reviewer, publisher, admin, intruder |
 | `DELETE tenant-saved-searches/{id:guid}` | reviewer, publisher, admin, intruder |
+| `GET tenant-investigations/{investigationId:guid}/folder` | intruder |
 | `GET tenant-investigations/{investigationId:guid}/tags` | intruder |
 | `GET tenant-saved-searches` | reviewer, publisher, admin, intruder |
 | `POST tenant-saved-searches` | reviewer, publisher, admin, intruder |
@@ -85,6 +88,7 @@ Source of truth is the test; this table is generated from it.
 | `GET tenant-raw-retrievals/{id:guid}/attestations` | operator, analyst, reviewer, publisher, intruder |
 | `GET tenant-raw-retrievals/{id:guid}/retention-eligibility` | operator, analyst, reviewer, publisher, intruder |
 | `GET tenant-raw-retrievals/{id:guid}/retention` | operator, analyst, reviewer, publisher, intruder |
+| `PUT tenant-investigations/{investigationId:guid}/folder` | reviewer, publisher, admin, intruder |
 | `PUT tenant-investigations/{investigationId:guid}/tags/{tag}` | reviewer, publisher, admin, intruder |
 | `PUT tenant-raw-retrievals/{id:guid}/retention` | operator, analyst, reviewer, publisher, intruder |
 | `GET tenant-raw-retrievals/{id:guid}/parses/{parseRunId:guid}/verification` | operator, analyst, reviewer, publisher, intruder |
