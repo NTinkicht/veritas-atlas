@@ -15,6 +15,7 @@ namespace VeritasAtlas.Infrastructure.Services;
 public sealed class EfTenantInvestigationEvidenceStore : ITenantInvestigationEvidenceStore
 {
     private const string UniqueViolation = "23505";
+    private const string DeadlockDetected = "40P01";
     public const string CollectedAction = "investigation.evidence_collected";
     public const string AuditEntityType = "investigation_evidence_item";
     private readonly VeritasAtlasDbContext _db;
@@ -142,6 +143,14 @@ public sealed class EfTenantInvestigationEvidenceStore : ITenantInvestigationEvi
             catch (DbUpdateException ex) when (attempt < inputs.Count && ex.InnerException is PostgresException { SqlState: UniqueViolation })
             {
                 Detach(added);
+            }
+            catch (DbUpdateException ex) when (attempt < inputs.Count + 3 && ex.InnerException is PostgresException { SqlState: DeadlockDetected })
+            {
+                // Overlapping batches can insert the same new entries in opposite order; PostgreSQL aborts
+                // one transaction with 40P01. The rolled-back attempt left nothing behind, so retry after a
+                // short jittered pause and replay whatever the winner committed.
+                Detach(added);
+                await Task.Delay(Random.Shared.Next(10, 60), cancellationToken);
             }
         }
     }
