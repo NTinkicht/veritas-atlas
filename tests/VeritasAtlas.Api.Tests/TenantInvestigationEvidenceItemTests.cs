@@ -505,6 +505,10 @@ public sealed class TenantInvestigationEvidenceItemTests
             return Task.FromResult(new EvidenceItemCollectResult(EvidenceItemCollectOutcome.Collected, model));
         }
 
+        public Task<EvidenceItemBatchResult> CollectBatchAsync(
+            Guid tenantId, Guid investigationId, IReadOnlyList<EvidenceItemInput> inputs, CancellationToken cancellationToken) =>
+            throw new NotSupportedException();
+
         public Task<IReadOnlyList<TenantInvestigationEvidenceItemModel>?> ListAsync(
             Guid tenantId, Guid investigationId, CancellationToken cancellationToken)
         {

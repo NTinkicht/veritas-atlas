@@ -50,6 +50,8 @@ public sealed class VeritasAtlasDbContext : DbContext
     public DbSet<TenantInvestigationBookmark> TenantInvestigationBookmarks => Set<TenantInvestigationBookmark>();
     public DbSet<TenantInvestigationTag> TenantInvestigationTags => Set<TenantInvestigationTag>();
     public DbSet<TenantInvestigationFolder> TenantInvestigationFolders => Set<TenantInvestigationFolder>();
+    public DbSet<TenantPublicationReviewerAssignment> TenantPublicationReviewerAssignments => Set<TenantPublicationReviewerAssignment>();
+    public DbSet<TenantPublicationComment> TenantPublicationComments => Set<TenantPublicationComment>();
     public DbSet<TenantSavedSearch> TenantSavedSearches => Set<TenantSavedSearch>();
     public DbSet<TenantSavedSearchVersion> TenantSavedSearchVersions => Set<TenantSavedSearchVersion>();
     public DbSet<TenantInvestigationShare> TenantInvestigationShares => Set<TenantInvestigationShare>();
@@ -95,6 +97,8 @@ public sealed class VeritasAtlasDbContext : DbContext
         modelBuilder.ApplyConfiguration(new TenantInvestigationBookmarkConfiguration());
         modelBuilder.ApplyConfiguration(new TenantInvestigationTagConfiguration());
         modelBuilder.ApplyConfiguration(new TenantInvestigationFolderConfiguration());
+        modelBuilder.ApplyConfiguration(new TenantPublicationReviewerAssignmentConfiguration());
+        modelBuilder.ApplyConfiguration(new TenantPublicationCommentConfiguration());
         modelBuilder.ApplyConfiguration(new TenantSavedSearchConfiguration());
         modelBuilder.ApplyConfiguration(new TenantSavedSearchVersionConfiguration());
         modelBuilder.ApplyConfiguration(new TenantInvestigationShareConfiguration());
