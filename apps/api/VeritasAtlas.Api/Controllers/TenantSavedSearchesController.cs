@@ -7,7 +7,7 @@ using VeritasAtlas.Domain.Provenance;
 namespace VeritasAtlas.Api.Controllers;
 
 /// <summary>
-/// VER-P1-01 slice 1: private saved evidence searches. The tenant comes only from the signed
+/// VER-P1-01 slices 1 and 4: private, versioned saved evidence searches. The tenant comes only from the signed
 /// <c>tenant</c> claim and the owner only from the name claim, never from the request. Exactly one
 /// author role (operator or analyst) is required. Only search criteria are stored; running a saved
 /// search goes through the normal evidence search, which re-evaluates freshness at that request.
@@ -53,6 +53,49 @@ public sealed class TenantSavedSearchesController : ControllerBase
         if (Authorize() is not { } caller) return Refusal!;
         var items = await _store.ListAsync(caller.TenantId, caller.Subject, cancellationToken);
         return Ok(new TenantSavedSearchListResponse(items.Select(ToResponse).ToList()));
+    }
+
+    [HttpPut("{id:guid}")]
+    public async Task<IActionResult> Update(
+        Guid id, [FromBody] TenantSavedSearchUpdateRequest? body, CancellationToken cancellationToken)
+    {
+        if (Authorize() is not { } caller) return Refusal!;
+        if (body is null || body.ExpectedVersion is not >= 1
+            || Validate(new TenantSavedSearchRequest(
+                body.Name, body.Query, body.SourceEntryId, body.Jurisdiction, body.SourceType,
+                body.Freshness, body.ParserName, body.ParserVersion, body.SubjectTerm)) is not { } definition)
+        {
+            return Error(StatusCodes.Status400BadRequest, "invalid_saved_search",
+                "The name, expected version or a search criterion is invalid.");
+        }
+
+        var result = await _store.UpdateAsync(
+            caller.TenantId, caller.Subject, id, body.ExpectedVersion.Value, definition, cancellationToken);
+        return result.Outcome switch
+        {
+            SavedSearchUpdateOutcome.Updated or SavedSearchUpdateOutcome.Unchanged => Ok(ToResponse(result.SavedSearch!)),
+            SavedSearchUpdateOutcome.NotFound => Error(StatusCodes.Status404NotFound, "saved_search_not_found",
+                "The saved search was not found."),
+            SavedSearchUpdateOutcome.VersionConflict => Error(StatusCodes.Status409Conflict, "saved_search_version_conflict",
+                "The saved search changed since the expected version."),
+            SavedSearchUpdateOutcome.DuplicateName => Error(StatusCodes.Status409Conflict, "saved_search_name_taken",
+                "A saved search with this name already exists."),
+            _ => Error(StatusCodes.Status409Conflict, "saved_search_version_limit_reached",
+                $"At most {TenantSavedSearchLimits.MaxVersions} versions are allowed.")
+        };
+    }
+
+    [HttpGet("{id:guid}/versions")]
+    public async Task<IActionResult> ListVersions(Guid id, CancellationToken cancellationToken)
+    {
+        if (Authorize() is not { } caller) return Refusal!;
+        var versions = await _store.ListVersionsAsync(caller.TenantId, caller.Subject, id, cancellationToken);
+        return versions is null
+            ? Error(StatusCodes.Status404NotFound, "saved_search_not_found", "The saved search was not found.")
+            : Ok(new TenantSavedSearchVersionListResponse(versions.Select(v => new TenantSavedSearchVersionResponse(
+                v.Version, v.Definition.Name, v.Definition.Query, v.Definition.SourceEntryId, v.Definition.Jurisdiction,
+                v.Definition.SourceType, v.Definition.Freshness, v.Definition.ParserName, v.Definition.ParserVersion,
+                v.Definition.SubjectTerm, v.CreatedAtUtc)).ToList()));
     }
 
     [HttpDelete("{id:guid}")]
@@ -135,7 +178,7 @@ public sealed class TenantSavedSearchesController : ControllerBase
     private static TenantSavedSearchResponse ToResponse(TenantSavedSearchModel m) =>
         new(m.Id, m.Definition.Name, m.Definition.Query, m.Definition.SourceEntryId, m.Definition.Jurisdiction,
             m.Definition.SourceType, m.Definition.Freshness, m.Definition.ParserName, m.Definition.ParserVersion,
-            m.Definition.SubjectTerm, m.CreatedAtUtc);
+            m.Definition.SubjectTerm, m.CreatedAtUtc, m.Version);
 }
 
 public sealed record TenantSavedSearchRequest(
@@ -144,7 +187,18 @@ public sealed record TenantSavedSearchRequest(
 
 public sealed record TenantSavedSearchResponse(
     Guid Id, string Name, string Query, Guid? SourceEntryId, string? Jurisdiction, string? SourceType,
+    string? Freshness, string? ParserName, string? ParserVersion, string? SubjectTerm, DateTime CreatedAtUtc,
+    int Version);
+
+public sealed record TenantSavedSearchUpdateRequest(
+    int? ExpectedVersion, string? Name, string? Query, Guid? SourceEntryId, string? Jurisdiction, string? SourceType,
+    string? Freshness, string? ParserName, string? ParserVersion, string? SubjectTerm);
+
+public sealed record TenantSavedSearchVersionResponse(
+    int Version, string Name, string Query, Guid? SourceEntryId, string? Jurisdiction, string? SourceType,
     string? Freshness, string? ParserName, string? ParserVersion, string? SubjectTerm, DateTime CreatedAtUtc);
+
+public sealed record TenantSavedSearchVersionListResponse(IReadOnlyList<TenantSavedSearchVersionResponse> Items);
 
 public sealed record TenantSavedSearchListResponse(IReadOnlyList<TenantSavedSearchResponse> Items);
 

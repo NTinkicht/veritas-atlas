@@ -1532,6 +1532,16 @@ namespace VeritasAtlas.Infrastructure.Migrations
                         });
                 });
 
+            modelBuilder.Entity("VeritasAtlas.Infrastructure.Persistence.TenantSavedSearchVersion", b =>
+                {
+                    b.HasOne("VeritasAtlas.Infrastructure.Persistence.TenantSavedSearch", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "SavedSearchId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_tenant_saved_search_versions_saved_search");
+                });
+
             modelBuilder.Entity("VeritasAtlas.Infrastructure.Persistence.TenantPublicationTransition", b =>
                 {
                     b.Property<Guid>("TenantId")
@@ -2090,6 +2100,12 @@ namespace VeritasAtlas.Infrastructure.Migrations
                         .HasColumnType("character varying(128)")
                         .HasColumnName("subject_term");
 
+                    b.Property<int>("Version")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(1)
+                        .HasColumnName("version");
+
                     b.HasKey("TenantId", "Id")
                         .HasName("pk_tenant_saved_searches");
 
@@ -2110,7 +2126,88 @@ namespace VeritasAtlas.Infrastructure.Migrations
 
                             t.HasCheckConstraint("ck_tenant_saved_searches_subject_shape", "length(btrim(subject)) > 0 AND subject !~ '[\\x01-\\x1f\\x7f-\\x9f]'");
 
+                            t.HasCheckConstraint("ck_tenant_saved_searches_version_positive", "version >= 1");
+
                             t.HasCheckConstraint("ck_tenant_saved_searches_tenant_id_not_empty", "tenant_id <> '00000000-0000-0000-0000-000000000000'::uuid");
+                        });
+                });
+
+            modelBuilder.Entity("VeritasAtlas.Infrastructure.Persistence.TenantSavedSearchVersion", b =>
+                {
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<Guid>("SavedSearchId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("saved_search_id");
+
+                    b.Property<int>("Version")
+                        .HasColumnType("integer")
+                        .HasColumnName("version");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<string>("Freshness")
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("freshness");
+
+                    b.Property<string>("Jurisdiction")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("jurisdiction");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("name");
+
+                    b.Property<string>("ParserName")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("parser_name");
+
+                    b.Property<string>("ParserVersion")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("parser_version");
+
+                    b.Property<string>("Query")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("query");
+
+                    b.Property<Guid?>("SourceEntryId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("source_entry_id");
+
+                    b.Property<string>("SourceType")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("source_type");
+
+                    b.Property<string>("SubjectTerm")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("subject_term");
+
+                    b.HasKey("TenantId", "SavedSearchId", "Version")
+                        .HasName("pk_tenant_saved_search_versions");
+
+                    b.ToTable("tenant_saved_search_versions", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_tenant_saved_search_versions_freshness_known", "freshness IS NULL OR freshness IN ('Current', 'Stale', 'Unknown', 'Superseded')");
+
+                            t.HasCheckConstraint("ck_tenant_saved_search_versions_name_shape", "length(btrim(name)) > 0 AND name = btrim(name) AND name !~ '[\\x01-\\x1f\\x7f-\\x9f]'");
+
+                            t.HasCheckConstraint("ck_tenant_saved_search_versions_query_shape", "length(btrim(query)) > 0 AND query !~ '[\\x01-\\x1f\\x7f-\\x9f]'");
+
+                            t.HasCheckConstraint("ck_tenant_saved_search_versions_version_positive", "version >= 1");
                         });
                 });
 

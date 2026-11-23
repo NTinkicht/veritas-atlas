@@ -14,6 +14,7 @@ public sealed class EfTenantSavedSearchStore : ITenantSavedSearchStore
 {
     private const string UniqueViolation = "23505";
     public const string CreatedAction = "saved_search.created";
+    public const string UpdatedAction = "saved_search.updated";
     public const string DeletedAction = "saved_search.deleted";
     public const string AuditEntityType = "saved_search";
     private readonly VeritasAtlasDbContext _db;
@@ -58,6 +59,7 @@ public sealed class EfTenantSavedSearchStore : ITenantSavedSearchStore
             CreatedAtUtc = ToPostgresPrecision(_timeProvider.GetUtcNow().UtcDateTime)
         };
         _db.TenantSavedSearches.Add(row);
+        _db.TenantSavedSearchVersions.Add(NewVersion(row));
         _db.TenantAuditEvents.Add(NewAudit(CreatedAction, row, row.CreatedAtUtc));
         try
         {
@@ -82,6 +84,96 @@ public sealed class EfTenantSavedSearchStore : ITenantSavedSearchStore
             .OrderBy(x => x.CreatedAtUtc).ThenBy(x => x.Id)
             .ToListAsync(cancellationToken);
         return rows.Select(ToModel).ToList();
+    }
+
+    public async Task<SavedSearchUpdateResult> UpdateAsync(
+        Guid tenantId, string subject, Guid id, int expectedVersion, TenantSavedSearchDefinition definition,
+        CancellationToken cancellationToken)
+    {
+        Require(tenantId, subject);
+        await using var transaction = await _db.Database.BeginTransactionAsync(cancellationToken);
+        var lockKey = $"saved_search:{tenantId:D}:{subject}";
+        await _db.Database.ExecuteSqlInterpolatedAsync(
+            $"SELECT pg_advisory_xact_lock(hashtextextended({lockKey}, 0))", cancellationToken);
+
+        var row = await _db.TenantSavedSearches.SingleOrDefaultAsync(
+            x => x.TenantId == tenantId && x.Subject == subject && x.Id == id, cancellationToken);
+        if (row is null)
+        {
+            return new SavedSearchUpdateResult(SavedSearchUpdateOutcome.NotFound, null);
+        }
+
+        if (row.Version != expectedVersion)
+        {
+            return new SavedSearchUpdateResult(SavedSearchUpdateOutcome.VersionConflict, null);
+        }
+
+        if (ToDefinition(row) == definition)
+        {
+            return new SavedSearchUpdateResult(SavedSearchUpdateOutcome.Unchanged, ToModel(row));
+        }
+
+        if (row.Version >= TenantSavedSearchLimits.MaxVersions)
+        {
+            return new SavedSearchUpdateResult(SavedSearchUpdateOutcome.VersionLimitReached, null);
+        }
+
+        row.Name = definition.Name;
+        row.Query = definition.Query;
+        row.SourceEntryId = definition.SourceEntryId;
+        row.Jurisdiction = definition.Jurisdiction;
+        row.SourceType = definition.SourceType;
+        row.Freshness = definition.Freshness;
+        row.ParserName = definition.ParserName;
+        row.ParserVersion = definition.ParserVersion;
+        row.SubjectTerm = definition.SubjectTerm;
+        row.Version += 1;
+        var at = ToPostgresPrecision(_timeProvider.GetUtcNow().UtcDateTime);
+        var version = NewVersion(row);
+        version.CreatedAtUtc = at;
+        _db.TenantSavedSearchVersions.Add(version);
+        _db.TenantAuditEvents.Add(NewAudit(UpdatedAction, row, at));
+        try
+        {
+            await _db.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+        }
+        catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: UniqueViolation })
+        {
+            _db.ChangeTracker.Clear();
+            return new SavedSearchUpdateResult(SavedSearchUpdateOutcome.DuplicateName, null);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            // The row was deleted between the read and the write: report it as absent.
+            _db.ChangeTracker.Clear();
+            return new SavedSearchUpdateResult(SavedSearchUpdateOutcome.NotFound, null);
+        }
+
+        return new SavedSearchUpdateResult(SavedSearchUpdateOutcome.Updated, ToModel(row));
+    }
+
+    public async Task<IReadOnlyList<TenantSavedSearchVersionModel>?> ListVersionsAsync(
+        Guid tenantId, string subject, Guid id, CancellationToken cancellationToken)
+    {
+        Require(tenantId, subject);
+        var owned = await _db.TenantSavedSearches.AsNoTracking().AnyAsync(
+            x => x.TenantId == tenantId && x.Subject == subject && x.Id == id, cancellationToken);
+        if (!owned)
+        {
+            return null;
+        }
+
+        var rows = await _db.TenantSavedSearchVersions.AsNoTracking()
+            .Where(x => x.TenantId == tenantId && x.SavedSearchId == id)
+            .OrderBy(x => x.Version)
+            .ToListAsync(cancellationToken);
+        return rows.Select(v => new TenantSavedSearchVersionModel(
+            v.Version,
+            new TenantSavedSearchDefinition(
+                v.Name, v.Query, v.SourceEntryId, v.Jurisdiction, v.SourceType, v.Freshness,
+                v.ParserName, v.ParserVersion, v.SubjectTerm),
+            DateTime.SpecifyKind(v.CreatedAtUtc, DateTimeKind.Utc))).ToList();
     }
 
     public async Task<bool> DeleteAsync(Guid tenantId, string subject, Guid id, CancellationToken cancellationToken)
@@ -109,6 +201,27 @@ public sealed class EfTenantSavedSearchStore : ITenantSavedSearchStore
 
         return true;
     }
+
+    private static TenantSavedSearchVersion NewVersion(TenantSavedSearch row) => new()
+    {
+        TenantId = row.TenantId,
+        SavedSearchId = row.Id,
+        Version = row.Version,
+        Name = row.Name,
+        Query = row.Query,
+        SourceEntryId = row.SourceEntryId,
+        Jurisdiction = row.Jurisdiction,
+        SourceType = row.SourceType,
+        Freshness = row.Freshness,
+        ParserName = row.ParserName,
+        ParserVersion = row.ParserVersion,
+        SubjectTerm = row.SubjectTerm,
+        CreatedAtUtc = row.CreatedAtUtc
+    };
+
+    private static TenantSavedSearchDefinition ToDefinition(TenantSavedSearch row) =>
+        new(row.Name, row.Query, row.SourceEntryId, row.Jurisdiction, row.SourceType, row.Freshness,
+            row.ParserName, row.ParserVersion, row.SubjectTerm);
 
     private static TenantAuditEvent NewAudit(string action, TenantSavedSearch row, DateTime at)
     {
@@ -147,9 +260,5 @@ public sealed class EfTenantSavedSearchStore : ITenantSavedSearchStore
         new(value.Ticks - value.Ticks % 10, DateTimeKind.Utc);
 
     private static TenantSavedSearchModel ToModel(TenantSavedSearch row) =>
-        new(row.Id,
-            new TenantSavedSearchDefinition(
-                row.Name, row.Query, row.SourceEntryId, row.Jurisdiction, row.SourceType, row.Freshness,
-                row.ParserName, row.ParserVersion, row.SubjectTerm),
-            DateTime.SpecifyKind(row.CreatedAtUtc, DateTimeKind.Utc));
+        new(row.Id, ToDefinition(row), DateTime.SpecifyKind(row.CreatedAtUtc, DateTimeKind.Utc), row.Version);
 }

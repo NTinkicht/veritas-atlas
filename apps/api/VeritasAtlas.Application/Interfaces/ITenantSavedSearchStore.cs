@@ -4,6 +4,7 @@ public static class TenantSavedSearchLimits
 {
     public const int MaxNameLength = 100;
     public const int MaxPerSubject = 25;
+    public const int MaxVersions = 50;
 }
 
 /// <summary>
@@ -23,7 +24,22 @@ public sealed record TenantSavedSearchDefinition(
     string? SubjectTerm);
 
 public sealed record TenantSavedSearchModel(
-    Guid Id, TenantSavedSearchDefinition Definition, DateTime CreatedAtUtc);
+    Guid Id, TenantSavedSearchDefinition Definition, DateTime CreatedAtUtc, int Version = 1);
+
+public sealed record TenantSavedSearchVersionModel(
+    int Version, TenantSavedSearchDefinition Definition, DateTime CreatedAtUtc);
+
+public enum SavedSearchUpdateOutcome
+{
+    Updated,
+    Unchanged,
+    NotFound,
+    VersionConflict,
+    DuplicateName,
+    VersionLimitReached
+}
+
+public sealed record SavedSearchUpdateResult(SavedSearchUpdateOutcome Outcome, TenantSavedSearchModel? SavedSearch);
 
 public enum SavedSearchCreateOutcome
 {
@@ -47,5 +63,17 @@ public interface ITenantSavedSearchStore
         Guid tenantId, string subject, CancellationToken cancellationToken);
 
     /// <summary>True when the caller's own saved search existed and was removed.</summary>
+    /// <summary>
+    /// Replaces the definition when <paramref name="expectedVersion"/> is still current, appending an immutable
+    /// history version. An identical definition changes nothing. A stale version or another subject's id never writes.
+    /// </summary>
+    Task<SavedSearchUpdateResult> UpdateAsync(
+        Guid tenantId, string subject, Guid id, int expectedVersion, TenantSavedSearchDefinition definition,
+        CancellationToken cancellationToken);
+
+    /// <summary>Version history, oldest first, or <c>null</c> when the id is not the caller's.</summary>
+    Task<IReadOnlyList<TenantSavedSearchVersionModel>?> ListVersionsAsync(
+        Guid tenantId, string subject, Guid id, CancellationToken cancellationToken);
+
     Task<bool> DeleteAsync(Guid tenantId, string subject, Guid id, CancellationToken cancellationToken);
 }
