@@ -143,6 +143,8 @@ public sealed class BackupRestoreDrillTests
         "tr_tenant_investigation_evidence_items_closed_guard",
         "tr_tenant_investigation_evidence_items_guard",
         "tr_tenant_investigation_evidence_items_no_truncate",
+        "tr_tenant_investigation_folders_closed_guard",
+        "tr_tenant_investigation_folders_guard",
         "tr_tenant_investigation_shares_closed_guard",
         "tr_tenant_investigation_shares_guard",
         "tr_tenant_investigation_shares_no_delete",

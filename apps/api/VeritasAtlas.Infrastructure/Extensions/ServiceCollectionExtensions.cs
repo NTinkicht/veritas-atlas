@@ -90,6 +90,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<ITenantInvestigationAnnotationStore, EfTenantInvestigationAnnotationStore>();
         services.AddScoped<ITenantInvestigationBookmarkStore, EfTenantInvestigationBookmarkStore>();
         services.AddScoped<ITenantInvestigationTagStore, EfTenantInvestigationTagStore>();
+        services.AddScoped<ITenantInvestigationFolderStore, EfTenantInvestigationFolderStore>();
         services.AddScoped<ITenantSavedSearchStore, EfTenantSavedSearchStore>();
         services.AddScoped<ITenantInvestigationShareStore, EfTenantInvestigationShareStore>();
         services.AddSingleton<ISourceFreshnessPolicyResolver, FailClosedSourceFreshnessPolicyResolver>();
