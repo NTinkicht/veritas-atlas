@@ -108,6 +108,135 @@ public sealed class EfTenantInvestigationEvidenceStore : ITenantInvestigationEvi
         return new EvidenceItemCollectResult(EvidenceItemCollectOutcome.Collected, ToModel(row));
     }
 
+    public async Task<EvidenceItemBatchResult> CollectBatchAsync(
+        Guid tenantId, Guid investigationId, IReadOnlyList<EvidenceItemInput> inputs, CancellationToken cancellationToken)
+    {
+        RequireTenant(tenantId);
+        ArgumentNullException.ThrowIfNull(inputs);
+        if (inputs.Count is < 1 or > TenantInvestigationEvidenceLimits.MaxBatchSize
+            || inputs.Select(x => x.EvidenceVerificationId).Distinct().Count() != inputs.Count
+            || inputs.Any(x => x is null
+                || !TenantInvestigationEvidenceLimits.IsValidNote(x.Note)
+                || string.IsNullOrWhiteSpace(x.CollectedBySubject)
+                || x.CollectedBySubject.Length > TenantInvestigationLimits.MaxSubjectLength
+                || x.CollectedBySubject.Any(char.IsControl)))
+        {
+            throw new ArgumentException("Invalid evidence batch input.", nameof(inputs));
+        }
+
+        // One retry: a concurrent collect of the same evidence loses the unique race, and the
+        // second pass then sees the winner and replays it.
+        for (var attempt = 0; ; attempt++)
+        {
+            var added = new List<object>();
+            try
+            {
+                return await TryCollectBatchAsync(tenantId, investigationId, inputs, added, cancellationToken);
+            }
+            catch (DbUpdateException ex) when (InvestigationStateQueries.IsClosedViolation(ex))
+            {
+                Detach(added);
+                return new EvidenceItemBatchResult(EvidenceItemCollectOutcome.InvestigationClosed, null, null);
+            }
+            catch (DbUpdateException ex) when (attempt == 0 && ex.InnerException is PostgresException { SqlState: UniqueViolation })
+            {
+                Detach(added);
+            }
+        }
+    }
+
+    private async Task<EvidenceItemBatchResult> TryCollectBatchAsync(
+        Guid tenantId, Guid investigationId, IReadOnlyList<EvidenceItemInput> inputs, List<object> added,
+        CancellationToken cancellationToken)
+    {
+        if (!await _db.TenantInvestigations.AsNoTracking()
+                .AnyAsync(x => x.TenantId == tenantId && x.Id == investigationId, cancellationToken))
+        {
+            return new EvidenceItemBatchResult(EvidenceItemCollectOutcome.InvestigationNotFound, null, null);
+        }
+
+        if (await InvestigationStateQueries.IsClosedAsync(_db, tenantId, investigationId, cancellationToken))
+        {
+            return new EvidenceItemBatchResult(EvidenceItemCollectOutcome.InvestigationClosed, null, null);
+        }
+
+        var ids = inputs.Select(x => x.EvidenceVerificationId).ToList();
+        var known = (await _db.TenantEvidenceVerifications.AsNoTracking()
+            .Where(x => x.TenantId == tenantId && ids.Contains(x.Id))
+            .Select(x => x.Id)
+            .ToListAsync(cancellationToken)).ToHashSet();
+        var missing = inputs.ToList().FindIndex(x => !known.Contains(x.EvidenceVerificationId));
+        if (missing >= 0)
+        {
+            return new EvidenceItemBatchResult(EvidenceItemCollectOutcome.EvidenceNotFound, null, missing);
+        }
+
+        var existing = (await _db.TenantInvestigationEvidenceItems.AsNoTracking()
+            .Where(x => x.TenantId == tenantId && x.InvestigationId == investigationId
+                && ids.Contains(x.EvidenceVerificationId))
+            .ToListAsync(cancellationToken)).ToDictionary(x => x.EvidenceVerificationId);
+        for (var i = 0; i < inputs.Count; i++)
+        {
+            if (existing.TryGetValue(inputs[i].EvidenceVerificationId, out var row) && row.Note != inputs[i].Note)
+            {
+                return new EvidenceItemBatchResult(EvidenceItemCollectOutcome.NoteConflict, null, i);
+            }
+        }
+
+        var now = ToPostgresPrecision(_timeProvider.GetUtcNow().UtcDateTime);
+        var entries = new List<EvidenceItemBatchEntry>(inputs.Count);
+        foreach (var input in inputs)
+        {
+            if (existing.TryGetValue(input.EvidenceVerificationId, out var replayed))
+            {
+                entries.Add(new EvidenceItemBatchEntry(ToModel(replayed), true));
+                continue;
+            }
+
+            var row = new TenantInvestigationEvidenceItem
+            {
+                TenantId = tenantId,
+                Id = Guid.NewGuid(),
+                InvestigationId = investigationId,
+                EvidenceVerificationId = input.EvidenceVerificationId,
+                Note = input.Note,
+                CollectedBySubject = input.CollectedBySubject,
+                CreatedAtUtc = now
+            };
+            var audit = new TenantAuditEvent
+            {
+                TenantId = tenantId,
+                Id = Guid.NewGuid(),
+                EventKey = $"{CollectedAction}:{row.Id:D}",
+                Action = CollectedAction,
+                EntityType = AuditEntityType,
+                EntityId = row.Id.ToString("D"),
+                ActorSubject = row.CollectedBySubject,
+                OccurredAtUtc = now
+            };
+            _db.TenantInvestigationEvidenceItems.Add(row);
+            _db.TenantAuditEvents.Add(audit);
+            added.Add(row);
+            added.Add(audit);
+            entries.Add(new EvidenceItemBatchEntry(ToModel(row), false));
+        }
+
+        if (added.Count > 0)
+        {
+            await _db.SaveChangesAsync(cancellationToken);
+        }
+
+        return new EvidenceItemBatchResult(EvidenceItemCollectOutcome.Collected, entries, null);
+    }
+
+    private void Detach(List<object> added)
+    {
+        foreach (var entity in added)
+        {
+            _db.Entry(entity).State = EntityState.Detached;
+        }
+    }
+
     public async Task<IReadOnlyList<TenantInvestigationEvidenceItemModel>?> ListAsync(
         Guid tenantId, Guid investigationId, CancellationToken cancellationToken)
     {

@@ -12,6 +12,15 @@ public interface ITenantInvestigationEvidenceStore
     Task<EvidenceItemCollectResult> CollectAsync(
         Guid tenantId, Guid investigationId, EvidenceItemInput input, CancellationToken cancellationToken);
 
+    /// <summary>
+    /// VER-P1-01: collect several verified evidence records in one all-or-nothing transaction.
+    /// Each entry follows the single-item rules (replay, note conflict, closed investigation,
+    /// unknown or cross-tenant evidence); the first refusing entry rejects the whole batch and
+    /// nothing is written. A repeated batch is idempotent: every entry replays.
+    /// </summary>
+    Task<EvidenceItemBatchResult> CollectBatchAsync(
+        Guid tenantId, Guid investigationId, IReadOnlyList<EvidenceItemInput> inputs, CancellationToken cancellationToken);
+
     /// <summary>Null when the investigation does not exist in the tenant.</summary>
     Task<IReadOnlyList<TenantInvestigationEvidenceItemModel>?> ListAsync(
         Guid tenantId, Guid investigationId, CancellationToken cancellationToken);
@@ -73,8 +82,20 @@ public enum EvidenceItemCollectOutcome
 public sealed record EvidenceItemCollectResult(
     EvidenceItemCollectOutcome Outcome, TenantInvestigationEvidenceItemModel? Item);
 
+public sealed record EvidenceItemBatchEntry(TenantInvestigationEvidenceItemModel Item, bool Replayed);
+
+/// <summary>
+/// Outcome of a batch collect. <see cref="Outcome"/> is <c>Collected</c> only when every entry was
+/// accepted; otherwise <see cref="FailedIndex"/> names the first refusing entry for the typed
+/// per-entry refusals (<c>EvidenceNotFound</c>, <c>NoteConflict</c>) and no row was written.
+/// </summary>
+public sealed record EvidenceItemBatchResult(
+    EvidenceItemCollectOutcome Outcome, IReadOnlyList<EvidenceItemBatchEntry>? Entries, int? FailedIndex);
+
 public static class TenantInvestigationEvidenceLimits
 {
+    public const int MaxBatchSize = 50;
+
     public const int MaxNoteLength = 500;
 
     public static bool IsValidNote(string? value) =>
