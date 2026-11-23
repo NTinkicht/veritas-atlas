@@ -2044,3 +2044,36 @@ public sealed class TenantInvestigationFolderConfiguration : IEntityTypeConfigur
         // No FKs (append-only parents): the guard trigger checks the investigation reference.
     }
 }
+
+public sealed class TenantPublicationReviewerAssignmentConfiguration : IEntityTypeConfiguration<VeritasAtlas.Infrastructure.Persistence.TenantPublicationReviewerAssignment>
+{
+    public void Configure(EntityTypeBuilder<VeritasAtlas.Infrastructure.Persistence.TenantPublicationReviewerAssignment> builder)
+    {
+        builder.ToTable("tenant_publication_reviewer_assignments", table =>
+        {
+            table.HasCheckConstraint(
+                "ck_tenant_publication_reviewer_assignments_tenant_id_not_empty",
+                "tenant_id <> '00000000-0000-0000-0000-000000000000'::uuid");
+            table.HasCheckConstraint(
+                "ck_tenant_publication_reviewer_assignments_reviewer_shape",
+                "length(btrim(reviewer_subject)) > 0 AND reviewer_subject !~ '[\\x01-\\x1f\\x7f-\\x9f]'");
+            table.HasCheckConstraint(
+                "ck_tenant_publication_reviewer_assignments_assigned_by_shape",
+                "length(btrim(assigned_by)) > 0 AND assigned_by !~ '[\\x01-\\x1f\\x7f-\\x9f]'");
+        });
+
+        builder.HasKey(x => new { x.TenantId, x.RevisionId }).HasName("pk_tenant_publication_reviewer_assignments");
+        builder.Property(x => x.TenantId).HasColumnName("tenant_id").IsRequired();
+        builder.Property(x => x.RevisionId).HasColumnName("revision_id").IsRequired();
+        builder.Property(x => x.ReviewerSubject)
+            .HasColumnName("reviewer_subject")
+            .HasMaxLength(VeritasAtlas.Application.Interfaces.TenantInvestigationLimits.MaxSubjectLength)
+            .IsRequired();
+        builder.Property(x => x.AssignedBy)
+            .HasColumnName("assigned_by")
+            .HasMaxLength(VeritasAtlas.Application.Interfaces.TenantInvestigationLimits.MaxSubjectLength)
+            .IsRequired();
+        builder.Property(x => x.AssignedAtUtc).HasColumnName("assigned_at_utc").IsRequired();
+        // No FK (append-only parents): the guard trigger checks the revision reference.
+    }
+}

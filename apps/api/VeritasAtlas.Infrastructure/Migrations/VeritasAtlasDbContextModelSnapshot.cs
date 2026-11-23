@@ -1956,6 +1956,45 @@ namespace VeritasAtlas.Infrastructure.Migrations
                         });
                 });
 
+            modelBuilder.Entity("VeritasAtlas.Infrastructure.Persistence.TenantPublicationReviewerAssignment", b =>
+                {
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<Guid>("RevisionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("revision_id");
+
+                    b.Property<string>("AssignedBy")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("assigned_by");
+
+                    b.Property<DateTime>("AssignedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("assigned_at_utc");
+
+                    b.Property<string>("ReviewerSubject")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("reviewer_subject");
+
+                    b.HasKey("TenantId", "RevisionId")
+                        .HasName("pk_tenant_publication_reviewer_assignments");
+
+                    b.ToTable("tenant_publication_reviewer_assignments", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_tenant_publication_reviewer_assignments_assigned_by_shape", "length(btrim(assigned_by)) > 0 AND assigned_by !~ '[\\x01-\\x1f\\x7f-\\x9f]'");
+
+                            t.HasCheckConstraint("ck_tenant_publication_reviewer_assignments_reviewer_shape", "length(btrim(reviewer_subject)) > 0 AND reviewer_subject !~ '[\\x01-\\x1f\\x7f-\\x9f]'");
+
+                            t.HasCheckConstraint("ck_tenant_publication_reviewer_assignments_tenant_id_not_empty", "tenant_id <> '00000000-0000-0000-0000-000000000000'::uuid");
+                        });
+                });
+
             modelBuilder.Entity("VeritasAtlas.Infrastructure.Persistence.TenantInvestigationFolder", b =>
                 {
                     b.Property<Guid>("TenantId")
