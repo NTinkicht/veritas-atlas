@@ -1956,6 +1956,62 @@ namespace VeritasAtlas.Infrastructure.Migrations
                         });
                 });
 
+            modelBuilder.Entity("VeritasAtlas.Infrastructure.Persistence.TenantPublicationComment", b =>
+                {
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("AuthorSubject")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("author_subject");
+
+                    b.Property<string>("Body")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("body");
+
+                    b.Property<Guid>("ClientKey")
+                        .HasColumnType("uuid")
+                        .HasColumnName("client_key");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<Guid>("RevisionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("revision_id");
+
+                    b.HasKey("TenantId", "Id")
+                        .HasName("pk_tenant_publication_comments");
+
+                    b.HasIndex("TenantId", "RevisionId", "ClientKey")
+                        .IsUnique()
+                        .HasDatabaseName("ux_tenant_publication_comments_revision_client_key");
+
+                    b.HasIndex("TenantId", "RevisionId", "CreatedAtUtc")
+                        .HasDatabaseName("ix_tenant_publication_comments_revision_created");
+
+                    b.ToTable("tenant_publication_comments", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_tenant_publication_comments_author_shape", "length(btrim(author_subject)) > 0 AND author_subject !~ '[\\x01-\\x1f\\x7f-\\x9f]'");
+
+                            t.HasCheckConstraint("ck_tenant_publication_comments_body_shape", "length(btrim(body)) > 0 AND char_length(body) <= 2000 AND body !~ '[\\x01-\\x08\\x0b\\x0c\\x0e-\\x1f\\x7f-\\x9f]'");
+
+                            t.HasCheckConstraint("ck_tenant_publication_comments_client_key_not_empty", "client_key <> '00000000-0000-0000-0000-000000000000'::uuid");
+
+                            t.HasCheckConstraint("ck_tenant_publication_comments_tenant_id_not_empty", "tenant_id <> '00000000-0000-0000-0000-000000000000'::uuid");
+                        });
+                });
+
             modelBuilder.Entity("VeritasAtlas.Infrastructure.Persistence.TenantPublicationReviewerAssignment", b =>
                 {
                     b.Property<Guid>("TenantId")
