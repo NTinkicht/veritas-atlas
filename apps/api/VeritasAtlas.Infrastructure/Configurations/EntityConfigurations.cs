@@ -2077,3 +2077,46 @@ public sealed class TenantPublicationReviewerAssignmentConfiguration : IEntityTy
         // No FK (append-only parents): the guard trigger checks the revision reference.
     }
 }
+
+public sealed class TenantPublicationCommentConfiguration : IEntityTypeConfiguration<VeritasAtlas.Infrastructure.Persistence.TenantPublicationComment>
+{
+    public void Configure(EntityTypeBuilder<VeritasAtlas.Infrastructure.Persistence.TenantPublicationComment> builder)
+    {
+        builder.ToTable("tenant_publication_comments", table =>
+        {
+            table.HasCheckConstraint(
+                "ck_tenant_publication_comments_tenant_id_not_empty",
+                "tenant_id <> '00000000-0000-0000-0000-000000000000'::uuid");
+            table.HasCheckConstraint(
+                "ck_tenant_publication_comments_client_key_not_empty",
+                "client_key <> '00000000-0000-0000-0000-000000000000'::uuid");
+            table.HasCheckConstraint(
+                "ck_tenant_publication_comments_author_shape",
+                "length(btrim(author_subject)) > 0 AND author_subject !~ '[\\x01-\\x1f\\x7f-\\x9f]'");
+            table.HasCheckConstraint(
+                "ck_tenant_publication_comments_body_shape",
+                "length(btrim(body)) > 0 AND char_length(body) <= 2000 AND body !~ '[\\x01-\\x08\\x0b\\x0c\\x0e-\\x1f\\x7f-\\x9f]'");
+        });
+
+        builder.HasKey(x => new { x.TenantId, x.Id }).HasName("pk_tenant_publication_comments");
+        builder.Property(x => x.TenantId).HasColumnName("tenant_id").IsRequired();
+        builder.Property(x => x.Id).HasColumnName("id").IsRequired();
+        builder.Property(x => x.RevisionId).HasColumnName("revision_id").IsRequired();
+        builder.Property(x => x.ClientKey).HasColumnName("client_key").IsRequired();
+        builder.Property(x => x.AuthorSubject)
+            .HasColumnName("author_subject")
+            .HasMaxLength(VeritasAtlas.Application.Interfaces.TenantInvestigationLimits.MaxSubjectLength)
+            .IsRequired();
+        builder.Property(x => x.Body)
+            .HasColumnName("body")
+            .HasMaxLength(VeritasAtlas.Application.Interfaces.TenantPublicationCommentRules.MaxBodyLength)
+            .IsRequired();
+        builder.Property(x => x.CreatedAtUtc).HasColumnName("created_at_utc").IsRequired();
+        builder.HasIndex(x => new { x.TenantId, x.RevisionId, x.ClientKey })
+            .IsUnique()
+            .HasDatabaseName("ux_tenant_publication_comments_revision_client_key");
+        builder.HasIndex(x => new { x.TenantId, x.RevisionId, x.CreatedAtUtc })
+            .HasDatabaseName("ix_tenant_publication_comments_revision_created");
+        // No FK (append-only parents): the guard trigger checks the revision reference.
+    }
+}

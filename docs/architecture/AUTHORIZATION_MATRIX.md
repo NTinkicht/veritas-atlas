@@ -28,6 +28,7 @@ test until the pinned matrix and this document are updated together.
 
 query -> evidence -> claims -> review -> publication:
 
+- Publication comments (add, list): every lifecycle role (operator, analyst, reviewer, publisher) may add and read, matching who can already read the revision; the history is append-only and tenant-internal (never served to the public reader), a retried add with the same client key is idempotent, and comments never change what any role may do in the lifecycle.
 - Publication reviewer assignment (assign, clear, get): only a publisher may write, every lifecycle role may read; the revision author cannot be assigned, a decided revision (Approved, Published, Withdrawn) refuses changes, and the assignment never changes what any role may do in the lifecycle.
 - Investigation folder (set, clear, get): operator and analyst may write, every known workflow role may read; one private folder per subject, and an investigation the caller cannot see answers 404.
 - Investigation tags (add, remove, list): operator and analyst may write, every known workflow role may read; each subject sees only its own tags, and an investigation the caller cannot see answers 404.
@@ -69,7 +70,9 @@ Source of truth is the test; this table is generated from it.
 | `GET tenant-investigations/{investigationId:guid}/shares` | reviewer, publisher, admin, intruder |
 | `GET tenant-publication-revisions` | admin, intruder |
 | `GET tenant-publication-revisions/{id:guid}` | admin, intruder |
+| `GET tenant-publication-revisions/{id:guid}/comments` | admin, intruder |
 | `GET tenant-publication-revisions/{id:guid}/reviewer` | admin, intruder |
+| `POST tenant-publication-revisions/{id:guid}/comments` | admin, intruder |
 | `DELETE tenant-publication-revisions/{id:guid}/reviewer` | operator, analyst, reviewer, admin, intruder |
 | `PUT tenant-publication-revisions/{id:guid}/reviewer` | operator, analyst, reviewer, admin, intruder |
 | `GET tenant-raw-retrievals` | operator, analyst, reviewer, publisher, intruder |
