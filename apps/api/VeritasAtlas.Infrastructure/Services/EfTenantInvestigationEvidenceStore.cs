@@ -124,8 +124,9 @@ public sealed class EfTenantInvestigationEvidenceStore : ITenantInvestigationEvi
             throw new ArgumentException("Invalid evidence batch input.", nameof(inputs));
         }
 
-        // One retry: a concurrent collect of the same evidence loses the unique race, and the
-        // second pass then sees the winner and replays it.
+        // Bounded retries: each lost unique race means a concurrent collect committed at least one
+        // entry of this batch, so the next pass replays that winner. At most one new winner per entry,
+        // hence attempt < inputs.Count retries.
         for (var attempt = 0; ; attempt++)
         {
             var added = new List<object>();
@@ -138,7 +139,7 @@ public sealed class EfTenantInvestigationEvidenceStore : ITenantInvestigationEvi
                 Detach(added);
                 return new EvidenceItemBatchResult(EvidenceItemCollectOutcome.InvestigationClosed, null, null);
             }
-            catch (DbUpdateException ex) when (attempt == 0 && ex.InnerException is PostgresException { SqlState: UniqueViolation })
+            catch (DbUpdateException ex) when (attempt < inputs.Count && ex.InnerException is PostgresException { SqlState: UniqueViolation })
             {
                 Detach(added);
             }
