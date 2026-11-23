@@ -38,7 +38,7 @@ public sealed class EfTenantPublicationReviewerAssignmentStore : ITenantPublicat
 
         await using var transaction = await _db.Database.BeginTransactionAsync(cancellationToken);
         await LockAsync(tenantId, revisionId, cancellationToken);
-        var revision = await FindRevisionAsync(tenantId, revisionId, cancellationToken);
+        var revision = await FindRevisionForUpdateAsync(tenantId, revisionId, cancellationToken);
         if (revision is null) return new ReviewerAssignResult(ReviewerAssignOutcome.NotFound, null);
         if (IsClosed(revision)) return new ReviewerAssignResult(ReviewerAssignOutcome.RevisionClosed, null);
         if (string.Equals(revision.AuthorId, reviewer, StringComparison.Ordinal))
@@ -93,7 +93,7 @@ public sealed class EfTenantPublicationReviewerAssignmentStore : ITenantPublicat
         Require(tenantId, actor);
         await using var transaction = await _db.Database.BeginTransactionAsync(cancellationToken);
         await LockAsync(tenantId, revisionId, cancellationToken);
-        var revision = await FindRevisionAsync(tenantId, revisionId, cancellationToken);
+        var revision = await FindRevisionForUpdateAsync(tenantId, revisionId, cancellationToken);
         if (revision is null) return ReviewerUnassignOutcome.NotFound;
         if (IsClosed(revision)) return ReviewerUnassignOutcome.RevisionClosed;
         var row = await _db.TenantPublicationReviewerAssignments.SingleOrDefaultAsync(
@@ -131,6 +131,14 @@ public sealed class EfTenantPublicationReviewerAssignmentStore : ITenantPublicat
     private Task<TenantPublicationRevision?> FindRevisionAsync(Guid tenantId, Guid revisionId, CancellationToken cancellationToken) =>
         _db.TenantPublicationRevisions.AsNoTracking().SingleOrDefaultAsync(
             x => x.TenantId == tenantId && x.Id == revisionId, cancellationToken);
+
+    // Row lock: a concurrent lifecycle transition updates this row, so it waits for this transaction
+    // (or this transaction waits for it and then reads the decided state). Without it an assignment
+    // could commit after approval and defeat the revision_closed check.
+    private Task<TenantPublicationRevision?> FindRevisionForUpdateAsync(Guid tenantId, Guid revisionId, CancellationToken cancellationToken) =>
+        _db.TenantPublicationRevisions.FromSqlInterpolated(
+                $"SELECT * FROM tenant_publication_revisions WHERE tenant_id = {tenantId} AND id = {revisionId} FOR UPDATE")
+            .AsNoTracking().SingleOrDefaultAsync(cancellationToken);
 
     private static bool IsClosed(TenantPublicationRevision revision) =>
         revision.State != nameof(LifecycleState.Draft)

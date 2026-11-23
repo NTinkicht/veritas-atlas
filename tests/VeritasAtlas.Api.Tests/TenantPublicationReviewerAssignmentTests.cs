@@ -215,6 +215,45 @@ public sealed class TenantPublicationReviewerAssignmentTests
         Assert.AreEqual("23514", toAuthor.SqlState);
     }
 
+    [TestMethod]
+    public async Task AssignmentWaitsForAConcurrentDecisionAndThenRefusesOverRealPostgres()
+    {
+        if (Database() is not { } cs) return;
+        await TenantInvestigationEvidenceItemTests.ResetAsync(cs);
+        using var factory = new ApiFactory(cs);
+        using var client = factory.CreateClient();
+        var author = Token("synthetic-author", "operator", TenantA);
+        var publisher = Token("synthetic-publisher", "publisher", TenantA);
+        var id = await CreateDraftAsync(client, author);
+        await TransitionAsync(client, author, id, "Submit", 0);
+
+        // A decision in flight holds the revision row lock; the assignment must wait for it, then see Approved.
+        await using var decider = new NpgsqlConnection(cs);
+        await decider.OpenAsync();
+        await using var tx = await decider.BeginTransactionAsync();
+        await using (var update = new NpgsqlCommand(
+                         "SELECT 1 FROM tenant_publication_revisions WHERE tenant_id = @t AND id = @r FOR UPDATE", decider, tx))
+        {
+            update.Parameters.AddWithValue("t", TenantA);
+            update.Parameters.AddWithValue("r", id);
+            Assert.AreEqual(1, await update.ExecuteScalarAsync());
+        }
+
+        var pending = Send(client, HttpMethod.Put, Reviewer(id), publisher, new { reviewer = "rita" });
+        await Task.Delay(1500);
+        Assert.IsFalse(pending.IsCompleted, "the assignment must wait for the in-flight decision");
+        await tx.RollbackAsync();
+        using (var response = await pending)
+        {
+            Assert.AreEqual(HttpStatusCode.Created, response.StatusCode, "positive control: it proceeds once the lock is released");
+        }
+
+        // Now the decision commits first: the same race ends in revision_closed, never a late assignment.
+        await TransitionAsync(client, Token("rita", "reviewer", TenantA), id, "Approve", 1);
+        using var late = await Send(client, HttpMethod.Put, Reviewer(id), publisher, new { reviewer = "sam" });
+        Assert.AreEqual(HttpStatusCode.Conflict, late.StatusCode);
+    }
+
     private static async Task<Guid> CreateDraftAsync(HttpClient client, string author)
     {
         using var created = await Send(client, HttpMethod.Post, Revisions, author,
