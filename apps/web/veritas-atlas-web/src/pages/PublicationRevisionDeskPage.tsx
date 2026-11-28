@@ -16,6 +16,7 @@ import { setVisibility, type VisibilityInput } from "../api/publicationVisibilit
 import { reconcileQueueItem, runCreateDraftFlow, runTransitionFlow } from "../api/revisionDeskFlow";
 import { AppSurface } from "../components/AppSurface";
 import { PublicationVisibilityForm } from "../components/PublicationVisibilityForm";
+import { PublicationCommentsPanel } from "../components/PublicationCommentsPanel";
 import { PublicationDraftForm } from "../components/PublicationDraftForm";
 import { RevisionQueue, type QueueView } from "../components/PublicationRevisionQueue";
 import { RevisionPanel, type Loadable } from "../components/PublicationRevisionView";
@@ -37,7 +38,8 @@ export function PublicationRevisionDeskPage() {
 
   async function load(id: string, keepNotice = false) {
     const ticket = ++latest.current;
-    setView({ kind: "loading" });
+    // Same-revision refresh after an action keeps the loaded view mounted so the comment draft survives.
+    setView((v) => (keepNotice && v.kind === "loaded" && v.data.id === id ? v : { kind: "loading" }));
     if (!keepNotice) setNotice(null);
     setActionFailure(null);
     try {
@@ -174,6 +176,7 @@ export function PublicationRevisionDeskPage() {
       {view.kind === "loaded" ? (
         <PublicationVisibilityForm key={`${view.data.id}:${view.data.factsVersion}`} revision={view.data} onSave={saveVisibility} signInHref={signInHref} />
       ) : null}
+      {view.kind === "loaded" ? <PublicationCommentsPanel key={view.data.id} revisionId={view.data.id} signInHref={signInHref} /> : null}
     </AppSurface>
   );
 }

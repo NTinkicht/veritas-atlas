@@ -7,7 +7,8 @@ import type { PublicationRevision } from "../api/publicationRevisions";
 import { PublicationRevisionDeskPage } from "./PublicationRevisionDeskPage";
 
 // SYNTHETIC fixtures only. Network-facing clients are mocked; the desk wiring is real.
-const api = vi.hoisted(() => ({ getRevision: vi.fn(), listRevisions: vi.fn(), setVisibility: vi.fn() }));
+const api = vi.hoisted(() => ({ getRevision: vi.fn(), listRevisions: vi.fn(), setVisibility: vi.fn(), listComments: vi.fn() }));
+vi.mock("../api/publicationComments", async (o) => ({ ...(await o<typeof import("../api/publicationComments")>()), listComments: api.listComments }));
 vi.mock("../api/publicationRevisions", async (o) => ({ ...(await o<typeof import("../api/publicationRevisions")>()), getRevision: api.getRevision, listRevisions: api.listRevisions }));
 vi.mock("../api/publicationVisibility", async (o) => ({ ...(await o<typeof import("../api/publicationVisibility")>()), setVisibility: api.setVisibility }));
 
@@ -22,6 +23,7 @@ const save = () => fireEvent.click(screen.getByRole("button", { name: "Save visi
 
 beforeEach(() => {
   Object.values(api).forEach((f) => f.mockReset());
+  api.listComments.mockResolvedValue([]);
   api.listRevisions.mockResolvedValue({ items: [], nextAfterId: null });
   api.getRevision.mockImplementation(async (id: string) => (id === A.id ? A : B));
 });
@@ -36,6 +38,20 @@ describe("PublicationRevisionDeskPage visibility save", () => {
     save();
     expect((await screen.findByText("Public visibility saved by the server.")).textContent).toBeTruthy();
     expect(api.getRevision).toHaveBeenCalledTimes(2);
+  });
+  it("keeps an unsent comment draft across the same-revision reload after a save", async () => {
+    api.setVisibility.mockResolvedValue({ replayed: false, revision: A });
+    setup();
+    await open(A);
+    fireEvent.change(await screen.findByLabelText("New comment"), { target: { value: "Unsent note" } });
+    let finish!: () => void;
+    api.getRevision.mockImplementationOnce(() => new Promise((res) => { finish = () => res(A); }));
+    save();
+    await waitFor(() => expect(api.getRevision).toHaveBeenCalledTimes(2));
+    await new Promise((r) => setTimeout(r, 20)); // the reload is in flight (slow network)
+    finish();
+    await screen.findByText("Public visibility saved by the server.");
+    expect((screen.getByLabelText("New comment") as HTMLTextAreaElement).value).toBe("Unsent note");
   });
   it("drops a late save for revision A once revision B was opened", async () => {
     let finish!: () => void;
