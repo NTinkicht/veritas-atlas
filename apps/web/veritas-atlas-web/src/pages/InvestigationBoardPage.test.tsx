@@ -21,6 +21,12 @@ vi.mock("../api/investigations", async (importOriginal) => ({
   ...api,
 }));
 
+vi.mock("../api/investigationOrganizer", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../api/investigationOrganizer")>()),
+  listTags: vi.fn().mockResolvedValue([]),
+  getFolder: vi.fn().mockResolvedValue(null),
+}));
+
 const row = (id: string, title: string): Investigation => ({ id, title, createdBySubject: "analyst-1", createdAtUtc: "2026-11-02T09:00:00Z", state: "open", version: 0 });
 const A = row("11111111-1111-4111-8111-111111111111", "Existing");
 const B = row("22222222-2222-4222-8222-222222222222", "Fresh inquiry");
