@@ -22,6 +22,7 @@ import {
 } from "../api/investigations";
 import { AppSurface } from "../components/AppSurface";
 import { CollectEvidenceForm } from "../components/CollectEvidenceForm";
+import { InvestigationOrganizerPanel } from "../components/InvestigationOrganizerPanel";
 import { InvestigationSharesPanel } from "../components/InvestigationSharesPanel";
 import { CreateInvestigationForm, EvidenceBoard, InvestigationStateControl, EvidenceComparison, InvestigationList, type AnnotationsState, type Loadable } from "../components/InvestigationBoardView";
 
@@ -282,6 +283,7 @@ export function InvestigationBoardPage() {
         />
       ) : null}
       {selected ? <InvestigationSharesPanel investigation={selected} signInHref={signInHref} /> : null}
+      {selected ? <InvestigationOrganizerPanel investigation={selected} signInHref={signInHref} /> : null}
       {selected ? (
         <CollectEvidenceForm investigation={selected} ready={board.kind === "loaded"} signInHref={signInHref} onCollected={(item) => collected(selected.id, item)} />
       ) : null}
