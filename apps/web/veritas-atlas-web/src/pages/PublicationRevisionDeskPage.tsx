@@ -16,6 +16,7 @@ import { setVisibility, type VisibilityInput } from "../api/publicationVisibilit
 import { reconcileQueueItem, runCreateDraftFlow, runTransitionFlow } from "../api/revisionDeskFlow";
 import { AppSurface } from "../components/AppSurface";
 import { PublicationVisibilityForm } from "../components/PublicationVisibilityForm";
+import { PublicationCommentsPanel } from "../components/PublicationCommentsPanel";
 import { PublicationDraftForm } from "../components/PublicationDraftForm";
 import { RevisionQueue, type QueueView } from "../components/PublicationRevisionQueue";
 import { RevisionPanel, type Loadable } from "../components/PublicationRevisionView";
@@ -174,6 +175,7 @@ export function PublicationRevisionDeskPage() {
       {view.kind === "loaded" ? (
         <PublicationVisibilityForm key={`${view.data.id}:${view.data.factsVersion}`} revision={view.data} onSave={saveVisibility} signInHref={signInHref} />
       ) : null}
+      {view.kind === "loaded" ? <PublicationCommentsPanel key={view.data.id} revisionId={view.data.id} signInHref={signInHref} /> : null}
     </AppSurface>
   );
 }

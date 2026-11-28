@@ -7,7 +7,8 @@ import type { PublicationRevision } from "../api/publicationRevisions";
 import { PublicationRevisionDeskPage } from "./PublicationRevisionDeskPage";
 
 // SYNTHETIC fixtures only. Network-facing clients are mocked; the desk wiring is real.
-const api = vi.hoisted(() => ({ getRevision: vi.fn(), listRevisions: vi.fn(), setVisibility: vi.fn() }));
+const api = vi.hoisted(() => ({ getRevision: vi.fn(), listRevisions: vi.fn(), setVisibility: vi.fn(), listComments: vi.fn() }));
+vi.mock("../api/publicationComments", async (o) => ({ ...(await o<typeof import("../api/publicationComments")>()), listComments: api.listComments }));
 vi.mock("../api/publicationRevisions", async (o) => ({ ...(await o<typeof import("../api/publicationRevisions")>()), getRevision: api.getRevision, listRevisions: api.listRevisions }));
 vi.mock("../api/publicationVisibility", async (o) => ({ ...(await o<typeof import("../api/publicationVisibility")>()), setVisibility: api.setVisibility }));
 
@@ -22,6 +23,7 @@ const save = () => fireEvent.click(screen.getByRole("button", { name: "Save visi
 
 beforeEach(() => {
   Object.values(api).forEach((f) => f.mockReset());
+  api.listComments.mockResolvedValue([]);
   api.listRevisions.mockResolvedValue({ items: [], nextAfterId: null });
   api.getRevision.mockImplementation(async (id: string) => (id === A.id ? A : B));
 });
