@@ -39,6 +39,20 @@ describe("PublicationRevisionDeskPage visibility save", () => {
     expect((await screen.findByText("Public visibility saved by the server.")).textContent).toBeTruthy();
     expect(api.getRevision).toHaveBeenCalledTimes(2);
   });
+  it("keeps an unsent comment draft across the same-revision reload after a save", async () => {
+    api.setVisibility.mockResolvedValue({ replayed: false, revision: A });
+    setup();
+    await open(A);
+    fireEvent.change(await screen.findByLabelText("New comment"), { target: { value: "Unsent note" } });
+    let finish!: () => void;
+    api.getRevision.mockImplementationOnce(() => new Promise((res) => { finish = () => res(A); }));
+    save();
+    await waitFor(() => expect(api.getRevision).toHaveBeenCalledTimes(2));
+    await new Promise((r) => setTimeout(r, 20)); // the reload is in flight (slow network)
+    finish();
+    await screen.findByText("Public visibility saved by the server.");
+    expect((screen.getByLabelText("New comment") as HTMLTextAreaElement).value).toBe("Unsent note");
+  });
   it("drops a late save for revision A once revision B was opened", async () => {
     let finish!: () => void;
     api.setVisibility.mockImplementation(() => new Promise((res) => { finish = () => res({ replayed: false, revision: A }); }));

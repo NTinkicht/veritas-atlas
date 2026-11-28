@@ -38,7 +38,8 @@ export function PublicationRevisionDeskPage() {
 
   async function load(id: string, keepNotice = false) {
     const ticket = ++latest.current;
-    setView({ kind: "loading" });
+    // Same-revision refresh after an action keeps the loaded view mounted so the comment draft survives.
+    setView((v) => (keepNotice && v.kind === "loaded" && v.data.id === id ? v : { kind: "loading" }));
     if (!keepNotice) setNotice(null);
     setActionFailure(null);
     try {
