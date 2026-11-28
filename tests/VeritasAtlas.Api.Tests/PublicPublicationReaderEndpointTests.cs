@@ -255,6 +255,112 @@ public sealed class PublicPublicationReaderEndpointTests
     }
 
     [TestMethod]
+    public async Task HtmlExportIsAccessibleEncodedAndCarriesAVerifiableDigest()
+    {
+        var connection = Database();
+        if (connection is null) return;
+        await ResetAsync(connection);
+        using var factory = new ApiFactory(connection);
+        using var client = factory.CreateClient();
+
+        var id = await Drive(client, connection, "Published", new Facts());
+        using var response = await client.GetAsync($"{Public}/{id}/export.html");
+        Assert.AreEqual(HttpStatusCode.OK, response.StatusCode);
+        AssertHardenedHeaders(response, "html export");
+        Assert.AreEqual("text/html", response.Content.Headers.ContentType?.MediaType);
+        StringAssert.Contains(response.Content.Headers.ContentDisposition?.ToString() ?? "", $"publication-{id:N}.html");
+        var bytes = await response.Content.ReadAsByteArrayAsync();
+        Assert.AreEqual($"sha-256=:{Convert.ToBase64String(System.Security.Cryptography.SHA256.HashData(bytes))}:",
+            string.Join(",", response.Headers.GetValues("Content-Digest")));
+        var html = Encoding.UTF8.GetString(bytes);
+        foreach (var expected in new[]
+        {
+            "<html lang=\"en\">", "<title>", "<h1>", "<article>", "Synthetic ruling", "Synthetic quote.", "Synthetic Gazette",
+            "as of 2026-01-01", "Conflicts with the 2025 notice.", "Single-source reading.", "Medium",
+            "<a href=\"https://gazette.example.org/notice/1\"",
+        })
+        {
+            StringAssert.Contains(html, expected);
+        }
+
+        foreach (var leak in new[] { "<script", "<style", "tenant", "a1111111", "storageKey", "s3://", "reviewer", "synthetic-author", Digest })
+        {
+            Assert.IsFalse(html.Contains(leak, StringComparison.OrdinalIgnoreCase), $"leaked {leak}");
+        }
+    }
+
+    [TestMethod]
+    public async Task HtmlExportEncodesHostileCitationText()
+    {
+        var connection = Database();
+        if (connection is null) return;
+        await ResetAsync(connection);
+        using var factory = new ApiFactory(connection);
+        using var client = factory.CreateClient();
+
+        const string hostile =
+            "[{\"citationLabel\":\"[1]\",\"title\":\"<script>alert(1)</script>\",\"quote\":\"\\\"><img src=x onerror=alert(2)>\"," +
+            "\"sourceName\":\"S & Co\",\"asOf\":null,\"effectiveDate\":null,\"freshnessLabel\":\"current\"," +
+            "\"sourceUri\":\"https://gazette.example.org/n?a=1&b=\\\"onmouseover=alert(3)\"}]";
+        var id = await Drive(client, connection, "Published", new Facts(CitationsJson: hostile));
+        using var response = await client.GetAsync($"{Public}/{id}/export.html");
+        Assert.AreEqual(HttpStatusCode.OK, response.StatusCode);
+        var html = await response.Content.ReadAsStringAsync();
+        Assert.IsFalse(html.Contains("<script", StringComparison.OrdinalIgnoreCase), "script tag");
+        Assert.IsFalse(html.Contains("<img", StringComparison.OrdinalIgnoreCase), "img tag");
+        StringAssert.Contains(html, "&lt;script&gt;alert(1)&lt;/script&gt;");
+        StringAssert.Contains(html, "S &amp; Co");
+        Assert.IsFalse(html.Contains("\"onmouseover", StringComparison.OrdinalIgnoreCase), "attribute breakout");
+    }
+
+    [TestMethod]
+    public async Task HtmlExportOfAnyHiddenRevisionIsByteIdenticalToAnUnknownIdAndWithdrawalClosesIt()
+    {
+        var connection = Database();
+        if (connection is null) return;
+        await ResetAsync(connection);
+        using var factory = new ApiFactory(connection);
+        using var client = factory.CreateClient();
+
+        using var unknown = await client.GetAsync($"{Public}/{Guid.NewGuid()}/export.html");
+        Assert.AreEqual(HttpStatusCode.NotFound, unknown.StatusCode);
+        var unknownBody = await unknown.Content.ReadAsStringAsync();
+        AssertHardenedHeaders(unknown, "unknown html export");
+        Assert.IsFalse(unknown.Headers.Contains("Content-Digest"));
+
+        var cases = new (string Label, string State, Facts Facts)[]
+        {
+            ("draft", "Draft", new Facts()),
+            ("approved but not published", "Approved", new Facts()),
+            ("withdrawn", "Withdrawn", new Facts()),
+            ("published but restricted", "Published", new Facts(Restricted: true)),
+            ("expired", "Published", new Facts(Expires: "now() - interval '1 hour'")),
+            ("current-state stale", "Published", new Facts(Currency: "NonCurrent")),
+        };
+        foreach (var (label, state, facts) in cases)
+        {
+            var hidden = await Drive(client, connection, state, facts);
+            using var response = await client.GetAsync($"{Public}/{hidden}/export.html");
+            Assert.AreEqual(HttpStatusCode.NotFound, response.StatusCode, label);
+            Assert.AreEqual(unknownBody, await response.Content.ReadAsStringAsync(), label);
+            AssertHardenedHeaders(response, label);
+            Assert.IsFalse(response.Headers.Contains("Content-Digest"), label);
+        }
+
+        var visible = await Drive(client, connection, "Published", new Facts());
+        using var ok = await client.GetAsync($"{Public}/{visible}/export.html");
+        Assert.AreEqual(HttpStatusCode.OK, ok.StatusCode, "positive control");
+
+        var publisher = Sign("synthetic-publisher", "publisher", Tenant.ToString("D"));
+        using var withdraw = await Send(client, HttpMethod.Post, $"{Revisions}/{visible}/transitions", publisher,
+            new { action = "Withdraw", expectedVersion = 3, operationId = $"{visible:N}-withdraw" });
+        Assert.AreEqual(HttpStatusCode.OK, withdraw.StatusCode);
+        using var after = await client.GetAsync($"{Public}/{visible}/export.html");
+        Assert.AreEqual(HttpStatusCode.NotFound, after.StatusCode);
+        Assert.AreEqual(unknownBody, await after.Content.ReadAsStringAsync());
+    }
+
+    [TestMethod]
     public async Task AnExpresslyLabelledHistoricalPublicationIsReadableAsHistorical()
     {
         var connection = Database();
