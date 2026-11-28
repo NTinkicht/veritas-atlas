@@ -117,6 +117,25 @@ describe("InvestigationOrganizerPanel", () => {
     expect(api.clearFolder).toHaveBeenCalledWith(A.id);
   });
 
+  it("keeps a folder name typed while a save is pending, and clears the draft when unchanged", async () => {
+    let resolveSave: (v: string) => void = () => {};
+    api.setFolder.mockReturnValue(new Promise<string>((r) => { resolveSave = r; }));
+    setup();
+    await screen.findByText("Not filed in a folder.");
+    typeFolder("First");
+    fireEvent.click(folderButton());
+    await waitFor(() => expect(api.setFolder).toHaveBeenCalledWith(A.id, "First"));
+    typeFolder("Second");
+    resolveSave("First");
+    expect(await screen.findByText("First")).toBeTruthy();
+    expect((screen.getByLabelText("Folder name") as HTMLInputElement).value).toBe("Second");
+    // Positive control: an unchanged draft is still cleared after a confirmed save.
+    api.setFolder.mockResolvedValue("Second");
+    fireEvent.click(folderButton());
+    expect(await screen.findByText("Second")).toBeTruthy();
+    await waitFor(() => expect((screen.getByLabelText("Folder name") as HTMLInputElement).value).toBe(""));
+  });
+
   it("disables every change and sends nothing for a closed investigation, while still listing tags", async () => {
     api.listTags.mockResolvedValue(["alpha"]);
     api.getFolder.mockResolvedValue("Case files");

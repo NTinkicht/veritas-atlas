@@ -106,7 +106,8 @@ function OrganizerBody({ investigation, signInHref }: Props) {
     if (name === null) return;
     run("folder", () => setFolder(id, name), (saved) => {
       setData((d) => (d === null ? d : { ...d, folder: saved }));
-      setFolderDraft("");
+      // Keep a newer draft typed while this save was pending (same rule as the tag draft).
+      setFolderDraft((now) => (now === folderDraft ? "" : now));
     });
   }
 
