@@ -55,6 +55,19 @@ describe("PublicationCommentsPanel", () => {
     expect((screen.getByLabelText("New comment") as HTMLTextAreaElement).value).toBe("");
   });
 
+  it("keeps text typed while the save is pending, but clears the submitted text (positive control)", async () => {
+    let resolve!: (v: typeof c2) => void;
+    api.addComment.mockReturnValueOnce(new Promise((r) => { resolve = r; }));
+    setup();
+    await screen.findByText("reviewer.one");
+    type("First");
+    send();
+    type("First and more");
+    resolve(c2);
+    await screen.findByText("publisher.two");
+    expect((screen.getByLabelText("New comment") as HTMLTextAreaElement).value).toBe("First and more");
+  });
+
   it("keeps the draft and shows nothing new when the server refuses (positive control: accepted above)", async () => {
     api.addComment.mockRejectedValue({ status: 403 });
     setup();

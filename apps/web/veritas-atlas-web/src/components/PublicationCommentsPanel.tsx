@@ -59,7 +59,8 @@ export function PublicationCommentsPanel({ revisionId, signInHref }: Props) {
         if (!active.current) return;
         setItems((list) => [...(list ?? []).filter((c) => c.id !== created.id), created]);
         pending.current = null;
-        setDraft("");
+        // Keep text typed while the POST was pending; clear only what was actually submitted.
+        setDraft((current) => (normalizeCommentBody(current) === body ? "" : current));
         setSaving(false);
       },
       (error) => {
