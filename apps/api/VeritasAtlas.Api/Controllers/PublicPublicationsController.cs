@@ -1,3 +1,5 @@
+using System.Security.Cryptography;
+using System.Text.Json;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using VeritasAtlas.Application.Interfaces;
@@ -43,6 +45,36 @@ public sealed class PublicPublicationsController : ControllerBase
 
         return Ok(new PublicPublicationResponse(view.Id, view.FreshnessLabel, IndependentlyReviewedLabel, view.Citations));
     }
+
+    /// <summary>
+    /// VER-P1-05 (#404): machine-readable, citation-preserving export of exactly what <see cref="Get"/> may show. It reuses the
+    /// same reader (hence the same fail-closed gate and identical hidden-cause 404), and carries an RFC 9530 Content-Digest
+    /// over the exact body bytes so a downloaded copy can be checked for tampering.
+    /// </summary>
+    [HttpGet("{id:guid}/export")]
+    public async Task<IActionResult> Export(Guid id, CancellationToken cancellationToken)
+    {
+        Response.Headers.CacheControl = "no-store";
+        Response.Headers["X-Content-Type-Options"] = "nosniff";
+        Response.Headers["Referrer-Policy"] = "no-referrer";
+        Response.Headers["Content-Security-Policy"] = "default-src 'none'; frame-ancestors 'none'";
+        var view = await _reader.GetAsync(id, cancellationToken);
+        if (view is null)
+        {
+            return NotFound(new PublicNotFound(PublicReaderDecision.AnonymousHiddenOutcome));
+        }
+
+        var body = JsonSerializer.SerializeToUtf8Bytes(
+            new PublicPublicationExport(ExportFormat, view.Id, view.FreshnessLabel, IndependentlyReviewedLabel, view.Citations),
+            new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        Response.Headers["Content-Digest"] = $"sha-256=:{Convert.ToBase64String(SHA256.HashData(body))}:";
+        Response.Headers.ContentDisposition = $"attachment; filename=\"publication-{view.Id:N}.json\"";
+        return File(body, "application/json");
+    }
+
+    public const string ExportFormat = "veritas-atlas.publication-export/v1";
+
+    public sealed record PublicPublicationExport(string Format, Guid Id, string FreshnessLabel, string HumanReviewLabel, IReadOnlyList<PublicCitationProjection> Citations);
 
     public sealed record PublicNotFound(string Error);
 

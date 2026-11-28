@@ -164,6 +164,97 @@ public sealed class PublicPublicationReaderEndpointTests
     }
 
     [TestMethod]
+    public async Task ExportPreservesEveryCitationFieldAndCarriesAVerifiableDigest()
+    {
+        var connection = Database();
+        if (connection is null) return;
+        await ResetAsync(connection);
+        using var factory = new ApiFactory(connection);
+        using var client = factory.CreateClient();
+
+        var id = await Drive(client, connection, "Published", new Facts());
+        using var read = await client.GetAsync($"{Public}/{id}");
+        var readJson = await read.Content.ReadFromJsonAsync<JsonElement>();
+        using var response = await client.GetAsync($"{Public}/{id}/export");
+        Assert.AreEqual(HttpStatusCode.OK, response.StatusCode);
+        AssertHardenedHeaders(response, "export");
+        Assert.AreEqual("application/json", response.Content.Headers.ContentType?.MediaType);
+        StringAssert.Contains(response.Content.Headers.ContentDisposition?.ToString() ?? "", $"publication-{id:N}.json");
+        var bytes = await response.Content.ReadAsByteArrayAsync();
+        var digest = string.Join(",", response.Headers.GetValues("Content-Digest"));
+        Assert.AreEqual($"sha-256=:{Convert.ToBase64String(System.Security.Cryptography.SHA256.HashData(bytes))}:", digest);
+
+        // Tamper control: a single flipped byte no longer matches the advertised digest.
+        var tampered = (byte[])bytes.Clone();
+        tampered[tampered.Length / 2] ^= 0x01;
+        Assert.AreNotEqual(digest, $"sha-256=:{Convert.ToBase64String(System.Security.Cryptography.SHA256.HashData(tampered))}:");
+
+        var json = JsonDocument.Parse(bytes).RootElement;
+        CollectionAssert.AreEquivalent(new[] { "format", "id", "freshnessLabel", "humanReviewLabel", "citations" },
+            json.EnumerateObject().Select(p => p.Name).ToArray());
+        Assert.AreEqual("veritas-atlas.publication-export/v1", json.GetProperty("format").GetString());
+        Assert.AreEqual(id, json.GetProperty("id").GetGuid());
+        // Reference retention: citations are identical to what the anonymous reader shows.
+        Assert.AreEqual(readJson.GetProperty("citations").GetRawText(), json.GetProperty("citations").GetRawText());
+        Assert.AreEqual("https://gazette.example.org/notice/1",
+            json.GetProperty("citations")[0].GetProperty("sourceUri").GetString());
+        var raw = Encoding.UTF8.GetString(bytes);
+        foreach (var leak in new[] { "tenant", "a1111111", "storageKey", "s3://", "reviewer", "synthetic-author", Digest })
+        {
+            Assert.IsFalse(raw.Contains(leak, StringComparison.OrdinalIgnoreCase), $"leaked {leak}");
+        }
+    }
+
+    [TestMethod]
+    public async Task ExportOfAnyHiddenRevisionIsByteIdenticalToAnUnknownIdAndWithdrawalClosesIt()
+    {
+        var connection = Database();
+        if (connection is null) return;
+        await ResetAsync(connection);
+        using var factory = new ApiFactory(connection);
+        using var client = factory.CreateClient();
+
+        using var unknown = await client.GetAsync($"{Public}/{Guid.NewGuid()}/export");
+        Assert.AreEqual(HttpStatusCode.NotFound, unknown.StatusCode);
+        var unknownBody = await unknown.Content.ReadAsStringAsync();
+        AssertHardenedHeaders(unknown, "unknown export");
+        Assert.IsFalse(unknown.Headers.Contains("Content-Digest"));
+
+        var cases = new (string Label, string State, Facts Facts)[]
+        {
+            ("draft", "Draft", new Facts()),
+            ("approved but not published", "Approved", new Facts()),
+            ("withdrawn", "Withdrawn", new Facts()),
+            ("published but restricted", "Published", new Facts(Restricted: true)),
+            ("expired", "Published", new Facts(Expires: "now() - interval '1 hour'")),
+            ("current-state stale", "Published", new Facts(Currency: "NonCurrent")),
+        };
+        foreach (var (label, state, facts) in cases)
+        {
+            var hidden = await Drive(client, connection, state, facts);
+            using var response = await client.GetAsync($"{Public}/{hidden}/export");
+            Assert.AreEqual(HttpStatusCode.NotFound, response.StatusCode, label);
+            Assert.AreEqual(unknownBody, await response.Content.ReadAsStringAsync(), label);
+            AssertHardenedHeaders(response, label);
+            Assert.IsFalse(response.Headers.Contains("Content-Digest"), label);
+        }
+
+        // Positive control: the same drive with permitted facts exports, so the refusals above are caused by state/facts.
+        var visible = await Drive(client, connection, "Published", new Facts());
+        using var ok = await client.GetAsync($"{Public}/{visible}/export");
+        Assert.AreEqual(HttpStatusCode.OK, ok.StatusCode, "positive control");
+
+        // Withdrawal closes a previously exportable revision at once.
+        var publisher = Sign("synthetic-publisher", "publisher", Tenant.ToString("D"));
+        using var withdraw = await Send(client, HttpMethod.Post, $"{Revisions}/{visible}/transitions", publisher,
+            new { action = "Withdraw", expectedVersion = 3, operationId = $"{visible:N}-withdraw" });
+        Assert.AreEqual(HttpStatusCode.OK, withdraw.StatusCode);
+        using var after = await client.GetAsync($"{Public}/{visible}/export");
+        Assert.AreEqual(HttpStatusCode.NotFound, after.StatusCode);
+        Assert.AreEqual(unknownBody, await after.Content.ReadAsStringAsync());
+    }
+
+    [TestMethod]
     public async Task AnExpresslyLabelledHistoricalPublicationIsReadableAsHistorical()
     {
         var connection = Database();

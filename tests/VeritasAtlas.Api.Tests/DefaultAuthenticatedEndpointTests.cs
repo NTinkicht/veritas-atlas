@@ -34,6 +34,7 @@ public sealed class DefaultAuthenticatedEndpointTests
         "* health/ready",
         "GET api/v1/auth-diagnostics/public",
         "GET api/v1/public/publications/{id:guid}",
+        "GET api/v1/public/publications/{id:guid}/export",
         "POST api/v1/auth/login",
     ];
 
